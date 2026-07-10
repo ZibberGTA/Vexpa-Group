@@ -8,4 +8,8 @@ abstract interface class VenueRepository {
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   });
+
+  Future<DataResult<Venue?>> findById(String venueId);
+
+  Stream<DataResult<Venue?>> watchById(String venueId);
 }

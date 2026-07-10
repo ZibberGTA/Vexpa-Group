@@ -38,6 +38,24 @@ final class VenueDataService {
     };
   }
 
+  Future<DataResult<Venue?>> loadPublicVenue(String venueId) async {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      return const DataSuccess(null);
+    }
+
+    return _repository.findById(trimmedId);
+  }
+
+  Stream<DataResult<Venue?>> watchPublicVenue(String venueId) {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      return Stream.value(const DataSuccess(null));
+    }
+
+    return _repository.watchById(trimmedId);
+  }
+
   VenueCatalog _sortedCatalog(List<Venue> venues) {
     final sorted = List<Venue>.from(venues)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
