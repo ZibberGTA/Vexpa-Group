@@ -1,40 +1,28 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
-import '../../../core/firebase/vexda_firebase.dart';
-import '../../venues/models/venue_model.dart';
+import '../../../core/vexcore/vex_venue_mapper.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../models/venue_details_view.dart';
 import 'venue_details_mapper.dart';
 
-/// Loads a single venue document from Firestore for the details page.
+/// Loads a public venue profile through VexCore for the details page.
 class VenueDetailsRepository {
-  VenueDetailsRepository({FirebaseFirestore? firestore})
-    : _firestoreOverride = firestore;
+  VenueDetailsRepository({VenueDataService? venueDataService})
+    : _venueDataService = venueDataService ?? WebVexCore.venueDataService;
 
-  final FirebaseFirestore? _firestoreOverride;
-
-  FirebaseFirestore? _resolveFirestore() {
-    if (_firestoreOverride != null) return _firestoreOverride;
-    if (!VexdaFirebase.isReady) return null;
-    return FirebaseFirestore.instance;
-  }
+  final VenueDataService _venueDataService;
 
   Future<VenueDetailsView?> loadVenue(String venueId) async {
     final trimmedId = venueId.trim();
     if (trimmedId.isEmpty) return null;
 
-    final firestore = _resolveFirestore();
-    if (firestore == null) {
-      if (kDebugMode) {
-        debugPrint('[VenueDetailsRepository] Firebase not initialized.');
-      }
-      return null;
-    }
-
     try {
-      final doc = await firestore.collection('venues').doc(trimmedId).get();
-
-      return _mapVenueDoc(doc);
+      final result = await _venueDataService.loadPublicVenue(trimmedId);
+      return switch (result) {
+        DataSuccess(:final value) => _mapVenue(value),
+        DataFailure(:final error) => throw error,
+      };
     } on Object catch (error, stackTrace) {
       if (kDebugMode) {
         debugPrint('[VenueDetailsRepository] Failed to load venue: $error');
@@ -49,35 +37,17 @@ class VenueDetailsRepository {
     final trimmedId = venueId.trim();
     if (trimmedId.isEmpty) return Stream.value(null);
 
-    final firestore = _resolveFirestore();
-    if (firestore == null) {
-      if (kDebugMode) {
-        debugPrint('[VenueDetailsRepository] Firebase not initialized.');
-      }
-      return Stream.value(null);
-    }
-
-    return firestore
-        .collection('venues')
-        .doc(trimmedId)
-        .snapshots()
-        .map(_mapVenueDoc);
+    return _venueDataService.watchPublicVenue(trimmedId).map((result) {
+      return switch (result) {
+        DataSuccess(:final value) => _mapVenue(value),
+        DataFailure(:final error) => throw error,
+      };
+    });
   }
 
-  VenueDetailsView? _mapVenueDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    if (!doc.exists) {
-      if (kDebugMode) {
-        debugPrint('[VenueDetailsRepository] Venue not found: ${doc.id}');
-      }
-      return null;
-    }
-
-    final data = doc.data();
-    if (data == null || data['isDeleted'] == true) {
-      return null;
-    }
-
-    final venue = VenueModel.fromMap(doc.id, data);
-    return VenueDetailsMapper.fromVenueModel(venue);
+  VenueDetailsView? _mapVenue(Venue? venue) {
+    if (venue == null) return null;
+    final model = venueModelFromVexVenue(venue);
+    return VenueDetailsMapper.fromVenueModel(model);
   }
 }
