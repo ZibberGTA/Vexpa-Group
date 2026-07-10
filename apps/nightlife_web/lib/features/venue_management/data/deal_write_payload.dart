@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:vex_engines/experience/application/experience_scheduling_utils.dart';
+import 'package:vex_engines/experience/application/experience_update_preparation.dart';
+
 import '../models/deal_types.dart';
 
 /// Builds Firestore payloads for venue deal writes.
@@ -42,7 +45,7 @@ class DealWritePayload {
       'isActive': isActive,
       'featured': featured,
       'isDeleted': false,
-      'searchTerms': buildSearchTerms([
+      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
         trimmedTitle,
         trimmedDescription,
         DealTypes.displayName(normalizedType),
@@ -87,7 +90,7 @@ class DealWritePayload {
       'availableDays': availableDays,
       'isActive': isActive,
       'featured': featured,
-      'searchTerms': buildSearchTerms([
+      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
         trimmedTitle,
         trimmedDescription,
         DealTypes.displayName(normalizedType),
@@ -137,7 +140,7 @@ class DealWritePayload {
     if (featured != null) payload['featured'] = featured;
 
     if (titlePatch != null || dealTypePatch != null || valuePatch != null) {
-      payload['searchTerms'] = buildSearchTerms([
+      payload['searchTerms'] = ExperienceUpdatePreparation.searchTermsForValues([
         effectiveTitle,
         description,
         DealTypes.displayName(effectiveType),
@@ -148,43 +151,8 @@ class DealWritePayload {
 
     return payload;
   }
-
-  static List<String> buildSearchTerms(List<String> values) {
-    final terms = <String>{};
-
-    for (final value in values) {
-      final cleanValue = value.trim().toLowerCase();
-      if (cleanValue.isEmpty) continue;
-
-      terms.add(cleanValue);
-
-      final words = cleanValue.split(RegExp(r'[^a-z0-9]+'));
-      for (final word in words) {
-        if (word.isEmpty) continue;
-        terms.add(word);
-        for (var i = 1; i <= word.length; i++) {
-          terms.add(word.substring(0, i));
-        }
-      }
-    }
-
-    return terms.take(100).toList();
-  }
 }
 
 /// Combines a calendar date with an optional HH:mm time string.
-DateTime combineDealDateAndTime(DateTime date, String? time) {
-  if (time == null || time.trim().isEmpty) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
-  final parts = time.trim().split(':');
-  if (parts.length >= 2) {
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute =
-        int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    return DateTime(date.year, date.month, date.day, hour, minute);
-  }
-
-  return DateTime(date.year, date.month, date.day);
-}
+DateTime combineDealDateAndTime(DateTime date, String? time) =>
+    ExperienceSchedulingUtils.combineDateAndTime(date, time);

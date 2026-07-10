@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:vex_engines/experience/application/experience_scheduling_utils.dart';
+import 'package:vex_engines/experience/application/experience_update_preparation.dart';
+
 /// Builds Firestore payloads for venue event writes.
 class EventWritePayload {
   EventWritePayload._();
@@ -33,7 +36,7 @@ class EventWritePayload {
       'isDeleted': false,
       'isActive': isActive,
       'featured': featured,
-      'searchTerms': buildSearchTerms([
+      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
         trimmedTitle,
         trimmedDescription,
         venueName,
@@ -70,51 +73,10 @@ class EventWritePayload {
 
     return payload;
   }
-
-  static List<String> buildSearchTerms(List<String> values) {
-    final terms = <String>{};
-
-    for (final value in values) {
-      final cleanValue = value.trim().toLowerCase();
-      if (cleanValue.isEmpty) continue;
-
-      terms.add(cleanValue);
-
-      final words = cleanValue.split(RegExp(r'[^a-z0-9]+'));
-      for (final word in words) {
-        if (word.isEmpty) continue;
-        terms.add(word);
-        for (var i = 1; i <= word.length; i++) {
-          terms.add(word.substring(0, i));
-        }
-      }
-    }
-
-    return terms.take(100).toList();
-  }
 }
 
-DateTime mergeEventDate(DateTime existing, DateTime picked) {
-  return DateTime(
-    picked.year,
-    picked.month,
-    picked.day,
-    existing.hour,
-    existing.minute,
-  );
-}
+DateTime mergeEventDate(DateTime existing, DateTime picked) =>
+    ExperienceSchedulingUtils.mergeEventDate(existing, picked);
 
-DateTime mergeEventTime(DateTime existing, String time) {
-  final parts = time.trim().split(':');
-  if (parts.length < 2) return existing;
-  final hour = int.tryParse(parts[0]) ?? existing.hour;
-  final minute =
-      int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? existing.minute;
-  return DateTime(
-    existing.year,
-    existing.month,
-    existing.day,
-    hour,
-    minute,
-  );
-}
+DateTime mergeEventTime(DateTime existing, String time) =>
+    ExperienceSchedulingUtils.mergeEventTime(existing, time);

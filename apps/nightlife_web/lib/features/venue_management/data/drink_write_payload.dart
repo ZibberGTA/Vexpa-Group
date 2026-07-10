@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:vex_engines/experience/application/experience_update_preparation.dart';
+
 import '../models/drink_categories.dart';
 
 /// Builds Firestore payloads for venue drink writes.
@@ -31,7 +33,7 @@ class DrinkWritePayload {
       'available': available,
       'featured': featured,
       'isDeleted': false,
-      'searchTerms': buildSearchTerms([
+      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
         trimmedName,
         DrinkCategories.displayName(normalizedCategory),
         venueName,
@@ -63,7 +65,7 @@ class DrinkWritePayload {
       'description': trimmedDescription,
       'available': available,
       'featured': featured,
-      'searchTerms': buildSearchTerms([
+      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
         trimmedName,
         DrinkCategories.displayName(normalizedCategory),
         venueName,
@@ -102,7 +104,7 @@ class DrinkWritePayload {
     if (featured != null) payload['featured'] = featured;
 
     if (name != null || categoryPatch != null) {
-      payload['searchTerms'] = buildSearchTerms([
+      payload['searchTerms'] = ExperienceUpdatePreparation.searchTermsForValues([
         effectiveName,
         DrinkCategories.displayName(effectiveCategory),
         venueName,
@@ -110,27 +112,5 @@ class DrinkWritePayload {
     }
 
     return payload;
-  }
-
-  static List<String> buildSearchTerms(List<String> values) {
-    final terms = <String>{};
-
-    for (final value in values) {
-      final cleanValue = value.trim().toLowerCase();
-      if (cleanValue.isEmpty) continue;
-
-      terms.add(cleanValue);
-
-      final words = cleanValue.split(RegExp(r'[^a-z0-9]+'));
-      for (final word in words) {
-        if (word.isEmpty) continue;
-        terms.add(word);
-        for (var i = 1; i <= word.length; i++) {
-          terms.add(word.substring(0, i));
-        }
-      }
-    }
-
-    return terms.take(100).toList();
   }
 }
