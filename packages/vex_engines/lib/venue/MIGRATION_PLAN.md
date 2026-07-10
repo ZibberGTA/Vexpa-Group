@@ -1,9 +1,25 @@
 # Venue Engine — Migration Plan
 
-Status: **structure created, runtime migration not started**
+Status: **Phases 0–2 complete for pure domain/shared helpers; orchestration not started**
 
 This plan is derived from the current monorepo (`apps/nightlife_web`,
 `apps/nightlife_app`, `packages/vex_core`, `packages/vex_engines`).
+
+## Engine Acceptance Rule
+
+An engine is not considered complete until:
+
+- all code specific to that business capability has one clear home;
+- both web and mobile can consume the engine where required;
+- shared platform capabilities come from VexCore rather than being duplicated;
+- the engine does not add unnecessary network calls or listeners;
+- the engine has its own tests;
+- the engine has its own documentation;
+- failures can be traced clearly to that engine;
+- the engine does not directly depend on another engine's private implementation.
+
+`docs/master-blueprint.md` does not exist yet. Record this rule in the Venue
+Engine README until the Master Blueprint is created.
 
 ## Principles
 
@@ -72,7 +88,7 @@ This plan is derived from the current monorepo (`apps/nightlife_web`,
 | Path | Tag | Target layer |
 | --- | --- | --- |
 | `data/venue_profile_repository.dart` | **VE/data** | Profile write orchestration |
-| `data/venue_profile_field_codec.dart` | **VE/domain** | Field validation/codec |
+| `data/venue_profile_field_codec.dart` | **VE/domain** | **Migrated Phase 2** |
 | `data/venue_dashboard_repository.dart` | **VE/application** | Dashboard aggregation |
 | `data/venue_images_repository.dart` | **VE/data** | Gallery metadata |
 | `data/venue_media_*` | **VE/data** | Upload orchestration (uses VexCore storage adapter) |
@@ -94,7 +110,7 @@ This plan is derived from the current monorepo (`apps/nightlife_web`,
 | --- | --- | --- |
 | `models/venue_model.dart` | **DECIDE** | Firestore document model used by adapters; may become adapter DTO in `data/` |
 | `models/image_position_metadata.dart` | **VE/shared** | Image positioning value object |
-| `data/venue_image_field_parser.dart` | **VE/data** | Parsing helper for adapters |
+| `data/venue_image_field_parser.dart` | **VE/shared** | **Migrated Phase 2** |
 
 ---
 
@@ -146,27 +162,35 @@ This plan is derived from the current monorepo (`apps/nightlife_web`,
 
 ## Recommended migration phases
 
-### Phase 0 — Structure (this task)
+### Phase 0 — Structure (complete)
 
 - Create `packages/vex_engines/lib/venue/` layers and documentation.
-- No app dependency on `vex_engines` yet.
-- No runtime file moves.
+- No app dependency on `vex_engines` until Phase 1.
 
-### Phase 1 — Pure shared helpers (low risk)
+### Phase 1 — Pure shared helpers (complete)
 
-Prerequisites: add `vex_engines` path dependency to web/mobile.
-
-Move (with re-export shims at old paths if needed):
+Moved into Venue Engine with web re-export shims:
 
 - `venue_contact_utils.dart` → `venue/shared/`
-- `venue_opening_hours_formatter.dart` + `venue_opening_hours_entry.dart` → `venue/shared/`
-- `image_position_metadata.dart` → `venue/shared/`
-- `venue_profile_completion_calculator.dart` → `venue/domain/`
-- mobile `venue_branding_parser.dart` → `venue/shared/`
+- `venue_opening_hours_formatter.dart` + `venue_opening_hours_entry.dart`
+- `image_position_metadata.dart` (Flutter alignment extension stays in web)
+- `venue_profile_completion.dart` + calculator + input
 
-Validation: unit tests only; no new Firestore listeners.
+Validation: unit tests in `packages/vex_engines/test/`; web imports unchanged.
 
-### Phase 2 — Web management orchestration
+### Phase 2 — Domain rules and value objects (complete)
+
+Moved into Venue Engine with web re-export shims:
+
+- `venue_profile_constants.dart` → `venue/domain/`
+- `venue_profile_field_codec.dart` → `venue/domain/` (engine-neutral API;
+  web shim adapts `VenueModel` for three display/selection helpers)
+- `venue_image_field_parser.dart` → `venue/shared/`
+
+Validation: `packages/vex_engines/test/venue/`; existing web tests compile
+through compatibility exports.
+
+### Phase 3 — Web management orchestration (next)
 
 - Extract write orchestration from `venue_profile_repository.dart` into `venue/application/`.
 - Keep Firestore adapters in web until a shared adapter strategy exists.

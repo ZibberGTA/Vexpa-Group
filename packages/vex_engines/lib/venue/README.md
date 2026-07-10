@@ -59,5 +59,30 @@ Migrations into this engine must not add network calls, duplicate Firestore
 listeners, or introduce extra mapping layers on hot paths. Prefer composition
 over re-fetching when wiring presentation to VexCore services.
 
+## Engine Acceptance Rule
+
+An engine is not considered complete until:
+
+- all code specific to that business capability has one clear home;
+- both web and mobile can consume the engine where required;
+- shared platform capabilities come from VexCore rather than being duplicated;
+- the engine does not add unnecessary network calls or listeners;
+- the engine has its own tests;
+- the engine has its own documentation;
+- failures can be traced clearly to that engine;
+- the engine does not directly depend on another engine's private implementation.
+
+`docs/master-blueprint.md` does not exist yet. This rule is recorded here until
+the Master Blueprint is created.
+
+## Migration status
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| 0 — Structure | Complete | Folder layout, README, migration plan |
+| 1 — Shared helpers | Complete | Contact utils, opening hours, image position, profile completion |
+| 2 — Domain rules | Complete | Profile field codec/constants, image field parser |
+| 3 — Profile orchestration | Planned | Repository write orchestration stays in web for now |
+
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.

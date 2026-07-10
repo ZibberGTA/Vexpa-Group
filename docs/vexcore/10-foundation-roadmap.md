@@ -96,6 +96,18 @@ Completion criteria:
 
 See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pilot.md`, and `16-venue-events-pilot.md` for rollback paths.
 
+### Venue Engine structure (in progress)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/venue/` |
+| Phase 1 shared helpers | Complete | Contact, opening hours, image position, profile completion |
+| Phase 2 domain rules | Complete | Profile field codec/constants, image field parser |
+| Phase 3 orchestration | Planned | Profile repository writes remain in web |
+
+Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
+`docs/master-blueprint.md` still needs to be created.
+
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.
