@@ -123,6 +123,20 @@ Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
 Network calls unchanged on venue search path (1 catalog + 1 index lookup per search).
 See `packages/vex_engines/lib/discovery/MIGRATION_PLAN.md`.
 
+### Experience Engine structure (Version 1 launch engine)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/experience/` |
+| Shared rules batch | Complete | Visibility, featured limits, search terms, scheduling, orchestration |
+| Web write facades | Complete | Write payloads and public filters delegate to engine |
+| VexCore parity tests | Complete | Engine visibility matches VexCore deal/event rules |
+| Write contracts + mobile | Planned | Engine-owned write prep; mobile adoption |
+
+The Experience Engine replaces separate Drink, Deal, and Event engines for Version 1.
+VexCore read modules (`venue_drinks`, `venue_deals`, `venue_events`) remain generic contracts.
+See `packages/vex_engines/lib/experience/MIGRATION_PLAN.md`.
+
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.

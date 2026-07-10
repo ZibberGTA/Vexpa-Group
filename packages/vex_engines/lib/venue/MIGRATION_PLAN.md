@@ -27,7 +27,7 @@ Engine README until the Master Blueprint is created.
 2. Venue Engine owns venue-specific orchestration, validation, and management.
 3. Apps keep routing, theming, and platform wiring until engine APIs stabilise.
 4. No migration may add duplicate listeners or extra Firestore reads.
-5. Drinks, deals, and events stay as VexCore modules unless product scope changes.
+5. Drinks, deals, and events business rules live in the Experience Engine; VexCore keeps read contracts.
 
 ## Classification key
 

@@ -48,10 +48,10 @@ profile orchestration, and venue-specific workflows.
 
 ## Content engines (drinks, deals, events)
 
-Drinks, deals, and events remain separate VexCore read modules for now.
-They are venue-scoped but also appear in cross-venue discovery and standalone
-detail pages. Do not fold them into the Venue Engine unless a product boundary
-requires a dedicated content engine. See `MIGRATION_PLAN.md` for rationale.
+Drinks, deals, and events are owned by the **Experience Engine** (Version 1 launch engine).
+VexCore keeps generic public read contracts (`venue_drinks`, `venue_deals`, `venue_events`).
+The Experience Engine owns business rules; Firebase adapters stay in app shells.
+See `packages/vex_engines/lib/experience/README.md` and `MIGRATION_PLAN.md`.
 
 ## Performance rule
 
