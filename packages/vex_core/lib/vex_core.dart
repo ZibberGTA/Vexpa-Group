@@ -10,3 +10,4 @@ export 'shared/shared.dart';
 export 'storage/storage.dart';
 export 'venue/venues.dart';
 export 'venue_drinks/venue_drinks.dart';
+export 'venue_deals/venue_deals.dart';
