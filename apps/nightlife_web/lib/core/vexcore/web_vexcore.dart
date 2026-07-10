@@ -5,6 +5,7 @@ import 'firebase_authentication_adapter.dart';
 import 'firebase_identity_adapter.dart';
 import 'firebase_venue_deal_repository.dart';
 import 'firebase_venue_drink_repository.dart';
+import 'firebase_venue_event_repository.dart';
 import 'firebase_venue_repository.dart';
 
 /// Composition root for the web app's VexCore adapters.
@@ -62,6 +63,18 @@ abstract final class WebVexCore {
 
   static VenueDealDataService get venueDealDataService =>
       VenueDealDataService(repository: venueDealRepository);
+
+  static final _defaultVenueEventRepository = FirebaseVenueEventRepository();
+
+  /// Test override for venue event repository. Reset to null after each test.
+  @visibleForTesting
+  static VenueEventRepository? venueEventRepositoryOverride;
+
+  static VenueEventRepository get venueEventRepository =>
+      venueEventRepositoryOverride ?? _defaultVenueEventRepository;
+
+  static VenueEventDataService get venueEventDataService =>
+      VenueEventDataService(repository: venueEventRepository);
 
   static const permissionEvaluator = VexPermissionEvaluator();
 }

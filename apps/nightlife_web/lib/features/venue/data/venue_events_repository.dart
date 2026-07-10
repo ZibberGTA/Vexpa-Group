@@ -1,18 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
+import '../../../core/vexcore/vex_venue_event_mapper.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue_management/data/event_write_payload.dart';
 import '../../venue_management/models/bulk_event_patch.dart';
 import 'models/event_model.dart';
-import 'public_venue_content_filters.dart';
 
 /// Loads and writes events for a venue from Firestore.
 class VenueEventsRepository {
-  VenueEventsRepository({FirebaseFirestore? firestore})
-      : _firestoreOverride = firestore;
+  VenueEventsRepository({
+    FirebaseFirestore? firestore,
+    VenueEventDataService? venueEventDataService,
+  }) : _firestoreOverride = firestore,
+       _venueEventDataService =
+           venueEventDataService ?? WebVexCore.venueEventDataService;
 
   final FirebaseFirestore? _firestoreOverride;
+  final VenueEventDataService _venueEventDataService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -20,26 +27,18 @@ class VenueEventsRepository {
     return FirebaseFirestore.instance;
   }
 
-  Stream<List<EventModel>> watchEvents(String venueId) async* {
-    final firestore = _resolveFirestore();
-    if (firestore == null) {
-      yield const [];
-      return;
+  Stream<List<EventModel>> watchEvents(String venueId) {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      return Stream.value(const []);
     }
 
-    yield* firestore
-        .collection('events')
-        .where('venueId', isEqualTo: venueId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) {
-      final now = DateTime.now();
-      final events = snapshot.docs
-          .map(EventModel.fromDoc)
-          .where((event) => isPublicVisibleEvent(event, now: now))
-          .toList();
-      events.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-      return events;
+    return _venueEventDataService.watchPublicEvents(trimmedId).map((result) {
+      return switch (result) {
+        DataSuccess(:final value) =>
+          value.map(eventModelFromVexVenueEvent).toList(),
+        DataFailure(:final error) => throw error,
+      };
     });
   }
 
