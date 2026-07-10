@@ -1,57 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/claim/domain/claim_confidence_score.dart';
+import 'package:vex_engines/claim/domain/claim_evidence.dart';
+import 'package:vex_engines/claim/domain/claim_search_candidate.dart';
+import 'package:vex_engines/claim/domain/claim_status.dart';
 
-enum VenueClaimStatus {
-  draft,
-  pendingReview,
-  needsMoreInfo,
-  autoApproved,
-  approved,
-  rejected,
-  completed,
-  error,
-}
+export 'package:vex_engines/claim/domain/claim_confidence_score.dart';
+export 'package:vex_engines/claim/domain/claim_evidence.dart';
+export 'package:vex_engines/claim/domain/claim_status.dart';
 
-extension VenueClaimStatusX on VenueClaimStatus {
-  String get firestoreValue {
-    return switch (this) {
-      VenueClaimStatus.draft => 'draft',
-      VenueClaimStatus.pendingReview => 'pending_review',
-      VenueClaimStatus.needsMoreInfo => 'needs_more_info',
-      VenueClaimStatus.autoApproved => 'auto_approved',
-      VenueClaimStatus.approved => 'approved',
-      VenueClaimStatus.rejected => 'rejected',
-      VenueClaimStatus.completed => 'completed',
-      VenueClaimStatus.error => 'error',
-    };
-  }
+typedef VenueClaimStatus = ClaimStatus;
+typedef VenueClaimEvidence = ClaimEvidence;
+typedef VenueClaimScoreSignal = ClaimConfidenceSignal;
+typedef VenueClaimScore = ClaimConfidenceScore;
 
-  String get label {
-    return switch (this) {
-      VenueClaimStatus.draft => 'Draft',
-      VenueClaimStatus.pendingReview => 'Pending Review',
-      VenueClaimStatus.needsMoreInfo => 'Needs More Info',
-      VenueClaimStatus.autoApproved => 'Auto Approved',
-      VenueClaimStatus.approved => 'Approved',
-      VenueClaimStatus.rejected => 'Rejected',
-      VenueClaimStatus.completed => 'Completed',
-      VenueClaimStatus.error => 'Error',
-    };
-  }
-
-  static VenueClaimStatus fromFirestore(Object? value) {
-    final raw = value?.toString().trim().toLowerCase();
-    return switch (raw) {
-      'draft' => VenueClaimStatus.draft,
-      'needs_more_info' ||
-      'more_info_requested' => VenueClaimStatus.needsMoreInfo,
-      'auto_approved' => VenueClaimStatus.autoApproved,
-      'approved' => VenueClaimStatus.approved,
-      'rejected' => VenueClaimStatus.rejected,
-      'completed' => VenueClaimStatus.completed,
-      'error' => VenueClaimStatus.error,
-      _ => VenueClaimStatus.pendingReview,
-    };
-  }
+extension VenueClaimStatusX on ClaimStatus {
+  static ClaimStatus fromFirestore(Object? value) =>
+      ClaimStatusCodec.fromFirestore(value);
 }
 
 class VenueClaimAuditEvent {
@@ -91,105 +55,7 @@ class VenueClaimAuditEvent {
   }
 }
 
-class VenueClaimEvidence {
-  const VenueClaimEvidence({
-    this.businessEmail = '',
-    this.website = '',
-    this.phone = '',
-    this.companyRegistration = '',
-    this.notes = '',
-    this.documentUrls = const [],
-  });
-
-  final String businessEmail;
-  final String website;
-  final String phone;
-  final String companyRegistration;
-  final String notes;
-  final List<String> documentUrls;
-
-  bool get hasBusinessEmail => businessEmail.trim().isNotEmpty;
-  bool get hasWebsite => website.trim().isNotEmpty;
-  bool get hasPhone => phone.trim().isNotEmpty;
-  bool get hasCompanyRegistration => companyRegistration.trim().isNotEmpty;
-
-  Map<String, dynamic> toMap() {
-    return {
-      'businessEmail': businessEmail.trim(),
-      'website': website.trim(),
-      'phone': phone.trim(),
-      'companyRegistration': companyRegistration.trim(),
-      'notes': notes.trim(),
-      'documentUrls': documentUrls,
-    };
-  }
-
-  factory VenueClaimEvidence.fromMap(Map<String, dynamic>? map) {
-    final rawUrls = map?['documentUrls'];
-    return VenueClaimEvidence(
-      businessEmail: (map?['businessEmail'] ?? '').toString(),
-      website: (map?['website'] ?? '').toString(),
-      phone: (map?['phone'] ?? '').toString(),
-      companyRegistration: (map?['companyRegistration'] ?? '').toString(),
-      notes: (map?['notes'] ?? '').toString(),
-      documentUrls: rawUrls is Iterable
-          ? rawUrls.map((url) => url.toString()).toList(growable: false)
-          : const [],
-    );
-  }
-}
-
-class VenueClaimScoreSignal {
-  const VenueClaimScoreSignal({
-    required this.key,
-    required this.label,
-    required this.points,
-    required this.matched,
-  });
-
-  final String key;
-  final String label;
-  final int points;
-  final bool matched;
-
-  Map<String, dynamic> toMap() {
-    return {'key': key, 'label': label, 'points': points, 'matched': matched};
-  }
-
-  factory VenueClaimScoreSignal.fromMap(Map<String, dynamic> map) {
-    return VenueClaimScoreSignal(
-      key: (map['key'] ?? '').toString(),
-      label: (map['label'] ?? '').toString(),
-      points: map['points'] is num ? (map['points'] as num).round() : 0,
-      matched: map['matched'] == true,
-    );
-  }
-}
-
-class VenueClaimScore {
-  const VenueClaimScore({
-    required this.score,
-    required this.threshold,
-    required this.signals,
-  });
-
-  final int score;
-  final int threshold;
-  final List<VenueClaimScoreSignal> signals;
-
-  bool get autoApproved => score >= threshold;
-
-  Map<String, dynamic> toMap() {
-    return {
-      'score': score,
-      'threshold': threshold,
-      'autoApproved': autoApproved,
-      'signals': signals.map((signal) => signal.toMap()).toList(),
-    };
-  }
-}
-
-class VenueClaimSearchResult {
+class VenueClaimSearchResult implements ClaimSearchCandidate {
   const VenueClaimSearchResult({
     required this.venueId,
     required this.name,
@@ -204,16 +70,25 @@ class VenueClaimSearchResult {
     this.rawData = const {},
   });
 
+  @override
   final String venueId;
+  @override
   final String name;
+  @override
   final String address;
+  @override
   final String city;
+  @override
   final String postcode;
+  @override
   final String category;
   final String logoUrl;
   final String bannerUrl;
+  @override
   final String website;
+  @override
   final String phone;
+  @override
   final Map<String, dynamic> rawData;
 
   String get displayAddress {
@@ -314,9 +189,9 @@ class VenueClaim {
   final String venueAddress;
   final String claimantUid;
   final String claimantEmail;
-  final VenueClaimStatus status;
+  final ClaimStatus status;
   final int confidenceScore;
-  final VenueClaimEvidence submittedEvidence;
+  final ClaimEvidence submittedEvidence;
   final Map<String, dynamic> draftVenueData;
   final bool autoApproved;
   final DateTime? submittedAt;
@@ -326,13 +201,10 @@ class VenueClaim {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<String> confidenceReasons;
-  final List<VenueClaimScoreSignal> scoreSignals;
+  final List<ClaimConfidenceSignal> scoreSignals;
 
-  bool get isPending => status == VenueClaimStatus.pendingReview;
-  bool get isApproved =>
-      status == VenueClaimStatus.approved ||
-      status == VenueClaimStatus.autoApproved ||
-      status == VenueClaimStatus.completed;
+  bool get isPending => status.isPending;
+  bool get isApproved => status.isApproved;
 
   factory VenueClaim.fromFirestore(String id, Map<String, dynamic> data) {
     final score = data['confidenceScore'];
@@ -344,9 +216,9 @@ class VenueClaim {
       venueAddress: (data['venueAddress'] ?? '').toString(),
       claimantUid: (data['claimantUid'] ?? '').toString(),
       claimantEmail: (data['claimantEmail'] ?? '').toString(),
-      status: VenueClaimStatusX.fromFirestore(data['status']),
+      status: ClaimStatusCodec.fromFirestore(data['status']),
       confidenceScore: score is num ? score.round() : 0,
-      submittedEvidence: VenueClaimEvidence.fromMap(
+      submittedEvidence: ClaimEvidence.fromMap(
         data['submittedEvidence'] is Map
             ? Map<String, dynamic>.from(data['submittedEvidence'] as Map)
             : null,
@@ -370,7 +242,7 @@ class VenueClaim {
           ? rawSignals
                 .whereType<Map>()
                 .map(
-                  (item) => VenueClaimScoreSignal.fromMap(
+                  (item) => ClaimConfidenceSignal.fromMap(
                     Map<String, dynamic>.from(item),
                   ),
                 )
