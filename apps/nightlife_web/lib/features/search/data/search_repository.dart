@@ -5,7 +5,7 @@ import 'search_venue_filter.dart';
 import 'search_venue_repository.dart';
 import 'unified_search_service.dart';
 
-/// Orchestrates Firestore-backed unified search across the Vexda platform.
+/// Orchestrates unified search through the Discovery Engine and VexCore adapters.
 class SearchRepository {
   SearchRepository({
     SearchVenueRepository? venueRepository,

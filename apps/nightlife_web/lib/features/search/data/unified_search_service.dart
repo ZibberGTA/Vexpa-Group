@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_engines/discovery/application/discovery_unified_search_composer.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/search_match_models.dart';
@@ -12,15 +13,19 @@ import 'sources/venue_search_data_source.dart';
 /// Unified Firestore search across venues, drinks, deals, events and trails.
 ///
 /// Mirrors the mobile [SearchService] flow while reusing the web venue catalog.
+/// Venue matching, ranking, and response composition use the Discovery Engine.
 class UnifiedSearchService {
   UnifiedSearchService({
     FirebaseFirestore? firestore,
     VenueSearchDataSource? venueSearchDataSource,
+    DiscoveryUnifiedSearchComposer? searchComposer,
   })  : _firestoreOverride = firestore,
-        _venueSearch = venueSearchDataSource ?? VenueSearchDataSource();
+        _venueSearch = venueSearchDataSource ?? VenueSearchDataSource(),
+        _composer = searchComposer ?? const DiscoveryUnifiedSearchComposer();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueSearchDataSource _venueSearch;
+  final DiscoveryUnifiedSearchComposer _composer;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -481,59 +486,16 @@ class UnifiedSearchService {
     String query,
     SearchFilterCategory category,
   ) {
-    final matches = grouped.values.toList();
-
-    for (var index = 0; index < matches.length; index++) {
-      final match = matches[index];
-      matches[index] = match.copyWith(
-        rankScore: SearchRanking.score(match, query),
-      );
-    }
-
-    SearchRanking.sortMatches(matches, query);
-
-    final filtered = matches.where((match) {
-      if (category == SearchFilterCategory.openNow && !match.venue.isOpen) {
-        return false;
-      }
-      return switch (category) {
-        SearchFilterCategory.drinks => match.hasDrinkMatches,
-        SearchFilterCategory.deals => match.hasDealMatches,
-        SearchFilterCategory.events => match.hasEventMatches,
-        SearchFilterCategory.trails => match.hasTrailMatches,
-        SearchFilterCategory.openNow ||
-        SearchFilterCategory.venues =>
-          match.directVenueMatch ||
-              match.hasDrinkMatches ||
-              match.hasDealMatches ||
-              match.hasEventMatches ||
-              match.hasTrailMatches,
-      };
-    }).toList();
-
-    var venueCount = 0;
-    var drinkCount = 0;
-    var dealCount = 0;
-    var eventCount = 0;
-    var trailCount = 0;
-
-    for (final match in filtered) {
-      if (match.directVenueMatch) venueCount++;
-      drinkCount += match.matchedDrinks.length;
-      dealCount += match.matchedDeals.length;
-      eventCount += match.matchedEvents.length;
-      trailCount += match.matchedTrails.length;
-    }
+    final composed = _composer.composeResponse(
+      groupedMatches: grouped.values,
+      query: query,
+      category: category,
+      withRankScore: (match, rankScore) => match.copyWith(rankScore: rankScore),
+    );
 
     return UnifiedSearchResponse(
-      matches: filtered,
-      groupCounts: SearchGroupCounts(
-        venues: venueCount,
-        drinks: drinkCount,
-        deals: dealCount,
-        events: eventCount,
-        trails: trailCount,
-      ),
+      matches: composed.matches,
+      groupCounts: composed.groupCounts,
     );
   }
 }

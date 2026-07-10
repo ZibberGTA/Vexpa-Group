@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/discovery/application/discovery_unified_search_composer.dart';
+import 'package:vex_engines/discovery/application/discovery_venue_search_service.dart';
 import 'package:vex_engines/venue/application/venue_profile_update_service.dart';
 import 'package:vex_engines/venue/data/venue_profile_write_repository.dart';
 
@@ -91,6 +93,11 @@ abstract final class WebVexCore {
   static VenueProfileWriteRepository get venueProfileWriteRepository =>
       venueProfileWriteRepositoryOverride ??
       _defaultVenueProfileWriteRepository;
+
+  static const discoveryVenueSearchService = DiscoveryVenueSearchService();
+
+  static const discoveryUnifiedSearchComposer =
+      DiscoveryUnifiedSearchComposer();
 
   static const permissionEvaluator = VexPermissionEvaluator();
 }

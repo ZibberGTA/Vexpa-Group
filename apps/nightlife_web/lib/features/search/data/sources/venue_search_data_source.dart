@@ -1,20 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/discovery/application/discovery_venue_search_service.dart';
 
 import '../../../../core/vexcore/web_vexcore.dart';
 import '../../../venues/models/venue_model.dart';
 import '../../models/venue_search_result.dart';
 import '../search_venue_filter.dart';
 import '../search_venue_mapper.dart';
-import '../venue_search_matcher.dart';
 import 'search_data_source.dart';
 
-/// Venue search backed by VexCore discovery services.
+/// Venue search backed by VexCore discovery services and the Discovery Engine.
 class VenueSearchDataSource implements SearchDataSource {
-  VenueSearchDataSource({VenueDataService? venueDataService})
-    : _venueDataService = venueDataService ?? WebVexCore.venueDataService;
+  VenueSearchDataSource({
+    VenueDataService? venueDataService,
+    DiscoveryVenueSearchService? discoverySearchService,
+  }) : _venueDataService = venueDataService ?? WebVexCore.venueDataService,
+       _discoverySearch =
+           discoverySearchService ?? WebVexCore.discoveryVenueSearchService;
 
   final VenueDataService _venueDataService;
+  final DiscoveryVenueSearchService _discoverySearch;
 
   @override
   SearchFilterCategory get category => SearchFilterCategory.venues;
@@ -28,26 +33,15 @@ class VenueSearchDataSource implements SearchDataSource {
     if (trimmed.isEmpty) return List<VenueSearchResult>.from(catalog);
 
     final firestoreMatches = await _searchDiscoveryIndex(trimmed);
-    final matched = <VenueSearchResult>[];
-    final seenIds = <String>{};
-
-    for (final venue in catalog) {
-      if (seenIds.contains(venue.id)) continue;
-
-      final textMatch = VenueSearchMatcher.matches(venue, trimmed);
-      final firestoreMatch = firestoreMatches.contains(venue.id);
-      if (!textMatch && !firestoreMatch) continue;
-
-      matched.add(venue);
-      seenIds.add(venue.id);
-    }
-
-    VenueSearchMatcher.sortByRelevance(matched, trimmed);
-    return matched;
+    return _discoverySearch.composeVenueMatches(
+      query: trimmed,
+      catalog: catalog,
+      indexMatchedIds: firestoreMatches,
+    );
   }
 
   Future<Set<String>> _searchDiscoveryIndex(String query) async {
-    final terms = VenueSearchMatcher.termsFromQuery(query);
+    final terms = _discoverySearch.termsFromQuery(query);
     if (terms.isEmpty) return const {};
 
     final result = await _venueDataService.searchDiscoveryVenues(terms: terms);
