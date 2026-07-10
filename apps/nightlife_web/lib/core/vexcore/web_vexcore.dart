@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/venue/application/venue_profile_update_service.dart';
+import 'package:vex_engines/venue/data/venue_profile_write_repository.dart';
 
 import 'firebase_authentication_adapter.dart';
 import 'firebase_identity_adapter.dart';
 import 'firebase_venue_deal_repository.dart';
 import 'firebase_venue_drink_repository.dart';
 import 'firebase_venue_event_repository.dart';
+import 'firebase_venue_profile_write_repository.dart';
 import 'firebase_venue_repository.dart';
 
 /// Composition root for the web app's VexCore adapters.
@@ -75,6 +78,19 @@ abstract final class WebVexCore {
 
   static VenueEventDataService get venueEventDataService =>
       VenueEventDataService(repository: venueEventRepository);
+
+  static const venueProfileUpdateService = VenueProfileUpdateService();
+
+  static final _defaultVenueProfileWriteRepository =
+      FirebaseVenueProfileWriteRepository();
+
+  /// Test override for venue profile write repository. Reset to null after each test.
+  @visibleForTesting
+  static VenueProfileWriteRepository? venueProfileWriteRepositoryOverride;
+
+  static VenueProfileWriteRepository get venueProfileWriteRepository =>
+      venueProfileWriteRepositoryOverride ??
+      _defaultVenueProfileWriteRepository;
 
   static const permissionEvaluator = VexPermissionEvaluator();
 }
