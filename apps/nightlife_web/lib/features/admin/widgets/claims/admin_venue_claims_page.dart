@@ -113,6 +113,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         claimId: claim.id,
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: confirmed,
+        currentStatus: claim.status,
       ),
       'Claim approved and draft published.',
     );
@@ -130,6 +131,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         claimId: claim.id,
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: notes,
+        currentStatus: claim.status,
       ),
       'Claim rejected. Draft work was kept.',
     );
@@ -147,6 +149,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         claimId: claim.id,
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: notes,
+        currentStatus: claim.status,
       ),
       'More information requested.',
     );

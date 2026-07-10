@@ -2,6 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_engines/claim/application/claim_confidence_scorer.dart';
+import 'package:vex_engines/claim/application/claim_review_service.dart';
+import 'package:vex_engines/claim/application/claim_submission_service.dart';
+import 'package:vex_engines/claim/domain/claim_evidence.dart';
+import 'package:vex_engines/claim/domain/claim_result.dart';
+import 'package:vex_engines/claim/domain/claim_status.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/venue_claim.dart';
@@ -27,12 +33,24 @@ class VenueClaimSubmissionResult {
 }
 
 class VenueClaimRepository {
-  VenueClaimRepository({FirebaseFirestore? firestore})
-    : _firestoreOverride = firestore;
+  VenueClaimRepository({
+    FirebaseFirestore? firestore,
+    ClaimSubmissionService? submissionService,
+    ClaimReviewService? reviewService,
+    ClaimConfidenceScorer? confidenceScorer,
+  })  : _firestoreOverride = firestore,
+        _submissionService =
+            submissionService ?? const ClaimSubmissionService(),
+        _reviewService = reviewService ?? const ClaimReviewService(),
+        _confidenceScorer =
+            confidenceScorer ?? const ClaimConfidenceScorer();
 
   static const int autoApprovalThreshold = 75;
 
   final FirebaseFirestore? _firestoreOverride;
+  final ClaimSubmissionService _submissionService;
+  final ClaimReviewService _reviewService;
+  final ClaimConfidenceScorer _confidenceScorer;
   FirebaseFirestore? _firestore;
 
   FirebaseFunctions get _functions => FirebaseFunctions.instance;
@@ -380,12 +398,26 @@ class VenueClaimRepository {
     required User user,
     required VenueClaimSearchResult venue,
     required VenueClaimEvidence evidence,
+    Iterable<ClaimStatus> existingStatusesForVenue = const [],
   }) async {
-    final response = await _callFunction('submitVenueClaim', {
-      'venueId': venue.venueId,
-      'submittedEvidence': evidence.toMap(),
-      'draftVenueData': _initialDraftFromVenue(venue, evidence),
-    });
+    final preparation = _submissionService.prepareSubmission(
+      venueId: venue.venueId,
+      claimantUid: user.uid,
+      venue: venue,
+      evidence: evidence,
+      claimantActive: !user.isAnonymous,
+      existingStatusesForVenue: existingStatusesForVenue,
+    );
+    if (preparation is ClaimFailure<ClaimSubmissionPayload>) {
+      throw VenueClaimBackendException(preparation.message);
+    }
+
+    final payload =
+        (preparation as ClaimSuccess<ClaimSubmissionPayload>).value;
+    final response = await _callFunction(
+      'submitVenueClaim',
+      payload.toFunctionPayload(),
+    );
     final status = VenueClaimStatusX.fromFirestore(response['status']);
     final claimId = (response['claimId'] ?? '').toString();
     final venueId = (response['venueId'] ?? venue.venueId).toString();
@@ -442,33 +474,60 @@ class VenueClaimRepository {
     required String claimId,
     required String reviewerUid,
     String notes = '',
+    ClaimStatus currentStatus = ClaimStatus.pendingReview,
   }) async {
-    await _callFunction('approveVenueClaim', {
-      'claimId': claimId,
-      'notes': notes,
-    });
+    final review = _reviewService.prepareReview(
+      claimId: claimId,
+      action: ClaimReviewAction.approve,
+      currentStatus: currentStatus,
+      notes: notes,
+      reviewerCanApprove: true,
+    );
+    if (review is ClaimFailure<ClaimReviewPayload>) {
+      throw VenueClaimBackendException(review.message);
+    }
+    final payload = (review as ClaimSuccess<ClaimReviewPayload>).value;
+    await _callFunction(payload.functionName, payload.toFunctionPayload());
   }
 
   Future<void> rejectClaim({
     required String claimId,
     required String reviewerUid,
     required String notes,
+    ClaimStatus currentStatus = ClaimStatus.pendingReview,
   }) async {
-    await _callFunction('rejectVenueClaim', {
-      'claimId': claimId,
-      'notes': notes,
-    });
+    final review = _reviewService.prepareReview(
+      claimId: claimId,
+      action: ClaimReviewAction.reject,
+      currentStatus: currentStatus,
+      notes: notes,
+      reviewerCanApprove: true,
+    );
+    if (review is ClaimFailure<ClaimReviewPayload>) {
+      throw VenueClaimBackendException(review.message);
+    }
+    final payload = (review as ClaimSuccess<ClaimReviewPayload>).value;
+    await _callFunction(payload.functionName, payload.toFunctionPayload());
   }
 
   Future<void> requestMoreInformation({
     required String claimId,
     required String reviewerUid,
     required String notes,
+    ClaimStatus currentStatus = ClaimStatus.pendingReview,
   }) async {
-    await _callFunction('requestMoreClaimInfo', {
-      'claimId': claimId,
-      'notes': notes,
-    });
+    final review = _reviewService.prepareReview(
+      claimId: claimId,
+      action: ClaimReviewAction.requestMoreInfo,
+      currentStatus: currentStatus,
+      notes: notes,
+      reviewerCanApprove: true,
+    );
+    if (review is ClaimFailure<ClaimReviewPayload>) {
+      throw VenueClaimBackendException(review.message);
+    }
+    final payload = (review as ClaimSuccess<ClaimReviewPayload>).value;
+    await _callFunction(payload.functionName, payload.toFunctionPayload());
   }
 
   Stream<List<VenueClaimAuditEvent>> watchClaimAudit(
@@ -498,117 +557,13 @@ class VenueClaimRepository {
   VenueClaimScore scoreClaim({
     required VenueClaimSearchResult venue,
     required VenueClaimEvidence evidence,
-  }) {
-    final venueDomain = _domainFromUrl(venue.website);
-    final evidenceEmailDomain = _domainFromEmail(evidence.businessEmail);
-    final evidenceWebsiteDomain = _domainFromUrl(evidence.website);
-    final phoneMatches =
-        _digits(venue.phone).isNotEmpty &&
-        _digits(venue.phone) == _digits(evidence.phone);
-
-    final signals = [
-      VenueClaimScoreSignal(
-        key: 'business_email_domain',
-        label: 'Business email matches venue domain',
-        points: 35,
-        matched: venueDomain.isNotEmpty && venueDomain == evidenceEmailDomain,
-      ),
-      VenueClaimScoreSignal(
-        key: 'website_domain',
-        label: 'Website matches existing venue website',
-        points: 25,
-        matched: venueDomain.isNotEmpty && venueDomain == evidenceWebsiteDomain,
-      ),
-      VenueClaimScoreSignal(
-        key: 'company_registration',
-        label: 'Company registration supplied',
-        points: 25,
-        matched: evidence.hasCompanyRegistration,
-      ),
-      VenueClaimScoreSignal(
-        key: 'phone_match',
-        label: 'Phone number matches venue listing',
-        points: 15,
-        matched: phoneMatches,
-      ),
-      VenueClaimScoreSignal(
-        key: 'location_verification',
-        label: 'Additional location notes supplied',
-        points: 5,
-        matched: evidence.notes.trim().length >= 20,
-      ),
-    ];
-
-    final total = signals
-        .where((signal) => signal.matched)
-        .fold<int>(0, (totalPoints, signal) => totalPoints + signal.points)
-        .clamp(0, 100)
-        .toInt();
-
-    return VenueClaimScore(
-      score: total,
-      threshold: autoApprovalThreshold,
-      signals: signals,
-    );
-  }
-
-  Map<String, dynamic> _initialDraftFromVenue(
-    VenueClaimSearchResult venue,
-    VenueClaimEvidence evidence,
-  ) {
-    return {
-      'name': venue.name,
-      'address': venue.rawData['address'] ?? venue.displayAddress,
-      'city': venue.city,
-      'postcode': venue.postcode,
-      'category': venue.category,
-      'venueType': venue.category,
-      'description': (venue.rawData['description'] ?? '').toString(),
-      'website': evidence.website.trim().isEmpty
-          ? venue.website
-          : evidence.website.trim(),
-      'websiteUrl': evidence.website.trim().isEmpty
-          ? venue.website
-          : evidence.website.trim(),
-      'phone': evidence.phone.trim().isEmpty
-          ? venue.phone
-          : evidence.phone.trim(),
-      'openingHours': venue.rawData['openingHours'] ?? <String, dynamic>{},
-      'featureTags': venue.rawData['featureTags'] ?? <String>[],
-      'socialLinks': venue.rawData['socialLinks'] ?? <String, dynamic>{},
-      'draftChecklist': <String, dynamic>{},
-    };
-  }
+  }) =>
+      _confidenceScorer.score(venue: venue, evidence: evidence);
 
   FirebaseFirestore _requireFirestore() {
     final firestore = _resolveFirestore();
     if (firestore == null) throw StateError('Firestore is not available.');
     return firestore;
-  }
-
-  static String _digits(String value) {
-    return value.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
-  static String _domainFromEmail(String value) {
-    final parts = value.trim().toLowerCase().split('@');
-    if (parts.length != 2) return '';
-    return _normaliseDomain(parts.last);
-  }
-
-  static String _domainFromUrl(String value) {
-    final trimmed = value.trim().toLowerCase();
-    if (trimmed.isEmpty) return '';
-    final parsed = Uri.tryParse(
-      trimmed.startsWith('http://') || trimmed.startsWith('https://')
-          ? trimmed
-          : 'https://$trimmed',
-    );
-    return _normaliseDomain(parsed?.host ?? '');
-  }
-
-  static String _normaliseDomain(String value) {
-    return value.trim().toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
   }
 
   Future<Map<String, dynamic>> _callFunction(
