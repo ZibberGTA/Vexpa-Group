@@ -3,4 +3,5 @@ library;
 
 export 'image_position_metadata.dart';
 export 'venue_contact_utils.dart';
+export 'venue_image_field_parser.dart';
 export 'venue_opening_hours_formatter.dart';
