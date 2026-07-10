@@ -1,7 +1,8 @@
 import 'package:test/test.dart';
+import 'package:vex_engines/vex_engines.dart';
 
 void main() {
-  test('vex_engines placeholder package is intentionally empty', () {
-    expect(true, isTrue);
+  test('vex_engines exports venue engine structure', () {
+    expect(venueEngineLibraryExists, isTrue);
   });
 }
