@@ -137,6 +137,20 @@ The Experience Engine replaces separate Drink, Deal, and Event engines for Versi
 VexCore read modules (`venue_drinks`, `venue_deals`, `venue_events`) remain generic contracts.
 See `packages/vex_engines/lib/experience/MIGRATION_PLAN.md`.
 
+### Claim Engine structure (Version 1 launch engine)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/claim/` |
+| Shared rules batch | Complete | Status, evidence, search support, confidence scoring |
+| Submission + review services | Complete | Validation and callable payload preparation |
+| Web runtime slice | Complete | `VenueClaimRepository` submission/review/scoring wired |
+| Mobile + admin presentation | Planned | No mobile claim flow yet; admin map stays in shell |
+
+The Claim Engine owns venue-claim lifecycle rules. VexCore continues to own auth,
+identity, permissions, and storage contracts. Firebase adapters remain in app shells.
+See `packages/vex_engines/lib/claim/MIGRATION_PLAN.md`.
+
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.
