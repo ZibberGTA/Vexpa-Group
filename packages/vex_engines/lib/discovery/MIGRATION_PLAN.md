@@ -78,13 +78,38 @@ Classification tags:
 
 No extra listeners or duplicate catalog fetches were introduced.
 
+## Migrated in Batch 2
+
+- `DiscoveryRelatedVenueService` (similar + nearby scoring)
+- `DiscoveryGeoUtils` / `DiscoveryMapBounds`
+- `DiscoverySearchTermIndexer`
+- `DiscoveryVenueFilterRules`, `DiscoveryMobileSearchMerger`, `DiscoveryMobileSearchRanking`
+- `DiscoveryTrendingScorer` + `DiscoveryBoostEvaluator`
+- `DiscoveryRecommendationScorer`
+
+Mobile adoption:
+
+- `SearchService` → shared text utils, filters, merge, ranking
+- `SearchIndexService` → shared term indexer
+- `TrendingService` → shared trending scorer
+- `VenueRecommendationService` → shared recommendation scorer
+- `VenueMapScreen` → shared query terms + bounds helpers
+
+## Network calls (Batch 2)
+
+| Flow | Before | After |
+| --- | --- | --- |
+| Related venues | 1 catalog load | Same — 1 catalog load |
+| Mobile search | Firestore queries unchanged | Same query pattern |
+| Trending | venues + boosts + analytics per venue | Same |
+| Recommendations | venue stream + deals/events per venue | Same |
+
 ## Next batch (recommended)
 
-1. Extract mobile `SearchService` pure logic onto shared engine APIs
-2. Migrate `venue_related_repository.dart` similar/nearby scoring
-3. Add VexCore cross-entity discovery read contracts; remove direct Firestore from `UnifiedSearchService`
-4. Trending and recommendation scorers
-5. Presentation phase: search pages/widgets under `presentation/web/`
+1. VexCore cross-entity discovery read contracts; remove direct Firestore from `UnifiedSearchService`
+2. Mobile `SearchService` venue-direct search path convergence with web index flow
+3. Presentation phase: search pages/widgets under `presentation/web/` and `presentation/mobile/`
+4. Recommendation/trending input DTOs fed from VexCore analytics contracts
 
 ## Rollback
 

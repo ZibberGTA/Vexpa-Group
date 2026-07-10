@@ -77,8 +77,9 @@ An engine is not considered complete until:
 | 1 — Pure domain/shared | Complete | Text utils, matcher, filters, open status, match models |
 | 2 — Application orchestration | Complete | Venue search merge, unified response composer, ranking |
 | 3 — Web runtime slice | Complete | `VenueSearchDataSource` + `UnifiedSearchService` composition |
-| 4 — Presentation | Planned | Search pages, map widgets, mobile screens |
-| 5 — Cross-entity contracts | Planned | Drinks/deals/events/trails via VexCore discovery repos |
+| 4 — Shared web/mobile logic | Complete | Related venues, trending/recommendation scorers, mobile search rules |
+| 5 — Presentation | Planned | Search pages, map widgets, mobile screens |
+| 6 — Cross-entity contracts | Planned | Drinks/deals/events/trails via VexCore discovery repos |
 
 See `MIGRATION_PLAN.md` for the file inventory and next batch.
 
@@ -91,6 +92,24 @@ Search page
   → Discovery Engine (matching, ranking, composition)
   → VexCore VenueDataService (catalog + index lookup)
   → FirebaseVenueRepository (Firestore)
+```
+
+## Runtime flow (related venues)
+
+```text
+Venue details page
+  → VenueRelatedRepository (web facade)
+  → DiscoveryRelatedVenueService (similar + nearby scoring)
+  → existing catalog from SearchVenueRepository (no extra fetch when cached)
+```
+
+## Runtime flow (mobile trending/recommendations)
+
+```text
+Mobile screen
+  → TrendingService / VenueRecommendationService (Firebase adapters)
+  → DiscoveryTrendingScorer / DiscoveryRecommendationScorer
+  → ranked results returned to existing widgets
 ```
 
 ## Rollback
