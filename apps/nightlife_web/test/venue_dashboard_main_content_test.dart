@@ -4,7 +4,6 @@ import 'package:nightlife_web/features/venue_management/models/venue_dashboard_c
 import 'package:nightlife_web/features/venue_management/models/venue_dashboard_date_range.dart';
 import 'package:nightlife_web/features/venue_management/models/venue_dashboard_home_data.dart';
 import 'package:nightlife_web/features/venue_management/models/venue_dashboard_stat.dart';
-import 'package:nightlife_web/features/venue_management/models/venue_profile_completion.dart';
 import 'package:nightlife_web/features/venue_management/services/venue_profile_completion_calculator.dart';
 import 'package:nightlife_web/features/venue_management/utils/venue_dashboard_welcome_name.dart';
 import 'package:nightlife_web/features/venues/models/venue_model.dart';
