@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/routing/app_router.dart';
+import '../../../core/vexcore/identity_mapper.dart';
 
 /// Web-facing roles used for dashboard routing and access control.
 enum VexdaUserRole { admin, venueOwner, employee, regularUser }
@@ -225,77 +227,37 @@ class UserRoleService {
     }
   }
 
-  static List<String> _parseVenueIds(dynamic value) {
-    if (value is! List) return const [];
-    return value
-        .map((item) => item?.toString().trim() ?? '')
-        .where((id) => id.isNotEmpty)
-        .toList();
-  }
+  static List<String> _parseVenueIds(dynamic value) =>
+      RoleResolver.parseVenueIds(value);
 
-  static String? _readRoleField(Map<String, dynamic>? data) {
-    if (data == null) return null;
+  static String? _readRoleField(Map<String, dynamic>? data) =>
+      RoleResolver.readRoleField(data);
 
-    final role = data['role']?.toString().trim();
-    if (role != null && role.isNotEmpty) return role;
+  static int _readRoleLevel(dynamic value) => RoleResolver.readRoleLevel(value);
 
-    final accountType = data['accountType']?.toString().trim();
-    if (accountType != null && accountType.isNotEmpty) return accountType;
-
-    return null;
-  }
-
-  static int _readRoleLevel(dynamic value) {
-    if (value is num) return value.toInt();
-    return int.tryParse(value?.toString().trim() ?? '') ?? 0;
-  }
-
-  static bool _readStaffFlag(Map<String, dynamic>? data) {
-    if (data == null) return false;
-    return data['staff'] == true || data['isStaff'] == true;
-  }
-
-  static bool _isAdminRoleName(String rawRole) {
-    final role = rawRole.trim().toLowerCase();
-    return role == 'admin' ||
-        role == 'founder' ||
-        role == 'management' ||
-        role == 'manager' ||
-        role == 'staff' ||
-        role == 'owner_founder' ||
-        role == 'app_owner';
-  }
+  static bool _readStaffFlag(Map<String, dynamic>? data) =>
+      RoleResolver.readStaffFlag(data);
 
   /// True when a `staff/{uid}` document grants admin/staff dashboard access.
   @visibleForTesting
-  static bool isValidStaffDocument(Map<String, dynamic>? data) {
-    if (data == null) return false;
-
-    if (_readStaffFlag(data)) return true;
-
-    if (_readRoleLevel(data['roleLevel']) >= 30) return true;
-
-    final staffRole = (data['role'] ?? '').toString().trim().toLowerCase();
-    return _isAdminRoleName(staffRole);
-  }
+  static bool isValidStaffDocument(Map<String, dynamic>? data) =>
+      RoleResolver.isValidStaffDocument(data);
 
   static _StaffRoleResolution? _staffResolutionFromDocument(
     Map<String, dynamic> data, {
     required String source,
   }) {
-    if (!isValidStaffDocument(data)) return null;
-
-    final roleLevel = _readRoleLevel(data['roleLevel']);
-    final staffRole = (data['role'] ?? '').toString().trim().toLowerCase();
+    final resolution = RoleResolver.resolveStaffFromDocument(
+      data,
+      source: source,
+    );
+    if (resolution == null) return null;
 
     return _StaffRoleResolution(
-      role: VexdaUserRole.admin,
-      roleLevel: roleLevel >= 30 ? roleLevel : 30,
-      staffFlag:
-          _readStaffFlag(data) ||
-          roleLevel >= 30 ||
-          _isAdminRoleName(staffRole),
-      source: source,
+      role: vexdaRoleFromDashboard(resolution.dashboardRole),
+      roleLevel: resolution.roleLevel,
+      staffFlag: resolution.staffFlag,
+      source: resolution.source,
     );
   }
 
@@ -303,11 +265,7 @@ class UserRoleService {
   ///
   /// Does not check owned venues — use [resolveFromUserContext] for full access.
   static VexdaUserRole parseUserDocument(Map<String, dynamic>? data) {
-    return resolveFromUserContext(
-      data: data,
-      venueIdsCount: _parseVenueIds(data?['venueIds']).length,
-      ownedVenuesCount: 0,
-    );
+    return vexdaRoleFromDashboard(RoleResolver.parseUserDocument(data));
   }
 
   static VexdaUserRole resolveFromUserContext({
@@ -315,54 +273,13 @@ class UserRoleService {
     required int venueIdsCount,
     required int ownedVenuesCount,
   }) {
-    if (data == null) {
-      return ownedVenuesCount > 0
-          ? VexdaUserRole.venueOwner
-          : VexdaUserRole.regularUser;
-    }
-
-    if (data['isAdmin'] == true) {
-      return VexdaUserRole.admin;
-    }
-
-    final roleLevel = _readRoleLevel(data['roleLevel']);
-    if (roleLevel >= 30) {
-      return VexdaUserRole.admin;
-    }
-
-    final rawRole = (_readRoleField(data) ?? 'user').trim().toLowerCase();
-
-    if (rawRole == 'staff') {
-      if (_readStaffFlag(data) || roleLevel >= 30) return VexdaUserRole.admin;
-      if (venueIdsCount > 0) return VexdaUserRole.employee;
-      return VexdaUserRole.admin;
-    }
-
-    if (rawRole == 'employee') return VexdaUserRole.employee;
-
-    if (_isAdminRoleName(rawRole)) {
-      return VexdaUserRole.admin;
-    }
-
-    if (rawRole == 'owner' ||
-        rawRole == 'venueowner' ||
-        rawRole == 'venue_owner' ||
-        rawRole == 'business' ||
-        rawRole == 'businessowner' ||
-        rawRole == 'business_owner' ||
-        rawRole == 'venue') {
-      return VexdaUserRole.venueOwner;
-    }
-
-    if (rawRole == 'customer' || rawRole == 'user') {
-      return VexdaUserRole.regularUser;
-    }
-
-    if (venueIdsCount > 0) return VexdaUserRole.employee;
-
-    if (ownedVenuesCount > 0) return VexdaUserRole.venueOwner;
-
-    return VexdaUserRole.regularUser;
+    return vexdaRoleFromDashboard(
+      RoleResolver.resolveFromUserContext(
+        data: data,
+        venueIdsCount: venueIdsCount,
+        ownedVenuesCount: ownedVenuesCount,
+      ),
+    );
   }
 
   static Future<void> ensureAuthTokenReady(User user) async {
@@ -427,16 +344,15 @@ class UserRoleService {
         'staff=$staffFlag',
       );
 
-      if (!staffFlag && roleLevel < 30 && !_isAdminRoleName(staffRole)) {
-        return null;
-      }
+      final coreResolution = RoleResolver.resolveStaffFromClaims(claims);
+      if (coreResolution == null) return null;
 
-      final resolution = _staffResolutionFromDocument({
-        'role': staffRole.isEmpty ? 'admin' : staffRole,
-        'roleLevel': roleLevel,
-        'staff': staffFlag,
-      }, source: 'customClaims');
-      return resolution;
+      return _StaffRoleResolution(
+        role: vexdaRoleFromDashboard(coreResolution.dashboardRole),
+        roleLevel: coreResolution.roleLevel,
+        staffFlag: coreResolution.staffFlag,
+        source: coreResolution.source,
+      );
     } catch (error) {
       _logTransition('custom-claim lookup failed uid=${user.uid} error=$error');
     }
@@ -696,14 +612,10 @@ class UserRoleService {
   static String? get debugActiveUid => _activeUid;
 
   static bool _wouldDowngradeRole(VexdaUserRole current, VexdaUserRole next) {
-    if (current == next) return false;
-
-    if (current == VexdaUserRole.admin) {
-      return next != VexdaUserRole.admin;
-    }
-
-    return next == VexdaUserRole.regularUser &&
-        current != VexdaUserRole.regularUser;
+    return RoleResolver.wouldDowngradeRole(
+      dashboardRoleFromVexda(current),
+      dashboardRoleFromVexda(next),
+    );
   }
 
   static void _invalidateResolvedProfileCache() {

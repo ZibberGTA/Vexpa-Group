@@ -1,43 +1,44 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/constants/app_strings.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../../shared/components/drinkspot_button.dart';
 import '../../../shared/components/public_loading_state.dart';
 import '../../../shared/layouts/public_page_shell.dart';
 import '../../../shared/widgets/glass_container.dart';
-import '../services/auth_service.dart';
-import '../services/user_role_service.dart';
+import '../../auth/services/auth_service.dart';
 
-/// Protected route requirements checked against Firestore roles.
+/// Protected route requirements checked through VexCore identity and permissions.
 enum AuthGuardRequirement { admin, venueStaff }
 
-/// Wraps staff dashboards with Firebase Auth + Firestore role checks.
+/// Wraps staff dashboards with Firebase Auth + VexCore identity resolution.
 ///
-/// Firebase Auth session: [AuthService.authStateChanges]
-/// Firestore role resolution: [UserRoleService.currentUserProfileStream]
+/// Authentication session: [WebVexCore.authentication]
+/// Identity resolution: [WebVexCore.identity]
+/// Route access: [WebVexCore.permissionEvaluator] via [VexPermission.accessAdminPortal]
 class AuthGuard extends StatelessWidget {
   const AuthGuard({super.key, required this.requirement, required this.child});
 
   final AuthGuardRequirement requirement;
   final Widget child;
 
-  bool _isAllowed(VexdaUserRole role) {
+  VexPermission get _requiredPermission {
     return switch (requirement) {
-      AuthGuardRequirement.admin => role.canAccessAdminDashboard,
-      AuthGuardRequirement.venueStaff => role.canAccessVenueDashboard,
+      AuthGuardRequirement.admin => VexPermission.accessAdminPortal,
+      AuthGuardRequirement.venueStaff => VexPermission.manageVenue,
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: AuthService.authStateChanges,
+    return StreamBuilder<AuthenticatedUser?>(
+      stream: WebVexCore.authentication.authStateChanges,
       builder: (context, authSnapshot) {
         if (authSnapshot.connectionState == ConnectionState.waiting) {
           return const PublicPageShell(
@@ -45,8 +46,8 @@ class AuthGuard extends StatelessWidget {
           );
         }
 
-        final user = authSnapshot.data;
-        if (user == null) {
+        final authUser = authSnapshot.data;
+        if (authUser == null) {
           return PublicPageShell(
             child: _AuthPrompt(
               title: 'Sign in required',
@@ -58,7 +59,11 @@ class AuthGuard extends StatelessWidget {
           );
         }
 
-        return _PermissionGate(user: user, isAllowed: _isAllowed, child: child);
+        return _PermissionGate(
+          uid: authUser.uid,
+          requiredPermission: _requiredPermission,
+          child: child,
+        );
       },
     );
   }
@@ -66,13 +71,13 @@ class AuthGuard extends StatelessWidget {
 
 class _PermissionGate extends StatefulWidget {
   const _PermissionGate({
-    required this.user,
-    required this.isAllowed,
+    required this.uid,
+    required this.requiredPermission,
     required this.child,
   });
 
-  final User user;
-  final bool Function(VexdaUserRole role) isAllowed;
+  final String uid;
+  final VexPermission requiredPermission;
   final Widget child;
 
   @override
@@ -81,6 +86,9 @@ class _PermissionGate extends StatefulWidget {
 
 class _PermissionGateState extends State<_PermissionGate> {
   static const _resolutionTimeout = Duration(seconds: 10);
+
+  final _identityAdapter = WebVexCore.identity;
+  final _permissionEvaluator = WebVexCore.permissionEvaluator;
 
   Timer? _timeoutTimer;
   bool _timedOut = false;
@@ -114,6 +122,24 @@ class _PermissionGateState extends State<_PermissionGate> {
     _timedOut = false;
   }
 
+  Future<bool> _isAllowed(VexIdentity identity) async {
+    final decision = await _permissionEvaluator.evaluate(
+      identity: identity,
+      permission: widget.requiredPermission,
+    );
+    return decision.isAllowed;
+  }
+
+  bool _isAllowedSync(VexIdentity identity) {
+    return switch (widget.requiredPermission) {
+      VexPermission.accessAdminPortal => RouteAccess.canAccessAdminPortal(
+        identity,
+      ),
+      VexPermission.manageVenue => RouteAccess.canAccessVenueDashboard(identity),
+      _ => false,
+    };
+  }
+
   Future<void> _retryResolution() async {
     setState(() {
       _retrying = true;
@@ -122,12 +148,15 @@ class _PermissionGateState extends State<_PermissionGate> {
     _startTimeout();
 
     try {
-      final profile = await UserRoleService.retryRoleResolution(widget.user);
+      final identity = await _identityAdapter.retryIdentityResolution(
+        widget.uid,
+      );
       if (!mounted) return;
       _clearTimeout();
+      final allowed = identity != null && await _isAllowed(identity);
       setState(() {
         _retrying = false;
-        if (!widget.isAllowed(profile.role)) {
+        if (!allowed) {
           _retryError = AppStrings.staffAccessDenied;
         }
       });
@@ -142,26 +171,26 @@ class _PermissionGateState extends State<_PermissionGate> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<UserRoleProfile>(
-      stream: UserRoleService.currentUserProfileStream(),
-      builder: (context, roleSnapshot) {
-        final cached = UserRoleService.peekCachedProfile(widget.user.uid);
-        final profile = roleSnapshot.data ?? cached;
-        final waitingForFirstProfile =
-            profile == null &&
-            roleSnapshot.connectionState == ConnectionState.waiting;
+    return StreamBuilder<VexIdentity?>(
+      stream: _identityAdapter.currentIdentityStream,
+      builder: (context, identitySnapshot) {
+        final cached = _identityAdapter.peekCachedIdentity(widget.uid);
+        final identity = identitySnapshot.data ?? cached;
+        final waitingForFirstIdentity =
+            identity == null &&
+            identitySnapshot.connectionState == ConnectionState.waiting;
 
-        if (profile != null) {
+        if (identity != null) {
           _clearTimeout();
         }
 
-        if (waitingForFirstProfile && !_timedOut) {
+        if (waitingForFirstIdentity && !_timedOut) {
           return const PublicPageShell(
             child: PublicLoadingState(message: 'Loading your permissions…'),
           );
         }
 
-        if (profile == null && (_timedOut || roleSnapshot.hasError)) {
+        if (identity == null && (_timedOut || identitySnapshot.hasError)) {
           return PublicPageShell(
             child: _AuthPrompt(
               title: 'Permissions unavailable',
@@ -184,8 +213,9 @@ class _PermissionGateState extends State<_PermissionGate> {
           );
         }
 
-        final role = profile?.role ?? VexdaUserRole.regularUser;
-        if (!widget.isAllowed(role)) {
+        final allowed =
+            identity != null && _isAllowedSync(identity);
+        if (!allowed) {
           return PublicPageShell(
             child: _AuthPrompt(
               title: 'Access restricted',
@@ -265,7 +295,7 @@ class _AuthPrompt extends StatelessWidget {
                     height: 1.55,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xxl),
                 DrinkSpotButton(label: actionLabel, onPressed: onAction),
                 if (secondaryLabel != null && onSecondary != null) ...[
                   const SizedBox(height: AppSpacing.md),
