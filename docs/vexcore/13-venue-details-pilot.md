@@ -22,7 +22,6 @@ Firestore venues/{venueId}
 
 The venue details page still loads these sections directly from existing web repositories:
 
-- drinks menu
 - deals
 - events
 - related venue suggestions

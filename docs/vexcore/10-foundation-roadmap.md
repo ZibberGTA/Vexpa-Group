@@ -89,9 +89,10 @@ Completion criteria:
 | --- | --- | --- |
 | Public venue discovery catalog | Complete | Web search/catalog reads through `VenueDataService`. |
 | Public venue details profile | Complete | Web `VenueDetailsRepository` load/watch through `VenueDataService`. |
+| Public venue drinks menu | Complete | Web `VenueDrinksRepository.watchDrinks` through `VenueDrinkDataService`. |
 | Admin route guard | Complete | Web `/admin` guard uses VexCore auth/identity/permissions. |
 
-See `13-venue-details-pilot.md` for the venue details rollback path.
+See `13-venue-details-pilot.md` and `14-venue-drinks-pilot.md` for rollback paths.
 
 ## Phase 8 — Event Bus Foundation
 
