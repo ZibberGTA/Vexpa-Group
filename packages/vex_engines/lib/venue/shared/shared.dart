@@ -1,2 +1,6 @@
 /// Cross-layer venue helpers shared by web and mobile presentation.
 library;
+
+export 'image_position_metadata.dart';
+export 'venue_contact_utils.dart';
+export 'venue_opening_hours_formatter.dart';
