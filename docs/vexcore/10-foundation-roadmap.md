@@ -109,6 +109,19 @@ See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pil
 Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
 `docs/master-blueprint.md` still needs to be created.
 
+### Discovery Engine structure (in progress)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/discovery/` |
+| Pure domain/shared batch | Complete | Text utils, matcher, filters, open status, match DTOs |
+| Application orchestration | Complete | Venue search merge, ranking, unified composer |
+| Web runtime slice | Complete | `VenueSearchDataSource` + `UnifiedSearchService` wired |
+| Presentation + mobile | Planned | Pages/widgets remain in apps for now |
+
+Network calls unchanged on venue search path (1 catalog + 1 index lookup per search).
+See `packages/vex_engines/lib/discovery/MIGRATION_PLAN.md`.
+
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.
