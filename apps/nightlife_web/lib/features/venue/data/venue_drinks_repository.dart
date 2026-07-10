@@ -1,19 +1,27 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
+import '../../../core/vexcore/vex_venue_drink_mapper.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue_management/data/drink_write_payload.dart';
 import '../../venue_management/models/bulk_drink_patch.dart';
 import '../../venue_management/models/drink_categories.dart';
 import '../../venue_management/models/drink_import_row.dart';
 import 'models/drink_model.dart';
 
-/// Loads and writes drinks for a venue from Firestore.
+/// Loads and writes drinks for a venue.
 class VenueDrinksRepository {
-  VenueDrinksRepository({FirebaseFirestore? firestore})
-      : _firestoreOverride = firestore;
+  VenueDrinksRepository({
+    FirebaseFirestore? firestore,
+    VenueDrinkDataService? venueDrinkDataService,
+  }) : _firestoreOverride = firestore,
+       _venueDrinkDataService =
+           venueDrinkDataService ?? WebVexCore.venueDrinkDataService;
 
   final FirebaseFirestore? _firestoreOverride;
+  final VenueDrinkDataService _venueDrinkDataService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -21,24 +29,18 @@ class VenueDrinksRepository {
     return FirebaseFirestore.instance;
   }
 
-  Stream<List<DrinkModel>> watchDrinks(String venueId) async* {
-    final firestore = _resolveFirestore();
-    if (firestore == null) {
-      yield const [];
-      return;
+  Stream<List<DrinkModel>> watchDrinks(String venueId) {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      return Stream.value(const []);
     }
 
-    yield* firestore
-        .collection('drinks')
-        .where('venueId', isEqualTo: venueId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) {
-      final drinks = snapshot.docs
-          .map((doc) => DrinkModel.fromMap(doc.id, doc.data()))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      return drinks;
+    return _venueDrinkDataService.watchPublicDrinks(trimmedId).map((result) {
+      return switch (result) {
+        DataSuccess(:final value) =>
+          value.map(drinkModelFromVexVenueDrink).toList(),
+        DataFailure(:final error) => throw error,
+      };
     });
   }
 
@@ -121,7 +123,9 @@ class VenueDrinksRepository {
       await firestore.collection('drinks').doc(drinkId).update(payload);
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueDrinksRepository] update drink failed (${error.code})');
+        debugPrint(
+          '[VenueDrinksRepository] update drink failed (${error.code})',
+        );
       }
       rethrow;
     }
@@ -141,14 +145,16 @@ class VenueDrinksRepository {
       'isDeleted': true,
       'deletedAt': FieldValue.serverTimestamp(),
       'deletedBy': deletedBy,
-      if (deletedByEmail != null) 'deletedByEmail': deletedByEmail,
+      'deletedByEmail': ?deletedByEmail,
     };
 
     try {
       await firestore.collection('drinks').doc(drinkId).update(payload);
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueDrinksRepository] delete drink failed (${error.code})');
+        debugPrint(
+          '[VenueDrinksRepository] delete drink failed (${error.code})',
+        );
       }
       rethrow;
     }
@@ -189,7 +195,9 @@ class VenueDrinksRepository {
       await firestore.collection('drinks').doc(drinkId).update(payload);
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueDrinksRepository] patch drink failed (${error.code})');
+        debugPrint(
+          '[VenueDrinksRepository] patch drink failed (${error.code})',
+        );
       }
       rethrow;
     }
@@ -284,7 +292,9 @@ class VenueDrinksRepository {
       return importedCount;
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueDrinksRepository] bulk import failed (${error.code})');
+        debugPrint(
+          '[VenueDrinksRepository] bulk import failed (${error.code})',
+        );
       }
       rethrow;
     }
