@@ -6,5 +6,6 @@ void main() {
     expect(venueEngineLibraryExists, isTrue);
     expect(discoveryEngineLibraryExists, isTrue);
     expect(experienceEngineLibraryExists, isTrue);
+    expect(claimEngineLibraryExists, isTrue);
   });
 }
