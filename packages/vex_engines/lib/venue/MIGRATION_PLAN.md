@@ -190,7 +190,25 @@ Moved into Venue Engine with web re-export shims:
 Validation: `packages/vex_engines/test/venue/`; existing web tests compile
 through compatibility exports.
 
-### Phase 3 — Web management orchestration (next)
+### Phase 3 — Profile update orchestration (complete)
+
+Moved into Venue Engine:
+
+- `VenueProfileSearchContext` — engine-neutral search term context
+- `VenueProfileUpdate` — prepared field map + server timestamp field names
+- `VenueProfileUpdateService` — validates and prepares profile updates
+- `VenueProfileWriteRepository` — write contract (implementation stays in web)
+
+Web changes:
+
+- `FirebaseVenueProfileWriteRepository` performs one merge write per update
+- `VenueProfileRepository` delegates preparation to the engine and writes through the adapter
+- Permission checks remain in the web compatibility repository
+
+Rollback: point `VenueProfileRepository` methods back to inline Firestore writes;
+leave engine contracts unused.
+
+### Phase 4 — Broader management orchestration (next)
 
 - Extract write orchestration from `venue_profile_repository.dart` into `venue/application/`.
 - Keep Firestore adapters in web until a shared adapter strategy exists.

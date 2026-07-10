@@ -82,7 +82,8 @@ the Master Blueprint is created.
 | 0 — Structure | Complete | Folder layout, README, migration plan |
 | 1 — Shared helpers | Complete | Contact utils, opening hours, image position, profile completion |
 | 2 — Domain rules | Complete | Profile field codec/constants, image field parser |
-| 3 — Profile orchestration | Planned | Repository write orchestration stays in web for now |
+| 3 — Profile update orchestration | Complete | `VenueProfileUpdateService` prepares writes; Firebase adapter persists |
+| 4 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
 
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.
