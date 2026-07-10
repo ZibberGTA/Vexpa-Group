@@ -1,43 +1,42 @@
 import '../../venue/data/models/drink_model.dart';
+import 'package:vex_engines/experience/application/experience_featured_limit.dart';
 
 /// Configurable limit for featured drinks shown in the customer app.
 class FeaturedDrinksLimit {
   FeaturedDrinksLimit._();
 
-  static const int maxFeaturedDrinks = 5;
+  static const _limit = ExperienceFeaturedLimit.drinks;
 
-  static const String limitMessage =
-      'You can feature up to 5 drinks. Unfeature another drink first.';
+  static int get maxFeaturedDrinks => _limit.maxFeatured;
+
+  static String get limitMessage => _limit.limitMessage;
 
   static int countFeatured(Iterable<DrinkModel> drinks) =>
-      drinks.where((drink) => drink.featured).length;
+      _limit.countFeatured(drinks, (drink) => drink.featured);
 
   static String? validateAdd({
     required bool wantsFeatured,
     required Iterable<DrinkModel> venueDrinks,
-  }) {
-    if (!wantsFeatured) return null;
-    if (countFeatured(venueDrinks) >= maxFeaturedDrinks) {
-      return limitMessage;
-    }
-    return null;
-  }
+  }) =>
+      _limit.validateAdd(
+        wantsFeatured: wantsFeatured,
+        venueItems: venueDrinks,
+        isFeatured: (drink) => drink.featured,
+      );
 
   static String? validateEdit({
     required DrinkModel drink,
     required bool wantsFeatured,
     required Iterable<DrinkModel> venueDrinks,
-  }) {
-    if (!wantsFeatured || drink.featured) return null;
-
-    final otherFeatured = venueDrinks
-        .where((item) => item.featured && item.id != drink.id)
-        .length;
-    if (otherFeatured >= maxFeaturedDrinks) {
-      return limitMessage;
-    }
-    return null;
-  }
+  }) =>
+      _limit.validateEdit(
+        item: drink,
+        currentlyFeatured: drink.featured,
+        wantsFeatured: wantsFeatured,
+        venueItems: venueDrinks,
+        isFeatured: (item) => item.featured,
+        isSameItem: (item) => item.id == drink.id,
+      );
 
   static String? validateBulkEdit({
     required Iterable<DrinkModel> selectedDrinks,
@@ -45,15 +44,12 @@ class FeaturedDrinksLimit {
     required Iterable<bool> proposedFeaturedValues,
   }) {
     final editingIds = selectedDrinks.map((drink) => drink.id).toSet();
-    final unchangedFeatured = venueDrinks
-        .where((drink) => drink.featured && !editingIds.contains(drink.id))
-        .length;
-    final proposedFeatured =
-        proposedFeaturedValues.where((value) => value).length;
-
-    if (unchangedFeatured + proposedFeatured > maxFeaturedDrinks) {
-      return limitMessage;
-    }
-    return null;
+    return _limit.validateBulkEdit(
+      selectedItems: selectedDrinks,
+      venueItems: venueDrinks,
+      proposedFeaturedValues: proposedFeaturedValues,
+      isFeatured: (drink) => drink.featured,
+      isSelected: (drink) => editingIds.contains(drink.id),
+    );
   }
 }

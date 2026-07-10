@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:vex_engines/experience/shared/experience_featured_sort.dart';
+
 import '../../../../core/theme/app_spacing.dart';
 
 /// Shared column identifiers for the events management table.
@@ -54,19 +56,5 @@ List<T> sortEventsFeaturedFirst<T>(
   List<T> items,
   bool Function(T item) isFeatured,
   int Function(T a, T b) compare,
-) {
-  final featured = <T>[];
-  final nonFeatured = <T>[];
-
-  for (final item in items) {
-    if (isFeatured(item)) {
-      featured.add(item);
-    } else {
-      nonFeatured.add(item);
-    }
-  }
-
-  featured.sort(compare);
-  nonFeatured.sort(compare);
-  return [...featured, ...nonFeatured];
-}
+) =>
+    sortExperienceFeaturedFirst(items, isFeatured, compare);

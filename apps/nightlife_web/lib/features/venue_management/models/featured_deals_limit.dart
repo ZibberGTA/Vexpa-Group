@@ -1,38 +1,42 @@
 import '../../venue/data/models/deal_model.dart';
+import 'package:vex_engines/experience/application/experience_featured_limit.dart';
 
 /// Configurable limit for featured deals on the public venue profile.
 class FeaturedDealsLimit {
   FeaturedDealsLimit._();
 
-  static const int maxFeaturedDeals = 3;
+  static const _limit = ExperienceFeaturedLimit.deals;
 
-  static const String limitMessage =
-      'You can feature up to 3 deals. Unfeature another deal first.';
+  static int get maxFeaturedDeals => _limit.maxFeatured;
+
+  static String get limitMessage => _limit.limitMessage;
 
   static int countFeatured(Iterable<DealModel> deals) =>
-      deals.where((deal) => deal.featured).length;
+      _limit.countFeatured(deals, (deal) => deal.featured);
 
   static String? validateAdd({
     required bool wantsFeatured,
     required Iterable<DealModel> venueDeals,
-  }) {
-    if (!wantsFeatured) return null;
-    if (countFeatured(venueDeals) >= maxFeaturedDeals) return limitMessage;
-    return null;
-  }
+  }) =>
+      _limit.validateAdd(
+        wantsFeatured: wantsFeatured,
+        venueItems: venueDeals,
+        isFeatured: (deal) => deal.featured,
+      );
 
   static String? validateEdit({
     required DealModel deal,
     required bool wantsFeatured,
     required Iterable<DealModel> venueDeals,
-  }) {
-    if (!wantsFeatured || deal.featured) return null;
-    final otherFeatured = venueDeals
-        .where((item) => item.featured && item.id != deal.id)
-        .length;
-    if (otherFeatured >= maxFeaturedDeals) return limitMessage;
-    return null;
-  }
+  }) =>
+      _limit.validateEdit(
+        item: deal,
+        currentlyFeatured: deal.featured,
+        wantsFeatured: wantsFeatured,
+        venueItems: venueDeals,
+        isFeatured: (item) => item.featured,
+        isSameItem: (item) => item.id == deal.id,
+      );
 
   static String? validateBulkEdit({
     required Iterable<DealModel> selectedDeals,
@@ -40,15 +44,12 @@ class FeaturedDealsLimit {
     required Iterable<bool> proposedFeaturedValues,
   }) {
     final editingIds = selectedDeals.map((deal) => deal.id).toSet();
-    final unchangedFeatured = venueDeals
-        .where((deal) => deal.featured && !editingIds.contains(deal.id))
-        .length;
-    final proposedFeatured =
-        proposedFeaturedValues.where((value) => value).length;
-
-    if (unchangedFeatured + proposedFeatured > maxFeaturedDeals) {
-      return limitMessage;
-    }
-    return null;
+    return _limit.validateBulkEdit(
+      selectedItems: selectedDeals,
+      venueItems: venueDeals,
+      proposedFeaturedValues: proposedFeaturedValues,
+      isFeatured: (deal) => deal.featured,
+      isSelected: (deal) => editingIds.contains(deal.id),
+    );
   }
 }

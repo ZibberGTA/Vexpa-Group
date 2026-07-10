@@ -1,36 +1,37 @@
 import '../../venue/data/models/event_model.dart';
+import 'package:vex_engines/experience/application/experience_featured_limit.dart';
 
 /// Configurable limit for featured events on the public venue profile.
 class FeaturedEventsLimit {
   FeaturedEventsLimit._();
 
-  static const int maxFeaturedEvents = 3;
+  static const _limit = ExperienceFeaturedLimit.events;
 
-  static const String limitMessage =
-      'You can feature up to 3 events. Unfeature another event first.';
+  static int get maxFeaturedEvents => _limit.maxFeatured;
+
+  static String get limitMessage => _limit.limitMessage;
 
   static String? validateEdit({
     required EventModel event,
     required bool wantsFeatured,
     required Iterable<EventModel> venueEvents,
-  }) {
-    if (!wantsFeatured || event.featured) return null;
-
-    final otherFeatured = venueEvents
-        .where((item) => item.featured && item.id != event.id)
-        .length;
-    if (otherFeatured >= maxFeaturedEvents) return limitMessage;
-    return null;
-  }
+  }) =>
+      _limit.validateEdit(
+        item: event,
+        currentlyFeatured: event.featured,
+        wantsFeatured: wantsFeatured,
+        venueItems: venueEvents,
+        isFeatured: (item) => item.featured,
+        isSameItem: (item) => item.id == event.id,
+      );
 
   static String? validateAdd({
     required bool wantsFeatured,
     required Iterable<EventModel> venueEvents,
-  }) {
-    if (!wantsFeatured) return null;
-
-    final featuredCount = venueEvents.where((event) => event.featured).length;
-    if (featuredCount >= maxFeaturedEvents) return limitMessage;
-    return null;
-  }
+  }) =>
+      _limit.validateAdd(
+        wantsFeatured: wantsFeatured,
+        venueItems: venueEvents,
+        isFeatured: (event) => event.featured,
+      );
 }
