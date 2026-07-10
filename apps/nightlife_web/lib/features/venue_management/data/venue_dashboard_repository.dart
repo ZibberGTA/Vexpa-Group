@@ -14,7 +14,6 @@ import '../models/venue_dashboard_performance_highlight.dart';
 import '../models/venue_dashboard_stat.dart';
 import '../models/venue_dashboard_tab.dart';
 import '../models/venue_dashboard_whats_next_action.dart';
-import '../models/venue_profile_completion.dart';
 import '../services/venue_profile_completion_calculator.dart';
 import 'venue_activity_service.dart';
 import 'venue_analytics_service.dart';
