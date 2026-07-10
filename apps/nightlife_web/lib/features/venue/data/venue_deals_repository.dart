@@ -1,19 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
+import '../../../core/vexcore/vex_venue_deal_mapper.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue/data/models/deal_model.dart';
-import '../../venue/data/public_venue_content_filters.dart';
 import '../../venue_management/data/deal_write_payload.dart';
 import '../../venue_management/models/bulk_deal_patch.dart';
 import '../../venue_management/models/deal_types.dart';
 
-/// Loads and writes deals for a venue from Firestore.
+/// Loads and writes deals for a venue.
 class VenueDealsRepository {
-  VenueDealsRepository({FirebaseFirestore? firestore})
-      : _firestoreOverride = firestore;
+  VenueDealsRepository({
+    FirebaseFirestore? firestore,
+    VenueDealDataService? venueDealDataService,
+  }) : _firestoreOverride = firestore,
+       _venueDealDataService =
+           venueDealDataService ?? WebVexCore.venueDealDataService;
 
   final FirebaseFirestore? _firestoreOverride;
+  final VenueDealDataService _venueDealDataService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -21,33 +28,18 @@ class VenueDealsRepository {
     return FirebaseFirestore.instance;
   }
 
-  Stream<List<DealModel>> watchDeals(String venueId) async* {
-    final firestore = _resolveFirestore();
-    if (firestore == null) {
-      yield const [];
-      return;
+  Stream<List<DealModel>> watchDeals(String venueId) {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      return Stream.value(const []);
     }
 
-    yield* firestore
-        .collection('deals')
-        .where('venueId', isEqualTo: venueId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) {
-      final deals = snapshot.docs
-          .map((doc) => DealModel.fromMap(doc.id, doc.data()))
-          .where((deal) => isPublicVisibleDeal(deal))
-          .toList();
-
-      deals.sort((a, b) {
-        final aUpcoming = isPublicUpcomingDeal(a);
-        final bUpcoming = isPublicUpcomingDeal(b);
-        if (aUpcoming != bUpcoming) return aUpcoming ? 1 : -1;
-        return (a.startDateTime ?? DateTime(2100))
-            .compareTo(b.startDateTime ?? DateTime(2100));
-      });
-
-      return deals;
+    return _venueDealDataService.watchPublicDeals(trimmedId).map((result) {
+      return switch (result) {
+        DataSuccess(:final value) =>
+          value.map(dealModelFromVexVenueDeal).toList(),
+        DataFailure(:final error) => throw error,
+      };
     });
   }
 
@@ -65,12 +57,16 @@ class VenueDealsRepository {
         .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
-      final deals = snapshot.docs
-          .map((doc) => DealModel.fromMap(doc.id, doc.data()))
-          .toList()
-        ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-      return deals;
-    });
+          final deals =
+              snapshot.docs
+                  .map((doc) => DealModel.fromMap(doc.id, doc.data()))
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+                );
+          return deals;
+        });
   }
 
   Future<String> addDeal({
@@ -145,8 +141,11 @@ class VenueDealsRepository {
       dealType: source.dealType,
       value: source.value,
       startDateTime: source.startDateTime ?? DateTime.now(),
-      endDateTime: source.endDateTime ??
-          (source.startDateTime ?? DateTime.now()).add(const Duration(days: 30)),
+      endDateTime:
+          source.endDateTime ??
+          (source.startDateTime ?? DateTime.now()).add(
+            const Duration(days: 30),
+          ),
       availableDays: source.availableDays,
       startTime: source.startTime,
       endTime: source.endTime,
@@ -221,7 +220,7 @@ class VenueDealsRepository {
       'isDeleted': true,
       'deletedAt': FieldValue.serverTimestamp(),
       'deletedBy': deletedBy,
-      if (deletedByEmail != null) 'deletedByEmail': deletedByEmail,
+      'deletedByEmail': ?deletedByEmail,
     };
 
     try {
