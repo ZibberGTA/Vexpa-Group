@@ -25,7 +25,6 @@ These paths still use existing web repositories or direct Firestore:
 - venue deal writes (add, update, delete, duplicate, bulk patch)
 - venue management deals dashboard (`watchManagementDeals`)
 - unified search deal queries
-- events on the public venue page
 - admin deal moderation repositories
 
 ## Behaviour preserved

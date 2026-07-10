@@ -91,9 +91,10 @@ Completion criteria:
 | Public venue details profile | Complete | Web `VenueDetailsRepository` load/watch through `VenueDataService`. |
 | Public venue drinks menu | Complete | Web `VenueDrinksRepository.watchDrinks` through `VenueDrinkDataService`. |
 | Public venue deals menu | Complete | Web `VenueDealsRepository.watchDeals` through `VenueDealDataService`. |
+| Public venue events menu | Complete | Web `VenueEventsRepository.watchEvents` through `VenueEventDataService`. |
 | Admin route guard | Complete | Web `/admin` guard uses VexCore auth/identity/permissions. |
 
-See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, and `15-venue-deals-pilot.md` for rollback paths.
+See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pilot.md`, and `16-venue-events-pilot.md` for rollback paths.
 
 ## Phase 8 — Event Bus Foundation
 
