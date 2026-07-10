@@ -740,6 +740,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  vex_engines:
+    dependency: "direct main"
+    description:
+      path: "../../packages/vex_engines"
+      relative: true
+    source: path
+    version: "0.1.0"
   vm_service:
     dependency: transitive
     description:

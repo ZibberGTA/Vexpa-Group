@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vex_engines/discovery/shared/discovery_geo_utils.dart';
+import 'package:vex_engines/discovery/shared/search_text_utils.dart';
 
 import '../../../core/utils/venue_branding_parser.dart';
 import '../../../core/config/app_config.dart';
@@ -170,13 +172,7 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
   }
 
   List<String> _termsFromSearch(String value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .split(RegExp(r'[^a-z0-9]+'))
-        .where((term) => term.trim().isNotEmpty)
-        .take(10)
-        .toList();
+    return SearchTextUtils.termsFromQuery(value);
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
@@ -269,19 +265,16 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
   }
 
   bool _isLocationInsideBounds(GeoPoint point, LatLngBounds bounds) {
-    final lat = point.latitude;
-    final lng = point.longitude;
-
-    final withinLat =
-        lat >= bounds.southwest.latitude && lat <= bounds.northeast.latitude;
-
-    final west = bounds.southwest.longitude;
-    final east = bounds.northeast.longitude;
-    final withinLng = west <= east
-        ? lng >= west && lng <= east
-        : lng >= west || lng <= east;
-
-    return withinLat && withinLng;
+    return DiscoveryMapBounds.contains(
+      latitude: point.latitude,
+      longitude: point.longitude,
+      bounds: DiscoveryLatLngBounds(
+        southLatitude: bounds.southwest.latitude,
+        westLongitude: bounds.southwest.longitude,
+        northLatitude: bounds.northeast.latitude,
+        eastLongitude: bounds.northeast.longitude,
+      ),
+    );
   }
 
   String _viewportKeyFor({

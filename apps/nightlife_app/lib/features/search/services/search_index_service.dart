@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/discovery/shared/discovery_search_term_indexer.dart';
 
 class SearchIndexService {
   static final _db = FirebaseFirestore.instance;
@@ -25,80 +26,39 @@ class SearchIndexService {
 
     final Set<String> terms = {};
 
-    _addText(terms, venueData['name']);
-    _addText(terms, venueData['description']);
-    _addText(terms, venueData['address']);
-    _addText(terms, venueData['category']);
-    _addText(terms, venueData['crowdLevel']);
+    DiscoverySearchTermIndexer.addText(terms, venueData['name']);
+    DiscoverySearchTermIndexer.addText(terms, venueData['description']);
+    DiscoverySearchTermIndexer.addText(terms, venueData['address']);
+    DiscoverySearchTermIndexer.addText(terms, venueData['category']);
+    DiscoverySearchTermIndexer.addText(terms, venueData['crowdLevel']);
 
     for (final doc in drinksSnapshot.docs) {
       final data = doc.data();
 
-      _addText(terms, data['name']);
-      _addText(terms, data['category']);
-      _addText(terms, data['description']);
-      _addText(terms, data['price']);
-      _addList(terms, data['keywords']);
+      DiscoverySearchTermIndexer.addText(terms, data['name']);
+      DiscoverySearchTermIndexer.addText(terms, data['category']);
+      DiscoverySearchTermIndexer.addText(terms, data['description']);
+      DiscoverySearchTermIndexer.addText(terms, data['price']);
+      DiscoverySearchTermIndexer.addList(terms, data['keywords']);
     }
 
     for (final doc in dealsSnapshot.docs) {
       final data = doc.data();
 
-      _addText(terms, data['title']);
-      _addText(terms, data['description']);
-      _addText(terms, data['startTime']);
-      _addText(terms, data['endTime']);
-      _addList(terms, data['keywords']);
+      DiscoverySearchTermIndexer.addText(terms, data['title']);
+      DiscoverySearchTermIndexer.addText(terms, data['description']);
+      DiscoverySearchTermIndexer.addText(terms, data['startTime']);
+      DiscoverySearchTermIndexer.addText(terms, data['endTime']);
+      DiscoverySearchTermIndexer.addList(terms, data['keywords']);
     }
 
     if (dealsSnapshot.docs.isNotEmpty) {
-      terms.addAll([
-        'deal',
-        'deals',
-        'offer',
-        'offers',
-        'discount',
-        'happy',
-        'hour',
-        'happy hour',
-      ]);
+      DiscoverySearchTermIndexer.addDealKeywords(terms);
     }
 
     await venueRef.update({
       'searchTerms': terms.toList(),
       'hasDeals': dealsSnapshot.docs.isNotEmpty,
     });
-  }
-
-  static void _addText(Set<String> terms, dynamic value) {
-    if (value == null) return;
-
-    final text = value.toString().toLowerCase().trim();
-    if (text.isEmpty) return;
-
-    terms.add(text);
-
-    final words = text
-        .split(RegExp(r'[^a-z0-9]+'))
-        .where((word) => word.trim().isNotEmpty)
-        .toList();
-
-    terms.addAll(words);
-
-    for (var i = 0; i < words.length - 1; i++) {
-      terms.add('${words[i]} ${words[i + 1]}');
-    }
-
-    for (var i = 0; i < words.length - 2; i++) {
-      terms.add('${words[i]} ${words[i + 1]} ${words[i + 2]}');
-    }
-  }
-
-  static void _addList(Set<String> terms, dynamic list) {
-    if (list is List) {
-      for (final item in list) {
-        _addText(terms, item);
-      }
-    }
   }
 }

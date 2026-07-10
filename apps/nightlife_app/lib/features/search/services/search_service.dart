@@ -1,34 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/discovery/application/discovery_mobile_search_rules.dart';
+import 'package:vex_engines/discovery/shared/search_text_utils.dart';
 
 import '../../../core/utils/venue_branding_parser.dart';
 
 class SearchService {
   static final _db = FirebaseFirestore.instance;
-
-  static String _normalise(String value) => value.trim().toLowerCase();
-
-  static bool _containsQuery(dynamic value, String query) {
-    if (query.isEmpty) return true;
-    if (value == null) return false;
-
-    if (value is Iterable) {
-      return value.any((item) => _containsQuery(item, query));
-    }
-
-    return value.toString().toLowerCase().contains(query);
-  }
-
-  static String _formatPrice(dynamic rawPrice) {
-    if (rawPrice == null) return '';
-
-    if (rawPrice is num) {
-      return '£${rawPrice.toStringAsFixed(2)}';
-    }
-
-    final value = rawPrice.toString().trim();
-    if (value.isEmpty) return '';
-    return value.startsWith('£') ? value : '£$value';
-  }
 
   static Future<Map<String, dynamic>?> _loadVenue(
     String venueId,
@@ -57,35 +34,6 @@ class SearchService {
     return cache[venueId];
   }
 
-  static bool _venuePassesFilters({
-    required Map<String, dynamic> venueData,
-    String? crowdLevel,
-    bool busyOnly = false,
-    String? venueType,
-  }) {
-    if (venueType != null && venueType != 'All') {
-      final venueKind = (venueData['venueType'] ?? venueData['category'] ?? '')
-          .toString()
-          .toLowerCase();
-      if (!venueKind.contains(venueType.toLowerCase())) return false;
-    }
-
-    final venueCrowd = (venueData['crowdLevel'] ??
-            venueData['currentCrowdLevel'] ??
-            'unknown')
-        .toString();
-
-    if (crowdLevel != null && crowdLevel != 'All' && venueCrowd != crowdLevel) {
-      return false;
-    }
-
-    if (busyOnly && venueCrowd != 'busy' && venueCrowd != 'packed') {
-      return false;
-    }
-
-    return true;
-  }
-
   static Map<String, dynamic> _venueResultShell(Map<String, dynamic> venueData) {
     return {
       'venueId': venueData['id']?.toString() ?? '',
@@ -105,44 +53,6 @@ class SearchService {
     };
   }
 
-  static void _addVenueResult({
-    required Map<String, Map<String, dynamic>> grouped,
-    required Map<String, dynamic> venueData,
-    Map<String, dynamic>? drink,
-    Map<String, dynamic>? deal,
-    Map<String, dynamic>? event,
-  }) {
-    final venueId = venueData['id']?.toString() ?? '';
-    if (venueId.isEmpty) return;
-
-    final result = grouped.putIfAbsent(
-      venueId,
-      () => _venueResultShell(venueData),
-    );
-
-    if (drink != null) {
-      final drinks = result['matchedDrinks'] as List<Map<String, dynamic>>;
-      if (!drinks.any((item) => item['id'] == drink['id'])) {
-        drinks.add(drink);
-      }
-    }
-
-    if (deal != null) {
-      final deals = result['matchedDeals'] as List<Map<String, dynamic>>;
-      if (!deals.any((item) => item['id'] == deal['id'])) {
-        deals.add(deal);
-      }
-      result['hasDeal'] = true;
-    }
-
-    if (event != null) {
-      final events = result['matchedEvents'] as List<Map<String, dynamic>>;
-      if (!events.any((item) => item['id'] == event['id'])) {
-        events.add(event);
-      }
-    }
-  }
-
   static Future<List<Map<String, dynamic>>> searchVenueResults({
     required String query,
     String? category,
@@ -153,7 +63,7 @@ class SearchService {
     String? priceBand,
     int resultLimit = 30,
   }) async {
-    final cleanQuery = _normalise(query);
+    final cleanQuery = SearchTextUtils.normalise(query);
     if (cleanQuery.length < 2) return <Map<String, dynamic>>[];
     final grouped = <String, Map<String, dynamic>>{};
     final venueCache = <String, Map<String, dynamic>?>{};
@@ -187,32 +97,27 @@ class SearchService {
         if (venueId == null || venueId.isEmpty) continue;
 
         final matchesQuery = cleanQuery.isEmpty ||
-            _containsQuery(drinkData['name'], cleanQuery) ||
-            _containsQuery(drinkData['brand'], cleanQuery) ||
-            _containsQuery(drinkData['category'], cleanQuery) ||
-            _containsQuery(drinkData['ingredients'], cleanQuery) ||
-            _containsQuery(drinkData['searchTerms'], cleanQuery) ||
-            _containsQuery(drinkData['searchKeywords'], cleanQuery);
+            SearchTextUtils.containsQuery(drinkData['name'], cleanQuery) ||
+            SearchTextUtils.containsQuery(drinkData['brand'], cleanQuery) ||
+            SearchTextUtils.containsQuery(drinkData['category'], cleanQuery) ||
+            SearchTextUtils.containsQuery(drinkData['ingredients'], cleanQuery) ||
+            SearchTextUtils.containsQuery(drinkData['searchTerms'], cleanQuery) ||
+            SearchTextUtils.containsQuery(drinkData['searchKeywords'], cleanQuery);
 
         if (!matchesQuery) continue;
 
-        if (priceBand != null && priceBand != 'All') {
-          final price = drinkData['price'];
-          if (price is num) {
-            final matchesPrice = switch (priceBand) {
-              '£' => price < 6,
-              '££' => price >= 6 && price < 12,
-              '£££' => price >= 12,
-              _ => true,
-            };
-            if (!matchesPrice) continue;
-          }
+        if (priceBand != null &&
+            !DiscoveryVenueFilterRules.matchesPriceBand(
+              price: drinkData['price'],
+              priceBand: priceBand,
+            )) {
+          continue;
         }
 
         final venueData = await _loadVenue(venueId, venueCache);
         if (venueData == null) continue;
 
-        if (!_venuePassesFilters(
+        if (!DiscoveryVenueFilterRules.passesFilters(
           venueData: venueData,
           crowdLevel: crowdLevel,
           busyOnly: busyOnly,
@@ -221,14 +126,15 @@ class SearchService {
           continue;
         }
 
-        _addVenueResult(
+        DiscoveryMobileSearchMerger.upsertMatch(
           grouped: grouped,
           venueData: venueData,
+          buildShell: _venueResultShell,
           drink: {
             'id': drinkDoc.id,
             'name': drinkData['name']?.toString() ?? '',
             'category': drinkData['category']?.toString() ?? '',
-            'price': _formatPrice(drinkData['price']),
+            'price': SearchTextUtils.formatPrice(drinkData['price']),
             'available': drinkData['available'] == true,
           },
         );
@@ -247,11 +153,11 @@ class SearchService {
         final dealData = dealDoc.data();
 
         final matchesQuery = cleanQuery.isEmpty ||
-            _containsQuery(dealData['title'], cleanQuery) ||
-            _containsQuery(dealData['description'], cleanQuery) ||
-            _containsQuery(dealData['category'], cleanQuery) ||
-            _containsQuery(dealData['searchTerms'], cleanQuery) ||
-            _containsQuery(dealData['searchKeywords'], cleanQuery);
+            SearchTextUtils.containsQuery(dealData['title'], cleanQuery) ||
+            SearchTextUtils.containsQuery(dealData['description'], cleanQuery) ||
+            SearchTextUtils.containsQuery(dealData['category'], cleanQuery) ||
+            SearchTextUtils.containsQuery(dealData['searchTerms'], cleanQuery) ||
+            SearchTextUtils.containsQuery(dealData['searchKeywords'], cleanQuery);
 
         if (!matchesQuery) continue;
 
@@ -261,7 +167,7 @@ class SearchService {
         final venueData = await _loadVenue(venueId, venueCache);
         if (venueData == null) continue;
 
-        if (!_venuePassesFilters(
+        if (!DiscoveryVenueFilterRules.passesFilters(
           venueData: venueData,
           crowdLevel: crowdLevel,
           busyOnly: busyOnly,
@@ -270,9 +176,10 @@ class SearchService {
           continue;
         }
 
-        _addVenueResult(
+        DiscoveryMobileSearchMerger.upsertMatch(
           grouped: grouped,
           venueData: venueData,
+          buildShell: _venueResultShell,
           deal: {
             'id': dealDoc.id,
             'title': dealData['title']?.toString() ?? '',
@@ -293,17 +200,20 @@ class SearchService {
       for (final eventDoc in eventSnapshot.docs) {
         final eventData = eventDoc.data();
         final endTimestamp = eventData['endDateTime'] as Timestamp?;
-        final startTimestamp = eventData['startDateTime'] as Timestamp? ?? eventData['dateTime'] as Timestamp?;
+        final startTimestamp = eventData['startDateTime'] as Timestamp? ??
+            eventData['dateTime'] as Timestamp?;
         final endDate = endTimestamp?.toDate() ??
-            (startTimestamp == null ? null : startTimestamp.toDate().add(const Duration(hours: 24)));
+            (startTimestamp == null
+                ? null
+                : startTimestamp.toDate().add(const Duration(hours: 24)));
         if (endDate == null || endDate.isBefore(now)) continue;
 
         final matchesQuery = cleanQuery.isEmpty ||
-            _containsQuery(eventData['title'], cleanQuery) ||
-            _containsQuery(eventData['description'], cleanQuery) ||
-            _containsQuery(eventData['category'], cleanQuery) ||
-            _containsQuery(eventData['searchTerms'], cleanQuery) ||
-            _containsQuery(eventData['searchKeywords'], cleanQuery);
+            SearchTextUtils.containsQuery(eventData['title'], cleanQuery) ||
+            SearchTextUtils.containsQuery(eventData['description'], cleanQuery) ||
+            SearchTextUtils.containsQuery(eventData['category'], cleanQuery) ||
+            SearchTextUtils.containsQuery(eventData['searchTerms'], cleanQuery) ||
+            SearchTextUtils.containsQuery(eventData['searchKeywords'], cleanQuery);
 
         if (!matchesQuery) continue;
 
@@ -313,7 +223,7 @@ class SearchService {
         final venueData = await _loadVenue(venueId, venueCache);
         if (venueData == null) continue;
 
-        if (!_venuePassesFilters(
+        if (!DiscoveryVenueFilterRules.passesFilters(
           venueData: venueData,
           crowdLevel: crowdLevel,
           busyOnly: busyOnly,
@@ -322,9 +232,10 @@ class SearchService {
           continue;
         }
 
-        _addVenueResult(
+        DiscoveryMobileSearchMerger.upsertMatch(
           grouped: grouped,
           venueData: venueData,
+          buildShell: _venueResultShell,
           event: {
             'id': eventDoc.id,
             'title': eventData['title']?.toString() ?? '',
@@ -335,17 +246,7 @@ class SearchService {
     }
 
     final results = grouped.values.toList();
-
-    results.sort((a, b) {
-      final aCount = (a['matchedDrinks'] as List).length +
-          (a['matchedDeals'] as List).length +
-          (a['matchedEvents'] as List).length;
-      final bCount = (b['matchedDrinks'] as List).length +
-          (b['matchedDeals'] as List).length +
-          (b['matchedEvents'] as List).length;
-      return bCount.compareTo(aCount);
-    });
-
+    DiscoveryMobileSearchRanking.sortByMatchCount(results);
     return results.take(resultLimit).toList();
   }
 

@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/discovery/application/discovery_recommendation_scorer.dart';
+import 'package:vex_engines/discovery/domain/discovery_recommendation.dart';
 
 import '../../crowd/utils/crowd_decay.dart';
 import '../../home/models/deal_model.dart';
@@ -20,6 +22,7 @@ class VenueRecommendation {
 class VenueRecommendationService {
   VenueRecommendationService._();
 
+  static const _scorer = DiscoveryRecommendationScorer();
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static Stream<List<VenueRecommendation>> recommendedNow({int limit = 6}) {
@@ -33,24 +36,11 @@ class VenueRecommendationService {
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final venue = VenueModel.fromMap(doc.id, data);
-        var score = 0;
-        final reasons = <String>[];
 
         final crowd = CrowdDecay.displayLevel(
           level: venue.crowdLevel,
           updatedAt: data['crowdUpdatedAt'] ?? data['updatedAt'],
         ).toLowerCase();
-
-        if (crowd == 'packed') {
-          score += 35;
-          reasons.add('packed now');
-        } else if (crowd == 'busy') {
-          score += 25;
-          reasons.add('busy now');
-        } else if (crowd == 'medium' || crowd == 'steady' || crowd == 'lively') {
-          score += 12;
-          reasons.add('good atmosphere');
-        }
 
         final dealSnapshot = await _db
             .collection('deals')
@@ -65,11 +55,6 @@ class VenueRecommendationService {
             .where((deal) => deal.isCurrentlyVisible)
             .toList();
 
-        if (activeDeals.isNotEmpty) {
-          score += activeDeals.length * 15;
-          reasons.add('${activeDeals.length} active deal${activeDeals.length == 1 ? '' : 's'}');
-        }
-
         final now = DateTime.now();
         final eventSnapshot = await _db
             .collection('events')
@@ -83,24 +68,33 @@ class VenueRecommendationService {
             .where((event) => event.endDateTime.isAfter(now))
             .toList();
 
-        if (upcomingEvents.isNotEmpty) {
-          score += upcomingEvents.length * 20;
-          reasons.add('${upcomingEvents.length} upcoming event${upcomingEvents.length == 1 ? '' : 's'}');
-        }
+        final scored = _scorer.score(
+          RecommendationScoreInput(
+            crowdLevel: crowd,
+            activeDealCount: activeDeals.length,
+            upcomingEventCount: upcomingEvents.length,
+            hasDealsFlag: venue.hasDeals,
+          ),
+        );
 
-        if (venue.hasDeals) score += 5;
-
-        if (score > 0) {
-          recommendations.add(VenueRecommendation(
-            venue: venue,
-            score: score,
-            reason: reasons.take(2).join(' • '),
-          ));
+        if (scored.isEligible) {
+          recommendations.add(
+            VenueRecommendation(
+              venue: venue,
+              score: scored.score,
+              reason: scored.reason,
+            ),
+          );
         }
       }
 
-      recommendations.sort((a, b) => b.score.compareTo(a.score));
-      return recommendations.take(limit).toList();
+      return _scorer.rankByScore(
+        items: recommendations,
+        readScore: (item) => item.score,
+        tieBreaker: (a, b) =>
+            a.venue.name.toLowerCase().compareTo(b.venue.name.toLowerCase()),
+        limit: limit,
+      );
     });
   }
 }

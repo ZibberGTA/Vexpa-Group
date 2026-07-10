@@ -1,31 +1,12 @@
-import 'dart:math';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/discovery/application/discovery_trending_scorer.dart';
+import 'package:vex_engines/discovery/domain/discovery_trending.dart';
 
 import '../../analytics/services/analytics_service.dart';
 import '../../home/models/venue_model.dart';
 
-class TrendingScoreBreakdown {
-  final double viewScore;
-  final double favouriteScore;
-  final double crowdScore;
-  final double conversionScore;
-  final double activityScore;
-  final double freshnessScore;
-  final double boostScore;
-
-  const TrendingScoreBreakdown({
-    required this.viewScore,
-    required this.favouriteScore,
-    required this.crowdScore,
-    required this.conversionScore,
-    required this.activityScore,
-    required this.freshnessScore,
-    required this.boostScore,
-  });
-
-  double get total => viewScore + favouriteScore + crowdScore + conversionScore + activityScore + freshnessScore + boostScore;
-}
+export 'package:vex_engines/discovery/domain/discovery_trending.dart'
+    show TrendingScoreBreakdown;
 
 class TrendingVenue {
   final VenueModel venue;
@@ -52,6 +33,7 @@ class TrendingVenue {
 class TrendingService {
   TrendingService._();
 
+  static const _scorer = DiscoveryTrendingScorer();
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static Future<List<TrendingVenue>> getTrendingVenues({
@@ -85,16 +67,21 @@ class TrendingService {
         range: range,
       );
 
-      final breakdown = _scoreVenue(
-        venue: venue,
-        summary: summary,
-        boostScore: boostScore.toDouble(),
-        since: since,
+      final scored = _scorer.score(
+        TrendingScoreInput(
+          venueViews: summary.venueViews,
+          favouriteTaps: summary.favouriteTaps,
+          crowdUpdates: summary.crowdUpdates,
+          drinkViews: summary.drinkViews,
+          dealViews: summary.dealViews,
+          eventViews: summary.eventViews,
+          crowdLevel: venue.crowdLevel,
+          boostScore: boostScore.toDouble(),
+          rangeSince: since,
+        ),
       );
 
-      final score = breakdown.total;
-
-      if (score > 0 || boostActive) {
+      if (scored.score > 0 || boostActive) {
         items.add(
           TrendingVenue(
             venue: venue,
@@ -102,83 +89,28 @@ class TrendingService {
             favourites: summary.favouriteTaps,
             crowdUpdates: summary.crowdUpdates,
             boostScore: boostScore,
-            score: score,
-            breakdown: breakdown,
+            score: scored.score,
+            breakdown: scored.breakdown,
           ),
         );
       }
     }
 
-    items.sort((a, b) => b.score.compareTo(a.score));
-    return items.take(limit).toList();
-  }
-
-  static TrendingScoreBreakdown _scoreVenue({
-    required VenueModel venue,
-    required AnalyticsSummary summary,
-    required double boostScore,
-    DateTime? since,
-  }) {
-    final views = summary.venueViews;
-    final favourites = summary.favouriteTaps;
-    final crowdUpdates = summary.crowdUpdates;
-    final drinkViews = summary.drinkViews;
-    final dealViews = summary.dealViews;
-    final eventViews = summary.eventViews;
-
-    // Logarithmic scoring prevents one massive venue from permanently dominating.
-    final viewScore = log(views + 1) * 9;
-    final favouriteScore = log(favourites + 1) * 18;
-    final crowdScore = log(crowdUpdates + 1) * 12 + _crowdLevelBonus(venue.crowdLevel);
-
-    // Rewards venues that convert views into saves, without overrewarding tiny samples.
-    final conversion = views == 0 ? 0 : favourites / views;
-    final confidence = min(1.0, views / 30);
-    final conversionScore = conversion * confidence * 40;
-
-    // Rewards live inventory activity: drinks, deals, and events that users engage with.
-    final activityScore = (log(drinkViews + 1) * 5) +
-        (log(dealViews + 1) * 8) +
-        (log(eventViews + 1) * 8);
-
-    // Fresh ranges should move faster; all-time still works but has less freshness pressure.
-    final double freshnessScore =
-    since == null ? 0.0 : _rangeFreshnessMultiplier(since) * 5.0;
-
-    return TrendingScoreBreakdown(
-      viewScore: viewScore,
-      favouriteScore: favouriteScore,
-      crowdScore: crowdScore,
-      conversionScore: conversionScore,
-      activityScore: activityScore,
-      freshnessScore: freshnessScore.toDouble(),
-      boostScore: boostScore,
+    return _scorer.rankByScore(
+      items: items,
+      readScore: (item) => item.score,
+      tieBreaker: (a, b) =>
+          a.venue.name.toLowerCase().compareTo(b.venue.name.toLowerCase()),
+      limit: limit,
     );
   }
 
-  static double _rangeFreshnessMultiplier(DateTime since) {
-    final ageDays = DateTime.now().difference(since).inDays.clamp(1, 30);
-    return 1 / sqrt(ageDays);
-  }
-
-  static int _crowdLevelBonus(String crowdLevel) {
-    switch (crowdLevel.toLowerCase()) {
-      case 'packed':
-        return 24;
-      case 'busy':
-        return 16;
-      case 'medium':
-      case 'moderate':
-        return 8;
-      default:
-        return 0;
-    }
-  }
-
   static bool _isBoostActive(Map<String, dynamic>? data) {
-    if (data == null || data['active'] != true) return false;
+    if (data == null) return false;
     final endsAt = data['endsAt'];
-    if (endsAt is Timestamp) return endsAt.toDate().isAfter(DateTime.now());
-    return true;
+    return DiscoveryBoostEvaluator.isBoostActive(
+      active: data['active'] == true,
+      endsAt: endsAt is Timestamp ? endsAt.toDate() : null,
+    );
   }
 }
