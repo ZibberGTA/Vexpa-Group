@@ -51,31 +51,43 @@ class EventModel {
   }
 
   factory EventModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
+    return EventModel.fromMap(doc.id, doc.data() ?? {});
+  }
 
-    final start = (data['startDateTime'] as Timestamp?)?.toDate() ??
-        (data['dateTime'] as Timestamp?)?.toDate() ??
+  factory EventModel.fromMap(String id, Map<String, dynamic> data) {
+    final start =
+        _dateFromValue(data['startDateTime']) ??
+        _dateFromValue(data['dateTime']) ??
         DateTime.now();
 
-    final end = (data['endDateTime'] as Timestamp?)?.toDate() ??
+    final end =
+        _dateFromValue(data['endDateTime']) ??
         start.add(const Duration(hours: 4));
 
     return EventModel(
-      id: doc.id,
+      id: id,
       venueId: data['venueId']?.toString() ?? '',
       title: data['title']?.toString() ?? '',
       description: data['description']?.toString() ?? '',
       startDateTime: start,
       endDateTime: end,
-      createdAt:
-          (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _dateFromValue(data['createdAt']) ?? DateTime.now(),
       category: data['category']?.toString() ?? 'General',
       imageUrl: data['imageUrl']?.toString() ?? '',
       isDeleted: data['isDeleted'] == true,
       artist: (data['artist'] ?? data['artistName'] ?? '').toString(),
       isActive: data['isActive'] != false,
       featured: data['featured'] == true,
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      updatedAt: _dateFromValue(data['updatedAt']),
     );
+  }
+
+  static DateTime? _dateFromValue(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 }
