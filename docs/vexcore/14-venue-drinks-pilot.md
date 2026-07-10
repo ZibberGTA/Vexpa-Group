@@ -25,7 +25,7 @@ These paths still use existing web repositories or direct Firestore:
 - venue drink writes (add, update, delete, bulk import)
 - venue management drinks dashboard
 - unified search drink queries
-- deals and events on the public venue page
+- events on the public venue page
 - admin drink moderation repositories
 
 ## Behaviour preserved
