@@ -1,4 +1,5 @@
-import 'dart:math' as math;
+import 'package:vex_engines/discovery/application/discovery_related_venue_service.dart';
+import 'package:vex_engines/discovery/domain/discovery_related_venue.dart';
 
 import '../../search/data/search_venue_catalog.dart';
 import '../../search/data/search_venue_repository.dart';
@@ -9,13 +10,21 @@ import '../models/venue_details_view.dart';
 class VenueRelatedRepository {
   VenueRelatedRepository({
     SearchVenueRepository? searchRepository,
+    DiscoveryRelatedVenueService? relatedVenueService,
     this._catalogOverride,
-  }) : _searchRepository = searchRepository ?? SearchVenueRepository();
+  }) : _searchRepository = searchRepository ?? SearchVenueRepository(),
+       _relatedVenueService =
+           relatedVenueService ?? const DiscoveryRelatedVenueService();
 
-  VenueRelatedRepository.withCatalog(this._catalogOverride)
-      : _searchRepository = SearchVenueRepository();
+  VenueRelatedRepository.withCatalog(
+    this._catalogOverride, {
+    DiscoveryRelatedVenueService? relatedVenueService,
+  }) : _searchRepository = SearchVenueRepository(),
+       _relatedVenueService =
+           relatedVenueService ?? const DiscoveryRelatedVenueService();
 
   final SearchVenueRepository _searchRepository;
+  final DiscoveryRelatedVenueService _relatedVenueService;
   final SearchVenueCatalog? _catalogOverride;
 
   Future<VenueRelatedSuggestions> loadSuggestions(VenueDetailsView venue) async {
@@ -24,88 +33,29 @@ class VenueRelatedRepository {
     final candidates =
         catalog.venues.where((item) => item.id != venue.id).toList();
 
-    final similar = _similarVenues(venue, candidates);
-    final nearby = _nearbyVenues(venue, candidates);
+    final subject = DiscoveryRelatedVenueSubject(
+      id: venue.id,
+      category: venue.displayCategory,
+      city: venue.city,
+      tags: venue.tags,
+      latitude: venue.latitude,
+      longitude: venue.longitude,
+    );
+
+    final similar = _relatedVenueService.rankSimilar(
+      subject: subject,
+      candidates: candidates,
+    );
+    final nearby = _relatedVenueService.rankNearby(
+      subject: subject,
+      candidates: candidates,
+    );
 
     return VenueRelatedSuggestions(
       similarVenues: similar,
       nearbyVenues: nearby,
     );
   }
-
-  List<VenueSearchResult> _similarVenues(
-    VenueDetailsView venue,
-    List<VenueSearchResult> candidates,
-  ) {
-    final category = venue.displayCategory.toLowerCase();
-    final city = venue.city.toLowerCase();
-
-    final scored = candidates.map((candidate) {
-      var score = 0;
-      if (candidate.venueType.toLowerCase() == category) score += 3;
-      if (candidate.city.toLowerCase() == city && city.isNotEmpty) score += 2;
-      for (final tag in venue.tags) {
-        if (candidate.tags.any(
-          (candidateTag) =>
-              candidateTag.toLowerCase() == tag.toLowerCase(),
-        )) {
-          score += 1;
-        }
-      }
-      return (candidate: candidate, score: score);
-    }).toList();
-
-    scored.sort((a, b) => b.score.compareTo(a.score));
-    return scored
-        .where((entry) => entry.score > 0)
-        .map((entry) => entry.candidate)
-        .take(4)
-        .toList();
-  }
-
-  List<VenueSearchResult> _nearbyVenues(
-    VenueDetailsView venue,
-    List<VenueSearchResult> candidates,
-  ) {
-    if (!venue.hasCoordinates) {
-      return candidates
-          .where(
-            (candidate) =>
-                venue.city.isNotEmpty &&
-                candidate.city.toLowerCase() == venue.city.toLowerCase(),
-          )
-          .take(4)
-          .toList();
-    }
-
-    final scored = candidates.map((candidate) {
-      final distance = _distanceKm(
-        venue.latitude!,
-        venue.longitude!,
-        candidate.latitude,
-        candidate.longitude,
-      );
-      return (candidate: candidate, distance: distance);
-    }).toList();
-
-    scored.sort((a, b) => a.distance.compareTo(b.distance));
-    return scored.map((entry) => entry.candidate).take(4).toList();
-  }
-
-  double _distanceKm(double lat1, double lng1, double lat2, double lng2) {
-    const earthRadiusKm = 6371.0;
-    final dLat = _degToRad(lat2 - lat1);
-    final dLng = _degToRad(lng2 - lng1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degToRad(lat1)) *
-            math.cos(_degToRad(lat2)) *
-            math.sin(dLng / 2) *
-            math.sin(dLng / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadiusKm * c;
-  }
-
-  double _degToRad(double value) => value * math.pi / 180;
 }
 
 class VenueRelatedSuggestions {

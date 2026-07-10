@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:vex_engines/discovery/domain/discovery_related_venue.dart';
 import 'package:vex_engines/discovery/domain/discovery_venue_searchable.dart';
 
 import '../../venues/models/image_position_metadata.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Search result model for cards and map markers.
-class VenueSearchResult implements DiscoveryVenueMatchable {
+class VenueSearchResult
+    implements DiscoveryVenueMatchable, DiscoveryRelatedVenueCandidate {
   const VenueSearchResult({
     required this.id,
     required this.name,
