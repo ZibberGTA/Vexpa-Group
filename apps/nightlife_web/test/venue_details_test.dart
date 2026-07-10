@@ -89,6 +89,7 @@ void main() {
           price: 12,
           description: '',
           available: true,
+          featured: false,
           isDeleted: false,
         ),
       ];
