@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Discover the UK's best nightlife — drinks, deals, events and venues with Vexda.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Vexda">
+  <meta name="theme-color" content="#111218">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Vexda</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!--
+    FIREBASE WEB SETUP
+
+    Firebase is initialized from Dart in main.dart using lib/firebase_options.dart.
+    Required web config fields: apiKey, authDomain, projectId, storageBucket,
+    messagingSenderId, appId.
+
+    If initialization fails, the search page falls back to mock preview data.
+    Hot restart after changing this file or firebase_options.dart.
+  -->
+
+  <!--
+    GOOGLE MAPS WEB SETUP (required for google_maps_flutter on /search)
+
+    1) Enable "Maps JavaScript API" for GCP project: nightlife-app-19acd
+       https://console.cloud.google.com/marketplace/product/google/maps-javascript-api.googleapis.com?project=nightlife-app-19acd
+
+    2) Confirm billing is enabled on the same project.
+
+    3) API key restrictions (Credentials → Browser key):
+       - Development: allow http://localhost:* and http://127.0.0.1:*
+       - Production: add your live domain later, e.g. https://vexda.com/*
+
+    4) The key below matches the Vexda mobile Android Maps SDK key.
+       ApiNotActivatedMapError means step (1) is not complete yet — enabling
+       Maps SDK for Android alone is not enough for Flutter Web.
+
+    5) google_maps_flutter_web is also listed in pubspec.yaml for clarity;
+       it is endorsed by google_maps_flutter on current Flutter versions.
+
+    After changing this file, hot restart Chrome (not hot reload).
+  -->
+  <script>
+    window.vexdaMapsLoadState = {
+      error: null,
+      errorDetail: null,
+    };
+
+    window.gm_authFailure = function () {
+      window.vexdaMapsLoadState.error = 'gm_authFailure';
+      window.vexdaMapsLoadState.errorDetail =
+        'Google Maps authentication failed. Enable Maps JavaScript API for project nightlife-app-19acd, confirm billing, and allow http://localhost:* on the browser API key.';
+      console.error('[Vexda Maps]', window.vexdaMapsLoadState.errorDetail);
+    };
+
+    (function () {
+      var originalError = console.error;
+      console.error = function () {
+        var message = Array.prototype.join.call(arguments, ' ');
+        if (message.indexOf('Google Maps JavaScript API error') !== -1) {
+          window.vexdaMapsLoadState.error = message;
+          if (message.indexOf('ApiNotActivatedMapError') !== -1) {
+            window.vexdaMapsLoadState.errorDetail =
+              'Maps JavaScript API is not enabled for project nightlife-app-19acd. Enable it in Google Cloud Console, then hot restart.';
+          }
+        }
+        originalError.apply(console, arguments);
+      };
+    })();
+  </script>
+  <script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0xi_cVXRDlQ39yULIuv91Zz4hsSsn7qo&loading=async"
+    onerror="window.vexdaMapsLoadState.error='Maps JavaScript API script failed to load'; window.vexdaMapsLoadState.errorDetail='Check network access and web/index.html Maps script URL.';">
+  </script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #111218;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

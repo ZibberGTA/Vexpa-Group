@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "931089492485",
+    "project_id": "nightlife-app-19acd",
+    "storage_bucket": "nightlife-app-19acd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931089492485:android:582478124601eb14d30a6c",
+        "android_client_info": {
+          "package_name": "com.drinkspot.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBduW56VLXR-fXtnSIg-loYupnL4XcL4qE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931089492485:android:f3c9fe27386c0629d30a6c",
+        "android_client_info": {
+          "package_name": "com.drinkspot.nightlifeapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBduW56VLXR-fXtnSIg-loYupnL4XcL4qE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931089492485:android:ffe5720da51e9229d30a6c",
+        "android_client_info": {
+          "package_name": "com.example.nightlife_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBduW56VLXR-fXtnSIg-loYupnL4XcL4qE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function roleLevel() {
+      return request.auth.token.roleLevel == null ? 0 : request.auth.token.roleLevel;
+    }
+
+    function hasStaffDocument(uid) {
+      return firestore.exists(/databases/(default)/documents/staff/$(uid));
+    }
+
+    function staffDocument(uid) {
+      return firestore.get(/databases/(default)/documents/staff/$(uid)).data;
+    }
+
+    function staffRoleLevelFromDocument(uid) {
+      return !hasStaffDocument(uid) ? 0
+        : staffDocument(uid).get('roleLevel', 0) >= 10 ? staffDocument(uid).get('roleLevel', 0)
+        : (staffDocument(uid).get('staff', false) == true || staffDocument(uid).get('isStaff', false) == true) ? 30
+        : staffDocument(uid).get('role', '') in ['founder', 'owner_founder', 'app_owner'] ? 100
+        : staffDocument(uid).get('role', '') in ['management', 'manager'] ? 60
+        : staffDocument(uid).get('role', '') in ['admin', 'staff'] ? 30
+        : staffDocument(uid).get('role', '') in ['support'] ? 10
+        : 0;
+    }
+
+    function userRoleLevelFromDocument(uid) {
+      return firestore.exists(/databases/(default)/documents/users/$(uid))
+        && (
+          firestore.get(/databases/(default)/documents/users/$(uid)).data.get('isAdmin', false) == true
+          || firestore.get(/databases/(default)/documents/users/$(uid)).data.get('roleLevel', 0) >= 30
+          || firestore.get(/databases/(default)/documents/users/$(uid)).data.get('role', '')
+            in ['admin', 'founder', 'management', 'staff', 'owner_founder', 'app_owner']
+        ) ? 30 : 0;
+    }
+
+    function effectiveRoleLevel() {
+      return roleLevel() > staffRoleLevelFromDocument(request.auth.uid)
+        ? (roleLevel() > userRoleLevelFromDocument(request.auth.uid) ? roleLevel() : userRoleLevelFromDocument(request.auth.uid))
+        : (staffRoleLevelFromDocument(request.auth.uid) > userRoleLevelFromDocument(request.auth.uid)
+          ? staffRoleLevelFromDocument(request.auth.uid)
+          : userRoleLevelFromDocument(request.auth.uid));
+    }
+
+    function isStaffPrincipal() {
+      return signedIn() && (
+        request.auth.token.staff == true
+        || staffRoleLevelFromDocument(request.auth.uid) >= 10
+        || userRoleLevelFromDocument(request.auth.uid) >= 30
+        || (
+          hasStaffDocument(request.auth.uid) && (
+            staffDocument(request.auth.uid).get('staff', false) == true
+            || staffDocument(request.auth.uid).get('isStaff', false) == true
+          )
+        )
+      );
+    }
+
+    function isAdminOrAbove() {
+      return isStaffPrincipal() && effectiveRoleLevel() >= 30;
+    }
+
+    function venueData(venueId) {
+      return firestore.get(/databases/(default)/documents/venues/$(venueId)).data;
+    }
+
+    function isVenueOwner(venueId) {
+      return signedIn() && venueData(venueId).ownerId == request.auth.uid;
+    }
+
+    function isVenueManager(venueId) {
+      return signedIn() && request.auth.uid in venueData(venueId).get('managerIds', []);
+    }
+
+    function userAssignedVenue(venueId) {
+      return signedIn()
+        && venueId in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('venueIds', []);
+    }
+
+    function canManageVenueMedia(venueId) {
+      return isAdminOrAbove() || isVenueOwner(venueId) || isVenueManager(venueId) || userAssignedVenue(venueId);
+    }
+
+    function isPublicVenue(venueId) {
+      return firestore.exists(/databases/(default)/documents/venues/$(venueId))
+        && venueData(venueId).get('isDeleted', false) == false
+        && venueData(venueId).get('searchablePublic', true) != false
+        && venueData(venueId).get('isHidden', false) == false
+        && venueData(venueId).get('publicVisible', true) != false;
+    }
+
+    function isImageUpload() {
+      return request.resource != null
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    match /venues/{venueId}/media/{mediaType}/{fileName} {
+      // Public venue media URLs are published via Firestore; storage stays readable
+      // for approved public venues so map pins and gallery images render without auth.
+      allow read: if isPublicVenue(venueId) || canManageVenueMedia(venueId) || isAdminOrAbove();
+      allow create, update: if canManageVenueMedia(venueId) && isImageUpload();
+      allow delete: if canManageVenueMedia(venueId) || isAdminOrAbove();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

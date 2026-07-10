@@ -1,0 +1,105 @@
+# Foundation Roadmap
+
+## Phase 0 — Structure and Audit
+
+Create `packages/vex_core`, `packages/vex_engines`, and `docs/vexcore`. Audit Firebase access, identity, permissions, duplication, and migration risk.
+
+Completion criteria:
+
+- Shared package structure exists.
+- Foundation docs are written.
+- No feature code migrated.
+- No Firebase Rules changed.
+- Both apps remain structurally intact.
+
+## Phase 1 — Core Contracts and Shared Primitives
+
+Stabilise VexCore primitives: exceptions, results, clock, identifiers, auth/identity/permission/data/storage/events/integration/config/observability contracts.
+
+Completion criteria:
+
+- `vex_core` analyzes and tests cleanly.
+- No Firebase or Flutter imports in pure VexCore contracts.
+- Apps can add the local path dependency without runtime imports.
+
+## Phase 2 — Authentication Adapter
+
+Create app-compatible Firebase Auth adapter behind `AuthenticationService`.
+
+Completion criteria:
+
+- Mobile anonymous/provider/email behavior is covered.
+- Web readiness/signup/login audit behavior is covered.
+- Existing app services can delegate without changing user-facing behavior.
+
+## Phase 3 — Identity Resolver
+
+Model current identity resolution behind `IdentityService`.
+
+Completion criteria:
+
+- Tests cover custom claims, `staff/{uid}`, email fallback, `users/{uid}`, `venueIds`, owned venues, role aliases, and role levels.
+- Bootstrap deadlock scenarios are tested.
+- No final role model decision is made without test evidence.
+
+## Phase 4 — Permission Evaluator
+
+Centralise admin, venue staff, owner, employee, and entitlement decisions behind `PermissionService`.
+
+Completion criteria:
+
+- Web permission matrix is preserved.
+- Mobile admin/management/founder behavior is preserved.
+- Permission decisions accept context such as venue ID where needed.
+
+## Phase 5 — Admin Route Pilot Migration
+
+Use VexCore auth/identity/permission contracts in a narrow admin route guard pilot.
+
+Completion criteria:
+
+- Web `/admin` guard behavior is unchanged.
+- Denied/loading/retry states remain equivalent.
+- Rollback to legacy `UserRoleService` is straightforward.
+
+## Phase 6 — Data Engine Repository Contracts
+
+Define repository contracts for bounded data access without moving broad repositories.
+
+Completion criteria:
+
+- Public, admin, venue management, claim, and storage boundaries are named.
+- Repository contracts do not contain Firebase paths.
+- Tenant context requirements are explicit.
+
+## Phase 7 — First Repository Migration
+
+Migrate one narrow repository method behind a VexCore data contract.
+
+Completion criteria:
+
+- One small, well-tested method is migrated.
+- Mobile and web still analyze.
+- No Firebase Rules changes are needed.
+- Rollback uses the existing repository path.
+
+## Phase 8 — Event Bus Foundation
+
+Introduce event publishing for completed business actions only.
+
+Completion criteria:
+
+- Event base type and no-op/local adapter are tested.
+- No command/query path is replaced by events.
+- First event candidate has clear consumers and privacy review.
+
+## Phase 9 — Enforce Architecture Rules
+
+Add automated checks for forbidden imports and direct Firebase access in the wrong layers.
+
+Completion criteria:
+
+- VexCore domain folders reject Firebase imports.
+- Engine folders reject Firebase imports.
+- New direct Firebase access in UI is flagged.
+- Existing legacy exceptions are tracked until migrated.

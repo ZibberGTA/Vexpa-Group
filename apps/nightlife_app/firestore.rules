@@ -1,0 +1,697 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // Auth helpers
+    // -------------------------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function roleLevel() {
+      return request.auth.token.roleLevel == null ? 0 : request.auth.token.roleLevel;
+    }
+
+    function hasStaffDocument(uid) {
+      return exists(/databases/$(database)/documents/staff/$(uid));
+    }
+
+    function staffDocument(uid) {
+      return get(/databases/$(database)/documents/staff/$(uid)).data;
+    }
+
+    function staffRoleName(uid) {
+      return hasStaffDocument(uid)
+        ? staffDocument(uid).get('role', '')
+        : '';
+    }
+
+    function staffRoleLevelFromDocument(uid) {
+      return !hasStaffDocument(uid) ? 0
+        : staffDocument(uid).get('roleLevel', 0) >= 10 ? staffDocument(uid).get('roleLevel', 0)
+        : (staffDocument(uid).get('staff', false) == true || staffDocument(uid).get('isStaff', false) == true) ? 30
+        : staffRoleName(uid) in ['founder', 'owner_founder', 'app_owner'] ? 100
+        : staffRoleName(uid) in ['management', 'manager'] ? 60
+        : staffRoleName(uid) in ['admin', 'staff'] ? 30
+        : staffRoleName(uid) in ['support'] ? 10
+        : 0;
+    }
+
+    function userRoleLevelFromDocument(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && (
+          get(/databases/$(database)/documents/users/$(uid)).data.get('isAdmin', false) == true
+          || get(/databases/$(database)/documents/users/$(uid)).data.get('roleLevel', 0) >= 30
+          || get(/databases/$(database)/documents/users/$(uid)).data.get('role', '')
+            in ['admin', 'founder', 'management', 'staff', 'owner_founder', 'app_owner']
+        ) ? 30 : 0;
+    }
+
+    function effectiveRoleLevel() {
+      return roleLevel() > staffRoleLevelFromDocument(request.auth.uid)
+        ? (roleLevel() > userRoleLevelFromDocument(request.auth.uid) ? roleLevel() : userRoleLevelFromDocument(request.auth.uid))
+        : (staffRoleLevelFromDocument(request.auth.uid) > userRoleLevelFromDocument(request.auth.uid)
+          ? staffRoleLevelFromDocument(request.auth.uid)
+          : userRoleLevelFromDocument(request.auth.uid));
+    }
+
+    function isStaffPrincipal() {
+      return signedIn() && (
+        request.auth.token.staff == true
+        || staffRoleLevelFromDocument(request.auth.uid) >= 10
+        || userRoleLevelFromDocument(request.auth.uid) >= 30
+        || (
+          hasStaffDocument(request.auth.uid) && (
+            staffDocument(request.auth.uid).get('staff', false) == true
+            || staffDocument(request.auth.uid).get('isStaff', false) == true
+          )
+        )
+      );
+    }
+
+    function isSupportOrAbove() {
+      return isStaffPrincipal() && effectiveRoleLevel() >= 10;
+    }
+
+    function isAdmin() {
+      return isStaffPrincipal() && effectiveRoleLevel() >= 30;
+    }
+
+    function isManagementOrAbove() {
+      return isStaffPrincipal() && effectiveRoleLevel() >= 60;
+    }
+
+    function isFounder() {
+      return isStaffPrincipal() && effectiveRoleLevel() >= 100;
+    }
+
+    // -------------------------------------------------------------------------
+    // Venue ownership helpers
+    // -------------------------------------------------------------------------
+
+    function ownershipKeys() {
+      return [
+        'ownerUid',
+        'ownerId',
+        'ownerIds',
+        'managers',
+        'managedBy',
+        'teamMembers',
+        'claimedBy',
+        'subscriptionOwner',
+        'verifiedOwner',
+        'ownerEmail'
+      ];
+    }
+
+    function hasNoOwnershipKeys(data) {
+      return !data.keys().hasAny(ownershipKeys());
+    }
+
+    function ownershipUnchanged() {
+      return !request.resource.data.diff(resource.data).changedKeys().hasAny(ownershipKeys());
+    }
+
+    function venueData(venueId) {
+      return get(/databases/$(database)/documents/venues/$(venueId)).data;
+    }
+
+    function ownsVenue(venueId) {
+      return signedIn() && venueData(venueId).ownerId == request.auth.uid;
+    }
+
+    function isVenueOwner(venueId) {
+      return ownsVenue(venueId);
+    }
+
+    function isVenueManager(venueId) {
+      return signedIn() && request.auth.uid in venueData(venueId).get('managerIds', []);
+    }
+
+    function userAssignedVenue(venueId) {
+      return signedIn()
+        && venueId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('venueIds', []);
+    }
+
+    function canManageVenue(venueId) {
+      return isAdmin()
+        || isVenueOwner(venueId)
+        || isVenueManager(venueId)
+        || userAssignedVenue(venueId);
+    }
+
+    function canManageVenueMedia(venueId) {
+      return canManageVenue(venueId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Public visibility helpers
+    // -------------------------------------------------------------------------
+
+    function isPublicVenue(data) {
+      return data.get('isDeleted', false) == false
+        && data.get('searchablePublic', true) != false
+        && data.get('isHidden', false) == false
+        && data.get('publicVisible', true) != false
+        && data.get('isVisible', true) != false
+        && data.get('status', 'active') != 'deleted'
+        && data.get('status', 'active') != 'hidden'
+        && data.get('status', 'active') != 'suspended';
+    }
+
+    function venueIsPublic(venueId) {
+      return exists(/databases/$(database)/documents/venues/$(venueId))
+        && isPublicVenue(venueData(venueId));
+    }
+
+    function isPublicCatalogItem(data) {
+      return data.get('isDeleted', false) == false
+        && data.get('isActive', true) != false
+        && data.get('available', true) != false;
+    }
+
+    function isDiscoverableCatalogItem(data) {
+      return isPublicCatalogItem(data) && venueIsPublic(data.venueId);
+    }
+
+    function adminOnlyVenueKeys() {
+      return [
+        'ownerId', 'ownerUid', 'ownerIds', 'managerIds', 'ownerEmail',
+        'publicVisible', 'isVisible', 'isHidden', 'searchablePublic',
+        'isDeleted', 'status', 'verified', 'subscriptionPlan', 'subscriptionPlanId',
+        'plan', 'planId', 'internalNotes', 'adminNotes', 'crmNotes',
+        'hiddenAt', 'hiddenBy', 'publishedBy', 'deletedAt', 'deletedBy',
+        'suspendedAt', 'suspendedBy', 'verifiedAt', 'verifiedBy'
+      ];
+    }
+
+    function venueOwnerUpdateSafe() {
+      return !request.resource.data.diff(resource.data).changedKeys().hasAny(adminOnlyVenueKeys());
+    }
+
+    function hasNoPrivilegeEscalationFields(data) {
+      return data.get('isAdmin', false) == false
+        && data.get('staff', false) == false
+        && !data.keys().hasAny(['roleLevel', 'ownerUid', 'ownerId', 'ownerIds', 'managerIds'])
+        && (!data.keys().hasAny(['venueIds']) || data.venueIds.size() == 0);
+    }
+
+    function isGuestSignup(data) {
+      return data.role == 'guest' && data.get('isGuest', false) == true;
+    }
+
+    function isSelfServiceSignup(data) {
+      return data.uid == request.auth.uid
+        && data.role in ['owner', 'user']
+        && data.get('accountType', '') in ['venue_owner', 'customer', '']
+        && data.get('status', 'active') == 'active'
+        && data.get('disabled', false) == false
+        && hasNoPrivilegeEscalationFields(data);
+    }
+
+    function catalogItemVenueUnchanged() {
+      return request.resource.data.venueId == resource.data.venueId;
+    }
+
+    // -------------------------------------------------------------------------
+    // users
+    // -------------------------------------------------------------------------
+
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isSupportOrAbove();
+      allow create: if isSelf(uid) && (
+        isGuestSignup(request.resource.data) || isSelfServiceSignup(request.resource.data)
+      );
+      allow update: if signedIn() && (
+        (
+          isSelf(uid) &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name', 'displayName', 'email', 'pendingEmail', 'phone', 'city',
+            'notificationPreferences', 'deletionRequested', 'deletionRequestedAt',
+            'status', 'lastLoginAt', 'lastLoginPlatform', 'updatedAt'
+          ])
+        ) ||
+        isAdmin() ||
+        (
+          isSupportOrAbove() &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name', 'displayName', 'email', 'pendingEmail', 'phone', 'city',
+            'notificationPreferences', 'deletionRequested', 'deletionRequestedAt',
+            'status', 'lastLoginAt', 'lastLoginPlatform', 'updatedAt',
+            'internalNotes', 'notes'
+          ])
+        )
+      );
+      allow delete: if isFounder();
+
+      match /trail_state/{docId} {
+        allow read, write: if isSelf(uid);
+      }
+
+      match /trails/{trailId} {
+        allow read, write: if isSelf(uid);
+
+        match /progress/{progressId} {
+          allow read, write: if isSelf(uid);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // staff / admin access
+    // -------------------------------------------------------------------------
+
+    match /staff/{staffUid} {
+      allow read: if isSelf(staffUid) || isSupportOrAbove();
+      allow create: if isManagementOrAbove()
+        && request.resource.data.role != 'founder'
+        && request.resource.data.role != 'management';
+      allow update: if isManagementOrAbove()
+        && resource.data.role != 'founder'
+        && resource.data.role != 'management'
+        && request.resource.data.role != 'founder'
+        && request.resource.data.role != 'management';
+      allow delete: if isFounder();
+    }
+
+    match /staff_invites/{inviteId} {
+      allow read: if isManagementOrAbove();
+      allow create: if isManagementOrAbove()
+        && request.resource.data.role != 'founder'
+        && request.resource.data.role != 'management';
+      allow update, delete: if isFounder();
+    }
+
+    // -------------------------------------------------------------------------
+    // venues + media
+    // -------------------------------------------------------------------------
+
+    match /venues/{venueId} {
+      allow read: if isPublicVenue(resource.data)
+        || canManageVenue(venueId)
+        || isSupportOrAbove();
+      allow create: if signedIn() && hasNoOwnershipKeys(request.resource.data);
+      allow update: if (isAdmin() && ownershipUnchanged()) || (
+        canManageVenue(venueId) && ownershipUnchanged() && venueOwnerUpdateSafe()
+      ) || (
+        isSupportOrAbove() &&
+        ownershipUnchanged() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'name', 'images', 'updatedAt'
+        ])
+      );
+      allow delete: if isFounder();
+
+      match /media/{mediaId} {
+        allow read: if (
+            resource.data.status == 'active' &&
+            resource.data.visible != false &&
+            venueIsPublic(venueId)
+          ) || isSupportOrAbove() || canManageVenueMedia(venueId);
+        allow create: if canManageVenueMedia(venueId)
+          && request.resource.data.venueId == venueId
+          && request.resource.data.mediaId == mediaId
+          && request.resource.data.mediaType in ['gallery', 'deal', 'event', 'logo', 'banner']
+          && request.resource.data.status in ['active', 'hidden', 'deleted'];
+        allow update: if canManageVenueMedia(venueId)
+          && request.resource.data.venueId == resource.data.venueId
+          && request.resource.data.mediaId == resource.data.mediaId
+          && request.resource.data.status in ['active', 'hidden', 'deleted'];
+        allow delete: if isFounder();
+      }
+    }
+
+    match /deleted_venues/{venueId} {
+      allow read: if isSupportOrAbove();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    match /deleted_users/{userId} {
+      allow read: if isSupportOrAbove();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    // -------------------------------------------------------------------------
+    // venue claims
+    // -------------------------------------------------------------------------
+
+    match /venue_claims/{claimId} {
+      allow read: if isSupportOrAbove() || (
+        signedIn() && resource.data.claimantUid == request.auth.uid
+      );
+      allow create: if signedIn() &&
+        request.resource.data.claimantUid == request.auth.uid &&
+        request.resource.data.status in ['draft', 'pending_review'] &&
+        request.resource.data.keys().hasAll([
+          'claimId',
+          'venueId',
+          'claimantUid',
+          'status',
+          'confidenceScore',
+          'submittedEvidence',
+          'draftVenueData',
+          'autoApproved',
+          'createdAt',
+          'updatedAt'
+        ]);
+      allow update: if isAdmin() || (
+        signedIn() &&
+        resource.data.claimantUid == request.auth.uid &&
+        request.resource.data.claimantUid == resource.data.claimantUid &&
+        request.resource.data.venueId == resource.data.venueId &&
+        (
+          request.resource.data.status == resource.data.status ||
+          (
+            resource.data.status in ['needs_more_info', 'rejected'] &&
+            request.resource.data.status == 'pending_review'
+          )
+        ) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status',
+          'draftVenueData',
+          'submittedEvidence',
+          'updatedAt',
+          'resubmittedAt'
+        ])
+      );
+      allow delete: if isFounder();
+
+      match /audit/{eventId} {
+        allow read: if isSupportOrAbove() || (
+          signedIn() && get(/databases/$(database)/documents/venue_claims/$(claimId)).data.claimantUid == request.auth.uid
+        );
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    match /venue_claim_directory/{venueId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    // -------------------------------------------------------------------------
+    // moderation / alerts
+    // -------------------------------------------------------------------------
+
+    match /admin_alerts/{alertId} {
+      allow read, update: if isSupportOrAbove();
+      allow create: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    match /reports/{reportId} {
+      allow read, update: if isSupportOrAbove();
+      allow create: if signedIn();
+      allow delete: if isFounder();
+    }
+
+    match /deleted_items/{itemId} {
+      allow read, update: if isSupportOrAbove();
+      allow create: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isStaffPrincipal();
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // public catalog collections
+    // -------------------------------------------------------------------------
+
+    match /drinks/{drinkId} {
+      allow read: if isDiscoverableCatalogItem(resource.data)
+        || canManageVenue(resource.data.venueId)
+        || isSupportOrAbove();
+      allow create: if signedIn()
+        && canManageVenue(request.resource.data.venueId)
+        && request.resource.data.venueId is string
+        && request.resource.data.isDeleted == false;
+      allow update: if (
+        canManageVenue(resource.data.venueId) && catalogItemVenueUnchanged()
+      ) || isAdmin();
+      allow delete: if isAdmin() || isFounder();
+    }
+
+    match /deals/{dealId} {
+      allow read: if isDiscoverableCatalogItem(resource.data)
+        || canManageVenue(resource.data.venueId)
+        || isSupportOrAbove();
+      allow create: if signedIn()
+        && canManageVenue(request.resource.data.venueId)
+        && request.resource.data.venueId is string
+        && request.resource.data.isDeleted == false;
+      allow update: if (
+        canManageVenue(resource.data.venueId) && catalogItemVenueUnchanged()
+      ) || isAdmin();
+      allow delete: if isAdmin() || isFounder();
+    }
+
+    match /events/{eventId} {
+      allow read: if isDiscoverableCatalogItem(resource.data)
+        || canManageVenue(resource.data.venueId)
+        || isSupportOrAbove();
+      allow create: if signedIn()
+        && canManageVenue(request.resource.data.venueId)
+        && request.resource.data.venueId is string
+        && request.resource.data.isDeleted == false;
+      allow update: if (
+        canManageVenue(resource.data.venueId) && catalogItemVenueUnchanged()
+      ) || isAdmin();
+      allow delete: if isAdmin() || isFounder();
+    }
+
+    match /trails/{trailId} {
+      allow read: if (
+          resource.data.get('published', false) == true
+          || resource.data.get('status', '') == 'published'
+        ) || isSupportOrAbove();
+      allow create, update: if isAdmin();
+      allow delete: if isFounder();
+    }
+
+    match /trail_progress/{uid} {
+      allow read, write: if isSelf(uid);
+    }
+
+    match /trail_activity/{activityId} {
+      allow read: if isSupportOrAbove();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /artists/{artistId} {
+      allow read: if resource.data.get('status', 'active') == 'active'
+        || isSupportOrAbove()
+        || (signedIn() && request.auth.uid == resource.data.get('ownerUid', ''));
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == resource.data.ownerUid);
+      allow delete: if isFounder();
+    }
+
+    match /artist_profiles/{artistId} {
+      allow read: if resource.data.get('status', 'active') == 'active'
+        || isSelf(artistId)
+        || isSupportOrAbove();
+      allow create: if isSelf(artistId);
+      allow update: if isSelf(artistId) || isAdmin();
+      allow delete: if isFounder();
+
+      match /thumbs_up/{ownerId} {
+        allow read: if signedIn();
+        allow create, update, delete: if signedIn() && request.auth.uid == ownerId;
+      }
+    }
+
+    match /artist_applications/{applicationId} {
+      allow read: if isSupportOrAbove()
+        || (signedIn() && (
+          resource.data.applicantUid == request.auth.uid
+          || resource.data.artistUid == request.auth.uid
+          || resource.data.ownerUid == request.auth.uid
+        ));
+      allow create: if signedIn()
+        && request.resource.data.applicantUid == request.auth.uid;
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.applicantUid == request.auth.uid);
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.applicantUid == request.auth.uid);
+    }
+
+    // -------------------------------------------------------------------------
+    // user-private data
+    // -------------------------------------------------------------------------
+
+    match /favourites/{favouriteId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid || isSupportOrAbove()
+      );
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid || isSupportOrAbove()
+      );
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin() || (
+        signedIn() && resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /account_deletion_requests/{uid} {
+      allow create: if isSelf(uid);
+      allow read: if isSelf(uid) || isSupportOrAbove();
+      allow update: if isSupportOrAbove();
+      allow delete: if isFounder();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || resource.data.artistUid == request.auth.uid
+        || resource.data.venueOwnerUid == request.auth.uid
+        || isSupportOrAbove()
+      );
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin()
+        || (signedIn() && (
+          resource.data.userId == request.auth.uid
+          || resource.data.artistUid == request.auth.uid
+          || resource.data.venueOwnerUid == request.auth.uid
+        ));
+      allow delete: if isAdmin();
+    }
+
+    match /chats/{chatId} {
+      allow read: if signedIn() && (
+        request.auth.uid in resource.data.get('participantIds', [])
+        || isSupportOrAbove()
+      );
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.get('participantIds', []);
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.get('participantIds', []);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && (
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.get('participantIds', [])
+          || isSupportOrAbove()
+        );
+        allow create: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.get('participantIds', []);
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // analytics / monetisation (restricted)
+    // -------------------------------------------------------------------------
+
+    match /analytics/{docId} {
+      allow read: if isSupportOrAbove()
+        || (signedIn()
+          && resource.data.venueId is string
+          && canManageVenue(resource.data.venueId));
+      allow create: if request.resource.data.keys().hasAll(['venueId', 'type', 'createdAt'])
+        && request.resource.data.venueId is string
+        && request.resource.data.type is string
+        && (
+          venueIsPublic(request.resource.data.venueId)
+          || (signedIn() && canManageVenue(request.resource.data.venueId))
+        );
+      allow update, delete: if isAdmin();
+    }
+
+    match /venue_boosts/{venueId} {
+      allow read: if canManageVenue(venueId) || isSupportOrAbove();
+      allow create, update: if canManageVenue(venueId) || isAdmin();
+      allow delete: if isAdmin() || isFounder();
+    }
+
+    match /monetisation_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /payment_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if isFounder();
+    }
+
+    match /smart_notification_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /financials/{docId} {
+      allow read, write: if isFounder();
+    }
+
+    match /subscriptions/{docId} {
+      allow read: if isAdmin();
+      allow write: if isFounder();
+    }
+
+    match /customers/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if false;
+
+      match /subscriptions/{subscriptionId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow write: if false;
+      }
+
+      match /checkout_sessions/{sessionId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid);
+        allow update, delete: if false;
+      }
+
+      match /portal_links/{linkId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid);
+        allow update, delete: if false;
+      }
+    }
+
+    match /app_settings/{docId} {
+      allow read: if isAdmin();
+      allow write: if isFounder();
+    }
+
+    // -------------------------------------------------------------------------
+    // Default deny
+    // -------------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

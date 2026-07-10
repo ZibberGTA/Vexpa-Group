@@ -1,0 +1,65 @@
+# Dart / Flutter
+**/.dart_tool/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# IDE
+**/.idea/
+**/*.iml
+**/.vscode/*
+!**/.vscode/launch.json
+!**/.vscode/tasks.json
+!**/.vscode/settings.json.example
+**/*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Firebase / Node
+**/node_modules/
+**/.firebase/
+**/firebase-debug.log
+**/firestore-debug.log
+**/ui-debug.log
+**/database-debug.log
+**/pubsub-debug.log
+**/.runtimeconfig.json
+
+# Emulator / local test output
+**/emulator-data/
+**/firebase-export-*/
+
+# Secrets and credentials — never commit
+**/.env
+**/.env.*
+!**/.env.example
+**/*service-account*.json
+**/*credentials*.json
+**/google-services.json.bak
+**/*.p12
+**/*.jks
+**/*.keystore
+**/*.pem
+**/*.key
+**/secrets/
+
+# Mobile signing (keep example configs in source if present)
+**/android/key.properties
+**/android/app/google-services.json.bak
+
+# Backup artifacts (local only)
+.backup/
+
+# Logs
+*.log
