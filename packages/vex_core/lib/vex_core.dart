@@ -8,3 +8,4 @@ export 'observability/observability.dart';
 export 'permissions/permissions.dart';
 export 'shared/shared.dart';
 export 'storage/storage.dart';
+export 'venue/venues.dart';
