@@ -83,6 +83,16 @@ Completion criteria:
 - No Firebase Rules changes are needed.
 - Rollback uses the existing repository path.
 
+### Completed pilots
+
+| Pilot | Status | Notes |
+| --- | --- | --- |
+| Public venue discovery catalog | Complete | Web search/catalog reads through `VenueDataService`. |
+| Public venue details profile | Complete | Web `VenueDetailsRepository` load/watch through `VenueDataService`. |
+| Admin route guard | Complete | Web `/admin` guard uses VexCore auth/identity/permissions. |
+
+See `13-venue-details-pilot.md` for the venue details rollback path.
+
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.
