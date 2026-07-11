@@ -5,7 +5,12 @@ import 'package:vex_core/venue_events/venue_event.dart';
 import 'package:vex_core/venue_events/venue_event_visibility.dart';
 import 'package:vex_engines/experience/application/experience_deal_scheduling.dart';
 import 'package:vex_engines/experience/application/experience_deal_status.dart';
+import 'package:vex_engines/experience/application/experience_drink_grouper.dart';
 import 'package:vex_engines/experience/application/experience_event_status.dart';
+import 'package:vex_engines/experience/application/experience_deal_validator.dart';
+import 'package:vex_engines/experience/application/experience_write_preparation.dart';
+import 'package:vex_engines/experience/shared/experience_deal_types.dart';
+import 'package:vex_engines/experience/shared/experience_drink_categories.dart';
 import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
 import 'package:vex_engines/experience/application/experience_deal_visibility.dart';
 import 'package:vex_engines/experience/application/experience_drink_validator.dart';
@@ -107,6 +112,71 @@ void main() {
         ),
         ExperienceEventManagementStatus.live,
       );
+    });
+  });
+
+  group('ExperienceDrinkCategories', () {
+    test('normalises and validates allowed categories', () {
+      expect(ExperienceDrinkCategories.displayName('beer'), 'Beer');
+      expect(ExperienceDrinkCategories.isAllowed('Cocktails'), isTrue);
+      expect(ExperienceDrinkCategories.isAllowed('Custom'), isFalse);
+    });
+  });
+
+  group('ExperienceDealTypes', () {
+    test('normalises display labels and allowed keys', () {
+      expect(
+        ExperienceDealTypes.normalize('Percentage Off'),
+        ExperienceDealTypes.percentageOff,
+      );
+      expect(ExperienceDealTypes.isAllowed('happy_hour'), isTrue);
+    });
+  });
+
+  group('ExperienceDealValidator', () {
+    test('validates deal form fields', () {
+      expect(ExperienceDealValidator.validateTitle('  '), isNotNull);
+      expect(
+        ExperienceDealValidator.validateDealType(ExperienceDealTypes.happyHour),
+        isNull,
+      );
+      expect(ExperienceDealValidator.validateValue('20%'), isNull);
+    });
+  });
+
+  group('ExperienceDrinkGrouper', () {
+    test('groups drinks by normalised category', () {
+      final grouped = ExperienceDrinkGrouper.groupByCategory(
+        [
+          _DrinkMenuRow(name: 'Lager', category: 'beer', available: true),
+          _DrinkMenuRow(name: 'Gin', category: 'gin', available: false),
+        ],
+        category: (drink) => drink.category,
+        name: (drink) => drink.name,
+        available: (drink) => drink.available,
+      );
+
+      expect(grouped.keys, contains('Beers'));
+      expect(grouped['Beers']!.single.name, 'Lager');
+    });
+  });
+
+  group('ExperienceWritePreparation', () {
+    test('prepares drink create fields with search terms', () {
+      final fields = ExperienceWritePreparation.drinkCreateFields(
+        venueId: 'v1',
+        venueName: 'Neon Room',
+        name: 'Espresso Martini',
+        category: 'Cocktails',
+        description: 'Classic',
+        available: true,
+        featured: false,
+        createdBy: 'owner',
+        price: 12,
+      );
+
+      expect(fields['category'], 'cocktails');
+      expect(fields['searchTerms'], contains('espresso martini'));
     });
   });
 
@@ -418,6 +488,18 @@ void main() {
       expect(sorted, ['a', 'b', 'c']);
     });
   });
+}
+
+final class _DrinkMenuRow {
+  const _DrinkMenuRow({
+    required this.name,
+    required this.category,
+    required this.available,
+  });
+
+  final String name;
+  final String category;
+  final bool available;
 }
 
 final class _DrinkStub {
