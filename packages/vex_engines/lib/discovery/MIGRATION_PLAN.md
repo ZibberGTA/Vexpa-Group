@@ -104,14 +104,59 @@ Mobile adoption:
 | Trending | venues + boosts + analytics per venue | Same |
 | Recommendations | venue stream + deals/events per venue | Same |
 
+## Migrated in Batch 3 (venue search consolidation)
+
+- `DiscoveryQueryNormalizer` — shared query normalisation, tokenisation, alias expansion
+- `DiscoveryVenueSearchTermBuilder` — venue index terms, form writes, deleted-item terms
+- `DiscoveryVenueClientMatcher` — mobile venue list matching with match reasons
+- `DiscoveryNearbySorter` — distance miles ordering and popularity fallback
+- `DiscoveryVenueFilterState` — platform-independent filter state
+- `DiscoveryMapGeometry` / `DiscoveryCoordinate` — centroid and coordinate validation
+- `DiscoverySearchResultRules` — tags, rating fallback, result reason enrichment
+- `VenueSearchMatcher` refactored to use shared query normaliser (web parity preserved)
+
+Mobile adoption:
+
+- `VenueSearchService` → `DiscoveryVenueClientMatcher`
+- `SearchTermBuilder` / `VenueSearchSyncService` → `DiscoveryVenueSearchTermBuilder`
+- `BoostService.activeBoostStream` → `DiscoveryBoostEvaluator`
+- `StartupDataService._sortNearby` → `DiscoveryNearbySorter`
+- `VenueFilterModel.hasActiveFilters` → `DiscoveryVenueFilterState`
+- Owner/venue form `_buildSearchTerms` → engine builder
+- `DeletedItemsService._buildSearchTerms` → engine builder
+
+Web adoption:
+
+- `SearchVenueMapper` → `DiscoverySearchResultRules` + `DiscoveryMapGeometry`
+- `SearchVenueMapGeometry` → engine centroid (Google Maps `LatLng` wrapper retained)
+
+## Network calls (Batch 3)
+
+| Flow | Before | After |
+| --- | --- | --- |
+| Mobile venue search (`VenueSearchService`) | 1 × Firestore `venues` query | Same — 1 query; in-memory match only |
+| Mobile venue search sync | 1 venue get + 1 drinks query + 1 update | Same |
+| Mobile startup preload | 1 venues query + geolocation | Same |
+| Mobile boost stream | 1 snapshot listener per venue | Same |
+| Web search mapper/geometry | In-memory only | Same — no network change |
+| Web venue search path | 1 catalog + 1 index lookup | Same |
+
+No extra listeners, catalog reloads, or ranking passes were introduced.
+
 ## Next batch (recommended)
 
 1. VexCore cross-entity discovery read contracts; remove direct Firestore from `UnifiedSearchService`
-2. Mobile `SearchService` venue-direct search path convergence with web index flow
+2. Converge mobile `VenueSearchService` Firestore path with web index flow where product allows
 3. Presentation phase: search pages/widgets under `presentation/web/` and `presentation/mobile/`
 4. Recommendation/trending input DTOs fed from VexCore analytics contracts
 
-## Rollback
+## Rollback (Batch 3)
+
+Revert mobile/web shims to inline matching, term builders, nearby sort, and mapper helpers.
+Engine modules can remain unused without affecting Firebase Rules or network behaviour.
+Point `VenueSearchMatcher` back to local private helpers if needed for web-only rollback.
+
+## Rollback (earlier batches)
 
 Revert web shims to inline implementations and remove `WebVexCore.discoveryVenueSearchService` wiring.
 Engine package exports can remain without runtime impact.
