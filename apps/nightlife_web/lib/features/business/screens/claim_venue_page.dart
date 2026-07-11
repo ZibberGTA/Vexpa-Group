@@ -2,17 +2,22 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/claim/application/claim_evidence_document_policy.dart';
 
 import '../../../core/constants/breakpoints.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../../shared/components/drinkspot_button.dart';
 import '../../../shared/components/public_page_hero.dart';
 import '../../../shared/layouts/content_container.dart';
 import '../../../shared/layouts/public_page_shell.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/widgets/premium_effects.dart';
+import '../../venue_claims/data/claim_evidence_file_picker.dart';
+import '../../venue_claims/data/claim_evidence_upload_service.dart';
 import '../../venue_claims/data/venue_claim_repository.dart';
 import '../../venue_claims/models/venue_claim.dart';
 
@@ -27,6 +32,7 @@ class ClaimVenuePage extends StatefulWidget {
 
 class _ClaimVenuePageState extends State<ClaimVenuePage> {
   final _repository = VenueClaimRepository();
+  final _evidenceUploadService = ClaimEvidenceUploadService();
   final _searchController = TextEditingController();
   final _businessEmailController = TextEditingController();
   final _websiteController = TextEditingController();
@@ -55,8 +61,10 @@ class _ClaimVenuePageState extends State<ClaimVenuePage> {
   String? _searchError;
   int _searchRequestId = 0;
   bool _submitting = false;
+  bool _uploadingEvidence = false;
   bool _showWizard = true;
   String? _message;
+  List<String> _documentUrls = const [];
 
   @override
   void dispose() {
@@ -146,6 +154,7 @@ class _ClaimVenuePageState extends State<ClaimVenuePage> {
           phone: _phoneController.text,
           companyRegistration: _companyRegistrationController.text,
           notes: _notesController.text,
+          documentUrls: _documentUrls,
         ),
       );
       if (!mounted) return;
@@ -170,6 +179,58 @@ class _ClaimVenuePageState extends State<ClaimVenuePage> {
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _uploadSupportingDocument() async {
+    if (_uploadingEvidence) return;
+    if (_documentUrls.length >= ClaimEvidenceDocumentPolicy.maxDocumentCount) {
+      setState(
+        () => _message =
+            'You can upload up to ${ClaimEvidenceDocumentPolicy.maxDocumentCount} supporting documents.',
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Navigator.pushNamed(context, AppRouter.login);
+      return;
+    }
+
+    final picked = await pickClaimEvidenceFile();
+    if (picked == null) return;
+
+    setState(() {
+      _uploadingEvidence = true;
+      _message = null;
+    });
+
+    try {
+      final identity = await WebVexCore.identity.resolveIdentity(user.uid);
+      if (identity == null) {
+        setState(() => _message = 'We could not verify your account for upload.');
+        return;
+      }
+
+      final result = await _evidenceUploadService.uploadDocument(
+        identity: identity,
+        bytes: picked.bytes,
+        fileName: picked.fileName,
+        documentId: generateClaimEvidenceDocumentId(),
+      );
+
+      if (!mounted) return;
+      switch (result) {
+        case DataSuccess(:final value):
+          setState(() => _documentUrls = [..._documentUrls, value.toString()]);
+        case DataFailure(:final error):
+          setState(
+            () => _message = error.message,
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingEvidence = false);
     }
   }
 
@@ -520,6 +581,26 @@ class _ClaimVenuePageState extends State<ClaimVenuePage> {
           ),
           const SizedBox(height: AppSpacing.lg),
           const _EvidenceExplainer(),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              DrinkSpotButton(
+                label: _uploadingEvidence
+                    ? 'Uploading document...'
+                    : 'Upload supporting document',
+                icon: Icons.upload_file_rounded,
+                onPressed: _uploadingEvidence ? null : _uploadSupportingDocument,
+              ),
+              if (_documentUrls.isNotEmpty)
+                Text(
+                  '${_documentUrls.length} document${_documentUrls.length == 1 ? '' : 's'} attached',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.xl),
           Align(
             alignment: Alignment.centerLeft,
