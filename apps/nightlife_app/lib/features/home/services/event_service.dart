@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/application/experience_event_visibility.dart';
 
 import '../models/event_model.dart';
 import '../../notifications/services/smart_notification_service.dart';
@@ -15,7 +16,15 @@ class EventService {
       final now = DateTime.now();
       final events = snapshot.docs
           .map((doc) => EventModel.fromDoc(doc))
-          .where((event) => event.endDateTime.isAfter(now))
+          .where(
+            (event) => ExperienceEventVisibility.isPublicVisible(
+              isDeleted: event.isDeleted,
+              isActive: event.isActive,
+              startDateTime: event.startDateTime,
+              endDateTime: event.endDateTime,
+              now: now,
+            ),
+          )
           .toList();
       events.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
       return events;
@@ -31,7 +40,15 @@ class EventService {
       final now = DateTime.now();
       final events = snapshot.docs
           .map((doc) => EventModel.fromDoc(doc))
-          .where((event) => event.endDateTime.isAfter(now))
+          .where(
+            (event) => ExperienceEventVisibility.isPublicVisible(
+              isDeleted: event.isDeleted,
+              isActive: event.isActive,
+              startDateTime: event.startDateTime,
+              endDateTime: event.endDateTime,
+              now: now,
+            ),
+          )
           .toList();
       events.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
       return events;

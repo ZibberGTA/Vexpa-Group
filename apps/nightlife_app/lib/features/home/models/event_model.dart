@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/application/experience_event_visibility.dart';
 
 class EventModel {
   final String id;
@@ -11,6 +12,7 @@ class EventModel {
   final String category;
   final String imageUrl;
   final bool isDeleted;
+  final bool isActive;
 
   EventModel({
     required this.id,
@@ -23,12 +25,18 @@ class EventModel {
     required this.category,
     required this.imageUrl,
     required this.isDeleted,
+    this.isActive = true,
   });
 
   /// Existing app screens still read `dateTime`; keep it as the event start.
   DateTime get dateTime => startDateTime;
 
-  bool get isLiveOrUpcoming => !isDeleted && endDateTime.isAfter(DateTime.now());
+  bool get isLiveOrUpcoming => ExperienceEventVisibility.isPublicVisible(
+        isDeleted: isDeleted,
+        isActive: isActive,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+      );
 
   factory EventModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -51,6 +59,7 @@ class EventModel {
       category: data['category'] ?? 'General',
       imageUrl: data['imageUrl'] ?? '',
       isDeleted: data['isDeleted'] ?? false,
+      isActive: data['isActive'] != false,
     );
   }
 
@@ -66,6 +75,7 @@ class EventModel {
       'category': category,
       'imageUrl': imageUrl,
       'isDeleted': isDeleted,
+      'isActive': isActive,
     };
   }
 }
