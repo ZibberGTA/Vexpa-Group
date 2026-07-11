@@ -45,7 +45,8 @@
 | Item | Detail |
 | --- | --- |
 | Purpose | Abstract upload, download URL, metadata, and deletion operations. |
-| Responsibilities | Storage service contract and storage result value object. |
+| Responsibilities | Storage service contract, document metadata/reference types, document access evaluator, storage result value object. |
+| Version 1 implementations | `VexDocumentStorageService` contract, `DocumentAccessEvaluator`, `VexStorageService` — Firebase adapters remain in apps. |
 | Allowed dependencies | Shared primitives and permission context. |
 | Forbidden responsibilities | UI image picking, direct Firebase Storage imports in engines. |
 | Example consumers | Venue media uploads, gallery management, marker image loading. |
@@ -56,6 +57,7 @@
 | --- | --- |
 | Purpose | Publish completed business actions for downstream reaction. |
 | Responsibilities | Event base type, publish, subscribe, subscription cancellation. |
+| Version 1 implementations | `InProcessVexEventBus`, typed platform events (`VenueProfileUpdatedEvent`, etc.). |
 | Allowed dependencies | Shared primitives and clock. |
 | Forbidden responsibilities | Replacing direct commands/queries, UI state propagation. |
 | Example consumers | Claim approved event, venue media uploaded event, subscription changed event. |

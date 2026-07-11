@@ -128,7 +128,7 @@ VexCore **is not**: UI, business engines, or venue-specific workflows.
 
 Pure Dart contracts in `packages/vex_core` — no Firebase or Flutter imports in domain folders. Apps implement Firebase adapters behind interfaces.
 
-Completed pilots include public venue catalog, details, drinks, deals, events reads, and web admin route guard. See [10-foundation-roadmap.md](./vexcore/10-foundation-roadmap.md).
+Completed pilots include public venue catalog, details, drinks, deals, events reads, web admin route guard, mobile auth/identity/permission composition roots, in-process event bus, document storage contracts, and configuration/logging defaults. **Status: ~85% — Version 1 foundation ready for lock pending remaining repository migrations.** See [10-foundation-roadmap.md](./vexcore/10-foundation-roadmap.md).
 
 ### Future migration strategy
 

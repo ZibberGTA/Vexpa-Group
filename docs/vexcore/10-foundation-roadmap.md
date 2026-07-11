@@ -26,6 +26,8 @@ Completion criteria:
 
 Create app-compatible Firebase Auth adapter behind `AuthenticationService`.
 
+**Status: Complete (Version 1).** Web and mobile `FirebaseAuthenticationAdapter` delegate to existing `AuthService` without extra Auth calls.
+
 Completion criteria:
 
 - Mobile anonymous/provider/email behavior is covered.
@@ -36,6 +38,8 @@ Completion criteria:
 
 Model current identity resolution behind `IdentityService`.
 
+**Status: Complete (Version 1).** Web and mobile `FirebaseIdentityAdapter` wrap existing `UserRoleService` streams. Mobile role parsing delegates to shared `RoleResolver`.
+
 Completion criteria:
 
 - Tests cover custom claims, `staff/{uid}`, email fallback, `users/{uid}`, `venueIds`, owned venues, role aliases, and role levels.
@@ -45,6 +49,8 @@ Completion criteria:
 ## Phase 4 — Permission Evaluator
 
 Centralise admin, venue staff, owner, employee, and entitlement decisions behind `PermissionService`.
+
+**Status: Complete (Version 1).** Web `AuthGuard` and mobile admin permission checks delegate to `VexPermissionEvaluator` / `AdminPermissionMatrix`.
 
 Completion criteria:
 
@@ -106,6 +112,9 @@ Completion criteria:
 | Public venue events menu | Complete | Web `VenueEventsRepository.watchEvents` through `VenueEventDataService`. |
 | Unified search content DTOs | Complete | VexCore `Searchable*Record` + `UnifiedSearchCandidateBatch` for adapter-fed candidates. |
 | Admin route guard | Complete | Web `/admin` guard uses VexCore auth/identity/permissions. |
+| Mobile platform composition root | Complete | `MobileVexCore` wires auth, identity, permissions, entitlements, events, config, logging. |
+| Document storage contracts | Complete | `VexDocumentStorageService`, metadata, access evaluator — adapters deferred. |
+| In-process event bus | Complete | `InProcessVexEventBus` + venue profile update pilot events. |
 
 See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pilot.md`, and `16-venue-events-pilot.md` for rollback paths.
 
@@ -190,6 +199,8 @@ See `packages/vex_engines/lib/analytics/MIGRATION_PLAN.md`.
 ## Phase 8 — Event Bus Foundation
 
 Introduce event publishing for completed business actions only.
+
+**Status: Complete (Version 1 pilot).** `InProcessVexEventBus` with typed platform events. Venue profile update publishes on web/mobile write adapters.
 
 Completion criteria:
 

@@ -4,14 +4,25 @@
 
 This documentation set records the approved VexCore package boundary, dependency rules, current Firebase access audit, identity/permission audit, duplication audit, migration inventory, risk register, and foundation roadmap.
 
-Foundation 1.0 is structural only:
+Foundation 1.0 structure and Version 1 runtime contracts are in place:
 
 - Create `packages/vex_core` as a pure Dart contract package.
 - Create `packages/vex_engines` as a placeholder for future business engines.
 - Document current mobile and web architecture.
-- Do not migrate feature code.
+- Wire web and mobile composition roots for auth, identity, permissions, entitlements, events, configuration, and logging.
 - Do not change Firebase Rules.
 - Do not deploy.
+
+## Architecture lock-in (Version 1)
+
+| Rule | Detail |
+| --- | --- |
+| Apps call Engines | Presentation and feature services delegate business rules to engines. |
+| Engines call VexCore | Shared infrastructure access goes through VexCore contracts. |
+| VexCore calls adapters | Firebase and other SDKs stay in app/infrastructure adapters. |
+| VexCore never selects engines | VexCore must not import or orchestrate business engines. |
+| Business rules stay in engines | Venue, discovery, claim, analytics rules remain engine-owned. |
+| Foundation changes are rare | After lock, VexCore contract changes should stay backward-compatible. |
 
 ## Documents
 
