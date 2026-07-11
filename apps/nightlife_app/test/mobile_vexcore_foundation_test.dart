@@ -14,10 +14,13 @@ void main() {
     final identityB = MobileVexCore.identity;
     final busA = MobileVexCore.eventBus;
     final busB = MobileVexCore.eventBus;
+    final loggerA = MobileVexCore.logger;
+    final loggerB = MobileVexCore.logger;
 
     expect(identical(authA, authB), isTrue);
     expect(identical(identityA, identityB), isTrue);
     expect(identical(busA, busB), isTrue);
+    expect(identical(loggerA, loggerB), isTrue);
   });
 
   test('admin permission checks delegate to VexCore matrix', () {

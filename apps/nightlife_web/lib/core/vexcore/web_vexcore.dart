@@ -106,6 +106,9 @@ abstract final class WebVexCore {
     logger: ConsoleVexLogger(prefix: 'WebVexCore'),
   );
 
+  static final ConsoleVexLogger _defaultLogger =
+      ConsoleVexLogger(prefix: 'WebVexCore');
+
   static final InMemoryConfigurationService _defaultConfiguration =
       InMemoryConfigurationService(
     environment: kDebugMode
@@ -121,7 +124,7 @@ abstract final class WebVexCore {
 
   static ConfigurationService get configuration => _defaultConfiguration;
 
-  static VexLogger get logger => ConsoleVexLogger(prefix: 'WebVexCore');
+  static VexLogger get logger => _defaultLogger;
 
   static ErrorReporter get errorReporter => const NoOpErrorReporter();
 }

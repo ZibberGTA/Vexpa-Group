@@ -101,3 +101,13 @@
 | Allowed dependencies | Dart SDK only. |
 | Forbidden responsibilities | Firebase models, UI models, engine-specific workflows. |
 | Example consumers | All VexCore layers and engines. |
+
+## Legacy visibility helpers (deprecated, frozen)
+
+| Module | Status | Canonical owner |
+| --- | --- | --- |
+| `venue_deals/venue_deal_visibility.dart` | `@Deprecated` — do not add rules | Experience Engine |
+| `venue_events/venue_event_visibility.dart` | `@Deprecated` — do not add rules | Experience Engine |
+| Drink filtering in `VenueDrinkDataService` | Legacy comment — do not extend | Experience Engine |
+
+These remain exported for backward compatibility until all consumers use Experience Engine visibility. VexCore must not depend on `vex_engines`.

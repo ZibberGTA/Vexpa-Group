@@ -16,10 +16,13 @@ void main() {
     final identityB = WebVexCore.identity;
     final busA = WebVexCore.eventBus;
     final busB = WebVexCore.eventBus;
+    final loggerA = WebVexCore.logger;
+    final loggerB = WebVexCore.logger;
 
     expect(identical(authA, authB), isTrue);
     expect(identical(identityA, identityB), isTrue);
     expect(identical(busA, busB), isTrue);
+    expect(identical(loggerA, loggerB), isTrue);
   });
 
   test('event bus publishes venue profile updates without Firebase', () async {

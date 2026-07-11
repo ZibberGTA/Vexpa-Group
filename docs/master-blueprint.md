@@ -128,11 +128,13 @@ VexCore **is not**: UI, business engines, or venue-specific workflows.
 
 Pure Dart contracts in `packages/vex_core` — no Firebase or Flutter imports in domain folders. Apps implement Firebase adapters behind interfaces.
 
-Completed pilots include public venue catalog, details, drinks, deals, events reads, web admin route guard, mobile auth/identity/permission composition roots, in-process event bus, document storage contracts, and configuration/logging defaults. **Status: ~85% — Version 1 foundation ready for lock pending remaining repository migrations.** See [10-foundation-roadmap.md](./vexcore/10-foundation-roadmap.md).
+Completed pilots include public venue catalog, details, drinks, deals, events reads, web admin route guard, mobile AuthGate adoption, mobile auth/identity/permission composition roots, in-process event bus, document storage contracts, and configuration/logging defaults.
+
+**Foundation 1.0 — Locked (2026-07-11).** Contract surface frozen; adoption and adapter work continue. See [11-foundation-lock.md](./vexcore/11-foundation-lock.md) and [10-foundation-roadmap.md](./vexcore/10-foundation-roadmap.md).
 
 ### Future migration strategy
 
-Phased: stabilise contracts → adapters → migrate one bounded repository method at a time → event bus → automated import enforcement. See foundation roadmap Phases 1–9.
+Phased: stabilise contracts → adapters → migrate one bounded repository method at a time → event bus → foundation lock → automated import enforcement. See foundation roadmap Phases 1–10.
 
 ### Database abstraction
 
@@ -272,11 +274,12 @@ See [ADR-0002](./decisions/0002-version-1-scope.md).
 - VexCore analytics read contracts
 - Discovery presentation layer; optional VexCore repository interfaces for adapter injection
 - Automated architecture enforcement (Foundation Phase 9)
+- Post-lock adoption backlog: document storage adapters, remaining Firestore paths, broader entitlements ([11-foundation-lock.md](./vexcore/11-foundation-lock.md))
 
 ### Version 2 — Intelligence and scale
 
 - **Intelligence Engine** — insight and decision support on aggregated/anonymised data
-- Event bus for completed business actions (Foundation Phase 8)
+- Event bus for completed business actions — **Foundation Phase 8 complete**
 - Broader repository migration behind VexCore
 - International and multi-city SEO expansion ([WEB_ARCHITECTURE Cities](../apps/nightlife_web/docs/WEB_ARCHITECTURE.md))
 

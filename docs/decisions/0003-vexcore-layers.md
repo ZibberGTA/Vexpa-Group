@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted — 2026-07-11
+Accepted — 2026-07-11  
+**Foundation 1.0 locked** — 2026-07-11 ([11-foundation-lock.md](../vexcore/11-foundation-lock.md))
 
 ## Context
 
@@ -57,4 +58,4 @@ Rules:
 
 When PostgreSQL migration begins, add ADR for adapter package structure and transaction boundaries.
 
-**References:** [01-foundation-overview.md](../vexcore/01-foundation-overview.md), [02-layer-boundaries.md](../vexcore/02-layer-boundaries.md), [03-dependency-rules.md](../vexcore/03-dependency-rules.md)
+**References:** [01-foundation-overview.md](../vexcore/01-foundation-overview.md), [02-layer-boundaries.md](../vexcore/02-layer-boundaries.md), [03-dependency-rules.md](../vexcore/03-dependency-rules.md), [11-foundation-lock.md](../vexcore/11-foundation-lock.md)

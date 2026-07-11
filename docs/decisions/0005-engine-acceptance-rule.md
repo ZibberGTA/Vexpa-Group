@@ -4,6 +4,8 @@
 
 Accepted — 2026-07-11
 
+**Note:** VexCore Foundation 1.0 lock ([11-foundation-lock.md](../vexcore/11-foundation-lock.md)) does not mark any engine complete — this ADR still governs engine acceptance criteria.
+
 ## Context
 
 Partial migrations leave duplicate logic in apps and engines. Without a clear "done" definition, engines are declared complete prematurely and technical debt returns.

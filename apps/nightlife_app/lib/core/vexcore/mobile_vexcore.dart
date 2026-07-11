@@ -28,6 +28,9 @@ final class MobileVexCore {
     logger: ConsoleVexLogger(prefix: 'MobileVexCore'),
   );
 
+  static final ConsoleVexLogger _defaultLogger =
+      ConsoleVexLogger(prefix: 'MobileVexCore');
+
   static final InMemoryConfigurationService _defaultConfiguration =
       InMemoryConfigurationService(
     environment: kDebugMode
@@ -47,7 +50,7 @@ final class MobileVexCore {
       _configurationOverride ?? _defaultConfiguration;
 
   static VexLogger get logger =>
-      _loggerOverride ?? ConsoleVexLogger(prefix: 'MobileVexCore');
+      _loggerOverride ?? _defaultLogger;
 
   static ErrorReporter get errorReporter =>
       _errorReporterOverride ?? const NoOpErrorReporter();

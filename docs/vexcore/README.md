@@ -36,6 +36,13 @@ Foundation 1.0 structure and Version 1 runtime contracts are in place:
 8. `08-migration-inventory.md`
 9. `09-risk-register.md`
 10. `10-foundation-roadmap.md`
+11. `11-foundation-lock.md` — **Foundation 1.0 locked** (2026-07-11)
+
+## Foundation 1.0 — Locked
+
+**Status:** Locked — see [11-foundation-lock.md](./11-foundation-lock.md).
+
+The Version 1 contract surface in `packages/vex_core` is frozen. Backward-compatible additions are allowed; breaking changes require an ADR and founder approval. Adoption and adapter work continue after lock.
 
 ## Entitlements (subscription access)
 

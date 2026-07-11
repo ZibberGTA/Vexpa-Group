@@ -218,3 +218,16 @@ Completion criteria:
 - Engine folders reject Firebase imports.
 - New direct Firebase access in UI is flagged.
 - Existing legacy exceptions are tracked until migrated.
+
+## Phase 10 — Foundation Lock
+
+**Status: Complete (2026-07-11).** VexCore Foundation 1.0 contract surface is locked. See [11-foundation-lock.md](./11-foundation-lock.md).
+
+Completion criteria:
+
+- Lock scope, rules, and adoption backlog documented.
+- Legacy visibility helpers deprecated with Experience Engine as canonical source.
+- Mobile AuthGate and composition roots consume stable VexCore singletons.
+- No new Firebase reads, Auth calls, or listeners added during lock work.
+
+Post-lock work (adapters, repository migration, Phase 9 enforcement) continues on separate tracks.

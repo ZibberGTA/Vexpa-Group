@@ -48,5 +48,11 @@ The event bus must not replace normal request-response calls.
 - New production Firebase integrations.
 - Runtime imports from app code into VexCore.
 - Final identity model decisions.
+
+## Foundation 1.0 — Locked (2026-07-11)
+
+Version 1 contracts are complete and locked. See [11-foundation-lock.md](./11-foundation-lock.md) for scope, rules, deprecated modules, and the post-lock adoption backlog.
+
+**Adoption** (AuthGate, route guards, repository adapters) continues independently of the lock.
 - Final engine APIs.
 - Deployment.
