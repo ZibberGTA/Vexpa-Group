@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+
+import 'mobile_vexcore.dart';
 
 /// Firebase adapter for owner venue create and update writes.
 class FirebaseVenueWriteRepository implements VenueWriteRepository {
@@ -55,6 +59,14 @@ class FirebaseVenueWriteRepository implements VenueWriteRepository {
           .collection('venues')
           .doc(trimmedId)
           .update(_buildFirestorePayload(payload));
+      unawaited(
+        MobileVexCore.eventBus.publish(
+          VenueProfileUpdatedEvent(
+            venueId: trimmedId,
+            updatedByUid: payload.fields['ownerId']?.toString() ?? '',
+          ),
+        ),
+      );
       return const DataSuccess(null);
     } on FirebaseException catch (error) {
       return DataFailure(

@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vex_core/vex_core.dart' as vex;
+
+import '../../../core/vexcore/admin_staff_role_bridge.dart';
 
 /// Staff roles used by the internal admin panel.
 ///
@@ -56,12 +59,40 @@ extension StaffRoleX on StaffRole {
 
   bool atLeast(StaffRole role) => level >= role.level;
 
-  bool get canUseAdminPanel => atLeast(StaffRole.support);
-  bool get canEditFullContent => atLeast(StaffRole.admin);
-  bool get canManageStaff => this == StaffRole.management || this == StaffRole.founder;
-  bool get canViewAuditLogs => atLeast(StaffRole.management);
-  bool get canViewFinancials => this == StaffRole.founder;
-  bool get canHardDelete => this == StaffRole.founder;
+  bool get canUseAdminPanel =>
+      AdminStaffRoleBridge.hasPermission(this, vex.StaffPermission.dashboardView);
+
+  bool get canEditFullContent => AdminStaffRoleBridge.hasAnyPermission(
+        this,
+        const [
+          vex.StaffPermission.venuesEdit,
+          vex.StaffPermission.drinksManage,
+          vex.StaffPermission.dealsManage,
+          vex.StaffPermission.eventsManage,
+        ],
+      );
+
+  bool get canManageStaff => AdminStaffRoleBridge.hasAnyPermission(
+        this,
+        const [
+          vex.StaffPermission.staffEdit,
+          vex.StaffPermission.staffInvite,
+        ],
+      );
+
+  bool get canViewAuditLogs =>
+      AdminStaffRoleBridge.hasPermission(this, vex.StaffPermission.auditView);
+
+  bool get canViewFinancials =>
+      AdminStaffRoleBridge.hasPermission(this, vex.StaffPermission.financials);
+
+  bool get canHardDelete => AdminStaffRoleBridge.hasAnyPermission(
+        this,
+        const [
+          vex.StaffPermission.usersDelete,
+          vex.StaffPermission.venuesDelete,
+        ],
+      );
 
   bool canAssign(StaffRole targetRole) {
     if (this == StaffRole.founder) return true;
@@ -99,12 +130,17 @@ extension StaffRoleX on StaffRole {
   }
 
   static StaffRole fromRoleLevel(dynamic value) {
-    if (value is num) {
-      if (value >= 100) return StaffRole.founder;
-      if (value >= 60) return StaffRole.management;
-      if (value >= 30) return StaffRole.admin;
-    }
-    return StaffRole.support;
+    return switch (vex.StaffRole.fromLevel(
+      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0,
+    )) {
+      vex.StaffRole.founder => StaffRole.founder,
+      vex.StaffRole.management => StaffRole.management,
+      vex.StaffRole.admin ||
+      vex.StaffRole.superAdmin ||
+      vex.StaffRole.coordinator =>
+        StaffRole.admin,
+      vex.StaffRole.supporter => StaffRole.support,
+    };
   }
 
   static StaffRole fromStaffData(Map<String, dynamic>? data) {

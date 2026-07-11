@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 enum AppUserRole {
   founder,
@@ -51,6 +52,31 @@ extension AppUserRoleX on AppUserRole {
   }
 }
 
+/// Cached role resolution snapshot for VexCore identity mapping.
+class UserRoleSnapshot {
+  const UserRoleSnapshot({
+    required this.uid,
+    required this.role,
+    this.email,
+    this.venueIds = const [],
+    this.ownedVenuesCount = 0,
+    this.roleLevel = 0,
+    this.staffFlag = false,
+    this.isAdminFlag = false,
+    this.source = 'unknown',
+  });
+
+  final String uid;
+  final String? email;
+  final AppUserRole role;
+  final List<String> venueIds;
+  final int ownedVenuesCount;
+  final int roleLevel;
+  final bool staffFlag;
+  final bool isAdminFlag;
+  final String source;
+}
+
 /// Firebase Auth session + Firestore `users/{uid}` role resolution.
 ///
 /// Firebase Auth identifies the signed-in user. Role and access are resolved
@@ -62,6 +88,27 @@ class UserRoleService {
 
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static UserRoleSnapshot? _lastSnapshot;
+
+  static UserRoleSnapshot? peekLastSnapshot(String uid) {
+    final snapshot = _lastSnapshot;
+    if (snapshot == null || snapshot.uid != uid) return null;
+    return snapshot;
+  }
+
+  static AppUserRole parseStaffAdminRole({
+    required int roleLevel,
+    String? rawRole,
+  }) {
+    if (roleLevel >= 100) return AppUserRole.founder;
+    if (roleLevel >= 60) return AppUserRole.management;
+    if (roleLevel >= 30) return AppUserRole.admin;
+    return parseRole(rawRole ?? 'admin');
+  }
+
+  static void _cacheSnapshot(UserRoleSnapshot snapshot) {
+    _lastSnapshot = snapshot;
+  }
 
   static AppUserRole parseRole(dynamic value) {
     final role = (value ?? 'user').toString().trim().toLowerCase();
@@ -110,54 +157,37 @@ class UserRoleService {
   }
 
   static List<String> _parseVenueIds(Map<String, dynamic>? data) {
-    final value = data?['venueIds'];
-    if (value is! List) return const [];
-    return value
-        .map((item) => item?.toString().trim() ?? '')
-        .where((id) => id.isNotEmpty)
-        .toList();
+    return RoleResolver.parseVenueIds(data?['venueIds']);
   }
 
   static String? _readRoleField(Map<String, dynamic>? data) {
-    if (data == null) return null;
-
-    final role = data['role']?.toString().trim();
-    if (role != null && role.isNotEmpty) return role;
-
-    final accountType = data['accountType']?.toString().trim();
-    if (accountType != null && accountType.isNotEmpty) return accountType;
-
-    return null;
+    return RoleResolver.readRoleField(data);
   }
 
   static AppUserRole _roleFromStaffData(Map<String, dynamic>? data) {
     if (data == null) return AppUserRole.user;
 
-    final roleLevel = data['roleLevel'];
-    if (roleLevel is num) {
-      if (roleLevel >= 100) return AppUserRole.founder;
-      if (roleLevel >= 60) return AppUserRole.management;
-      if (roleLevel >= 30) return AppUserRole.admin;
+    final staffResolution = RoleResolver.resolveStaffFromDocument(
+      data,
+      source: 'staffCollection',
+    );
+    if (staffResolution != null) {
+      return parseStaffAdminRole(
+        roleLevel: staffResolution.roleLevel,
+        rawRole: RoleResolver.readRoleField(data),
+      );
     }
 
     return parseRole(data['role']);
   }
 
   static AppUserRole _roleFromCustomClaims(Map<String, dynamic> claims) {
-    if (claims['staff'] == true) {
-      final fromLevel = claims['roleLevel'];
-      if (fromLevel is num) {
-        if (fromLevel >= 100) return AppUserRole.founder;
-        if (fromLevel >= 60) return AppUserRole.management;
-        if (fromLevel >= 30) return AppUserRole.admin;
-      }
-
-      final staffRole = (claims['staffRole'] ?? claims['role'] ?? 'admin')
-          .toString()
-          .trim()
-          .toLowerCase();
-      if (staffRole == 'staff') return AppUserRole.admin;
-      return parseRole(staffRole);
+    final staffResolution = RoleResolver.resolveStaffFromClaims(claims);
+    if (staffResolution != null) {
+      return parseStaffAdminRole(
+        roleLevel: staffResolution.roleLevel,
+        rawRole: (claims['staffRole'] ?? claims['role'])?.toString(),
+      );
     }
 
     return AppUserRole.user;
@@ -319,65 +349,48 @@ class UserRoleService {
     }
   }
 
-  static AppUserRole _resolveFromUserDocument({
-    required Map<String, dynamic>? data,
-    required int venueIdsCount,
-    required int ownedVenuesCount,
-  }) {
-    return resolveFromUserContext(
-      data: data,
-      venueIdsCount: venueIdsCount,
-      ownedVenuesCount: ownedVenuesCount,
-    );
-  }
-
   /// Resolves access from a user document plus venue assignment/ownership signals.
   static AppUserRole resolveFromUserContext({
     required Map<String, dynamic>? data,
     required int venueIdsCount,
     required int ownedVenuesCount,
   }) {
-    if (data == null) {
-      return ownedVenuesCount > 0 ? AppUserRole.owner : AppUserRole.user;
-    }
+    final dashboardRole = RoleResolver.resolveFromUserContext(
+      data: data,
+      venueIdsCount: venueIdsCount,
+      ownedVenuesCount: ownedVenuesCount,
+    );
 
-    if (data['isAdmin'] == true) {
-      return AppUserRole.admin;
-    }
+    return switch (dashboardRole) {
+      DashboardRole.venueOwner => AppUserRole.owner,
+      DashboardRole.employee => AppUserRole.employee,
+      DashboardRole.regularUser => AppUserRole.user,
+      DashboardRole.admin => parseStaffAdminRole(
+          roleLevel: RoleResolver.readRoleLevel(data?['roleLevel']),
+          rawRole: _readRoleField(data),
+        ),
+    };
+  }
 
-    final rawRole = (_readRoleField(data) ?? 'user').trim().toLowerCase();
-
-    if (rawRole == 'staff') {
-      if (venueIdsCount > 0) return AppUserRole.employee;
-      return AppUserRole.admin;
-    }
-
-    if (rawRole == 'employee') return AppUserRole.employee;
-
-    if (rawRole == 'admin' ||
-        rawRole == 'founder' ||
-        rawRole == 'management' ||
-        rawRole == 'manager' ||
-        rawRole == 'owner_founder' ||
-        rawRole == 'app_owner') {
-      return parseRole(rawRole);
-    }
-
-    if (rawRole == 'owner' ||
-        rawRole == 'venueowner' ||
-        rawRole == 'venue_owner' ||
-        rawRole == 'business' ||
-        rawRole == 'businessowner' ||
-        rawRole == 'business_owner' ||
-        rawRole == 'venue') {
-      return AppUserRole.owner;
-    }
-
-    if (venueIdsCount > 0) return AppUserRole.employee;
-
-    if (ownedVenuesCount > 0) return AppUserRole.owner;
-
-    return parseRole(rawRole);
+  static UserRoleSnapshot _snapshotForResolution({
+    required User user,
+    required AppUserRole role,
+    required Map<String, dynamic>? data,
+    required List<String> venueIds,
+    required int ownedVenuesCount,
+    required String source,
+  }) {
+    return UserRoleSnapshot(
+      uid: user.uid,
+      email: user.email,
+      role: role,
+      venueIds: venueIds,
+      ownedVenuesCount: ownedVenuesCount,
+      roleLevel: RoleResolver.readRoleLevel(data?['roleLevel']),
+      staffFlag: role.isStaff || RoleResolver.readStaffFlag(data),
+      isAdminFlag: data?['isAdmin'] == true || role.isStaff,
+      source: source,
+    );
   }
 
   static void _logRoleResolution({
@@ -413,6 +426,16 @@ class UserRoleService {
 
     final staffFromClaims = await _getStaffRoleFromClaims(user);
     if (staffFromClaims != null && staffFromClaims.isStaff) {
+      _cacheSnapshot(
+        _snapshotForResolution(
+          user: user,
+          role: staffFromClaims,
+          data: null,
+          venueIds: const [],
+          ownedVenuesCount: 0,
+          source: 'customClaims',
+        ),
+      );
       _logRoleResolution(
         user: user,
         userDocFound: false,
@@ -428,6 +451,16 @@ class UserRoleService {
 
     final staffFromFirestore = await _getStaffRoleFromFirestore(user);
     if (staffFromFirestore != null && staffFromFirestore.isStaff) {
+      _cacheSnapshot(
+        _snapshotForResolution(
+          user: user,
+          role: staffFromFirestore,
+          data: null,
+          venueIds: const [],
+          ownedVenuesCount: 0,
+          source: 'staffCollection',
+        ),
+      );
       _logRoleResolution(
         user: user,
         userDocFound: false,
@@ -450,6 +483,17 @@ class UserRoleService {
       data: data,
       venueIdsCount: venueIds.length,
       ownedVenuesCount: ownedVenuesCount,
+    );
+
+    _cacheSnapshot(
+      _snapshotForResolution(
+        user: user,
+        role: resolved,
+        data: data,
+        venueIds: venueIds,
+        ownedVenuesCount: ownedVenuesCount,
+        source: 'usersCollection',
+      ),
     );
 
     _logRoleResolution(
