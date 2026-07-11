@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_event_mapper.dart';
 import '../../../core/vexcore/web_vexcore.dart';
-import '../../venue/data/public_venue_content_filters.dart';
 import '../../venue_management/data/event_write_payload.dart';
 import '../../venue_management/models/bulk_event_patch.dart';
 import 'models/event_model.dart';
@@ -15,12 +15,17 @@ class VenueEventsRepository {
   VenueEventsRepository({
     FirebaseFirestore? firestore,
     VenueEventDataService? venueEventDataService,
+    ExperienceContentOrchestrator? contentOrchestrator,
   }) : _firestoreOverride = firestore,
        _venueEventDataService =
-           venueEventDataService ?? WebVexCore.venueEventDataService;
+           venueEventDataService ?? WebVexCore.venueEventDataService,
+       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
+
+  static const _defaultOrchestrator = ExperienceContentOrchestrator();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueEventDataService _venueEventDataService;
+  final ExperienceContentOrchestrator _contentOrchestrator;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -43,11 +48,15 @@ class VenueEventsRepository {
   }
 
   List<EventModel> _visibleEvents(List<VenueEvent> events, {DateTime? now}) {
-    return events
-        .map(eventModelFromVexVenueEvent)
-        .where((event) => isPublicVisibleEvent(event, now: now))
-        .toList()
-      ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+    final mapped = events.map(eventModelFromVexVenueEvent).toList();
+    return _contentOrchestrator.filterPublicVisibleEvents(
+      mapped,
+      isDeleted: (event) => event.isDeleted,
+      isActive: (event) => event.isActive,
+      startDateTime: (event) => event.startDateTime,
+      endDateTime: (event) => event.endDateTime,
+      now: now,
+    )..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
   }
 
   Stream<List<EventModel>> watchManagementEvents(String venueId) async* {

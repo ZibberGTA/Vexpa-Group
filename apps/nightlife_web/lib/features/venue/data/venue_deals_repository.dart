@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_deal_mapper.dart';
@@ -16,12 +17,17 @@ class VenueDealsRepository {
   VenueDealsRepository({
     FirebaseFirestore? firestore,
     VenueDealDataService? venueDealDataService,
+    ExperienceContentOrchestrator? contentOrchestrator,
   }) : _firestoreOverride = firestore,
        _venueDealDataService =
-           venueDealDataService ?? WebVexCore.venueDealDataService;
+           venueDealDataService ?? WebVexCore.venueDealDataService,
+       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
+
+  static const _defaultOrchestrator = ExperienceContentOrchestrator();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueDealDataService _venueDealDataService;
+  final ExperienceContentOrchestrator _contentOrchestrator;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -44,11 +50,16 @@ class VenueDealsRepository {
   }
 
   List<DealModel> _visibleDeals(List<VenueDeal> deals, {DateTime? now}) {
-    final visible = deals
-        .map(dealModelFromVexVenueDeal)
-        .where((deal) => isPublicVisibleDeal(deal, now: now))
-        .toList()
-      ..sort((a, b) {
+    final mapped = deals.map(dealModelFromVexVenueDeal).toList();
+    final visible = _contentOrchestrator.filterPublicVisibleDeals(
+      mapped,
+      isDeleted: (deal) => deal.isDeleted,
+      isActive: (deal) => deal.isActive,
+      startDateTime: (deal) => deal.startDateTime,
+      endDateTime: (deal) => deal.endDateTime,
+      effectiveEndDateTime: (deal) => deal.effectiveEndDateTime,
+      now: now,
+    )..sort((a, b) {
         final clock = now ?? DateTime.now();
         final aUpcoming = isPublicUpcomingDeal(a, now: clock);
         final bUpcoming = isPublicUpcomingDeal(b, now: clock);
