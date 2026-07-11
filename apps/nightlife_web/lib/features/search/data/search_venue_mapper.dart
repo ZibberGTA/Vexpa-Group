@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/discovery/application/discovery_search_result_rules.dart';
+import 'package:vex_engines/discovery/shared/discovery_map_geometry.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../venues/models/venue_model.dart';
@@ -19,18 +21,16 @@ class SearchVenueMapper {
     [Color(0xFF251838), AppColors.primaryPurple],
   ];
 
-  static const _defaultRating = 4.5;
-
   /// Preview mapping for venue profile dashboard cards (coordinates optional).
   static VenueSearchResult previewFromVenueModel(VenueModel venue) {
     final latitude = venue.latitude ?? venue.location?.latitude ?? 0;
     final longitude = venue.longitude ?? venue.location?.longitude ?? 0;
     final gradients = _gradientsFor(venue.id);
-    final tags = venue.featureTags.isNotEmpty
-        ? venue.featureTags.take(3).toList()
-        : _tagsFromCategory(
-            venue.venueType.isNotEmpty ? venue.venueType : venue.category,
-          );
+    final tags = DiscoverySearchResultRules.resolveTags(
+      featureTags: venue.featureTags,
+      venueType: venue.venueType.isNotEmpty ? venue.venueType : venue.category,
+      category: venue.category,
+    );
     final openStatus = SearchVenueOpenStatus.fromOpeningHours(
       venue.openingHours,
     );
@@ -44,11 +44,16 @@ class SearchVenueMapper {
       city: venue.city,
       postcode: venue.postcode,
       venueType: venue.venueType.isNotEmpty ? venue.venueType : venue.category,
-      rating: venue.averageRating > 0 ? venue.averageRating : _defaultRating,
+      rating: DiscoverySearchResultRules.resolveRating(venue.averageRating),
       tags: tags,
       bannerGradient: gradients,
       logoGradient: gradients,
-      resultReason: _resultReasonFor(venue),
+      resultReason: DiscoverySearchResultRules.resultReasonFor(
+        hasDeals: venue.hasDeals,
+        featureTags: venue.featureTags,
+        venueType: venue.venueType,
+        category: venue.category,
+      ),
       isOpen: openStatus.isOpen,
       latitude: latitude,
       longitude: longitude,
@@ -63,16 +68,16 @@ class SearchVenueMapper {
   static VenueSearchResult? fromVenueModel(VenueModel venue) {
     final latitude = venue.latitude ?? venue.location?.latitude;
     final longitude = venue.longitude ?? venue.location?.longitude;
-    if (!_isValidCoordinate(latitude, longitude)) {
+    if (!DiscoveryMapGeometry.isValidCoordinate(latitude, longitude)) {
       return null;
     }
 
     final gradients = _gradientsFor(venue.id);
-    final tags = venue.featureTags.isNotEmpty
-        ? venue.featureTags.take(3).toList()
-        : _tagsFromCategory(
-            venue.venueType.isNotEmpty ? venue.venueType : venue.category,
-          );
+    final tags = DiscoverySearchResultRules.resolveTags(
+      featureTags: venue.featureTags,
+      venueType: venue.venueType.isNotEmpty ? venue.venueType : venue.category,
+      category: venue.category,
+    );
     final openStatus = SearchVenueOpenStatus.fromOpeningHours(
       venue.openingHours,
     );
@@ -87,11 +92,16 @@ class SearchVenueMapper {
       city: venue.city,
       postcode: venue.postcode,
       venueType: venue.venueType.isNotEmpty ? venue.venueType : venue.category,
-      rating: venue.averageRating > 0 ? venue.averageRating : _defaultRating,
+      rating: DiscoverySearchResultRules.resolveRating(venue.averageRating),
       tags: tags,
       bannerGradient: gradients,
       logoGradient: gradients,
-      resultReason: _resultReasonFor(venue),
+      resultReason: DiscoverySearchResultRules.resultReasonFor(
+        hasDeals: venue.hasDeals,
+        featureTags: venue.featureTags,
+        venueType: venue.venueType,
+        category: venue.category,
+      ),
       isOpen: openStatus.isOpen,
       latitude: latitude!,
       longitude: longitude!,
@@ -104,30 +114,8 @@ class SearchVenueMapper {
 
   static List<VenueSearchResult> fallbackVenues() => SearchPreviewData.venues;
 
-  static bool _isValidCoordinate(double? latitude, double? longitude) {
-    if (latitude == null || longitude == null) return false;
-    if (latitude.isNaN || longitude.isNaN) return false;
-    if (latitude < -90 || latitude > 90) return false;
-    if (longitude < -180 || longitude > 180) return false;
-    return true;
-  }
-
   static List<Color> _gradientsFor(String venueId) {
     final index = venueId.hashCode.abs() % _gradientPresets.length;
     return _gradientPresets[index];
-  }
-
-  static List<String> _tagsFromCategory(String category) {
-    final cleaned = category.trim();
-    if (cleaned.isEmpty) return const ['Venue'];
-    return [cleaned];
-  }
-
-  static String _resultReasonFor(VenueModel venue) {
-    if (venue.hasDeals) return 'Happy Hour active';
-    if (venue.featureTags.isNotEmpty) return venue.featureTags.first;
-    if (venue.venueType.trim().isNotEmpty) return venue.venueType;
-    if (venue.category.trim().isNotEmpty) return venue.category;
-    return 'Open until late';
   }
 }
