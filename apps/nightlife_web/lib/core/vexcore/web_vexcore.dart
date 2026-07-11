@@ -7,6 +7,8 @@ import 'package:vex_engines/venue/data/venue_profile_write_repository.dart';
 
 import 'firebase_authentication_adapter.dart';
 import 'firebase_identity_adapter.dart';
+import 'firebase_vex_document_storage_service.dart';
+import 'firebase_vex_storage_service.dart';
 import 'firebase_venue_deal_repository.dart';
 import 'firebase_venue_drink_repository.dart';
 import 'firebase_venue_event_repository.dart';
@@ -101,6 +103,26 @@ abstract final class WebVexCore {
 
   static const permissionEvaluator = VexPermissionEvaluator();
   static const entitlementService = EntitlementService();
+
+  static final FirebaseVexStorageService _defaultStorage =
+      FirebaseVexStorageService();
+
+  static final FirebaseVexDocumentStorageService _defaultDocumentStorage =
+      FirebaseVexDocumentStorageService();
+
+  /// Test override for [storage]. Reset to null after each test.
+  @visibleForTesting
+  static VexStorageService? storageOverride;
+
+  /// Test override for [documentStorage]. Reset to null after each test.
+  @visibleForTesting
+  static VexDocumentStorageService? documentStorageOverride;
+
+  static VexStorageService get storage =>
+      storageOverride ?? _defaultStorage;
+
+  static VexDocumentStorageService get documentStorage =>
+      documentStorageOverride ?? _defaultDocumentStorage;
 
   static final InProcessVexEventBus _defaultEventBus = InProcessVexEventBus(
     logger: ConsoleVexLogger(prefix: 'WebVexCore'),
