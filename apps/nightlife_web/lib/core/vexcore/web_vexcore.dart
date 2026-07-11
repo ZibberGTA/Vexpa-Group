@@ -100,4 +100,28 @@ abstract final class WebVexCore {
       DiscoveryUnifiedSearchComposer();
 
   static const permissionEvaluator = VexPermissionEvaluator();
+  static const entitlementService = EntitlementService();
+
+  static final InProcessVexEventBus _defaultEventBus = InProcessVexEventBus(
+    logger: ConsoleVexLogger(prefix: 'WebVexCore'),
+  );
+
+  static final InMemoryConfigurationService _defaultConfiguration =
+      InMemoryConfigurationService(
+    environment: kDebugMode
+        ? VexEnvironment.development
+        : VexEnvironment.production,
+  );
+
+  /// Test override for event bus. Reset to null after each test.
+  @visibleForTesting
+  static VexEventBus? eventBusOverride;
+
+  static VexEventBus get eventBus => eventBusOverride ?? _defaultEventBus;
+
+  static ConfigurationService get configuration => _defaultConfiguration;
+
+  static VexLogger get logger => ConsoleVexLogger(prefix: 'WebVexCore');
+
+  static ErrorReporter get errorReporter => const NoOpErrorReporter();
 }
