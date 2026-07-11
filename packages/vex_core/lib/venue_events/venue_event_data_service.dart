@@ -1,7 +1,6 @@
 import '../data/data_result.dart';
 import 'venue_event.dart';
 import 'venue_event_repository.dart';
-import 'venue_event_visibility.dart';
 
 /// Domain service for public venue event reads.
 final class VenueEventDataService {
@@ -37,12 +36,7 @@ final class VenueEventDataService {
     });
   }
 
-  List<VenueEvent> _publicEvents(List<VenueEvent> events, {DateTime? now}) {
-    final visible =
-        events
-            .where((event) => isPublicVisibleVenueEvent(event, now: now))
-            .toList()
-          ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-    return visible;
+  List<VenueEvent> _publicEvents(List<VenueEvent> events) {
+    return events.toList()..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
   }
 }

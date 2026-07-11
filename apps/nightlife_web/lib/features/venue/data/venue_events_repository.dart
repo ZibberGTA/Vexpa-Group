@@ -5,6 +5,7 @@ import 'package:vex_core/vex_core.dart';
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_event_mapper.dart';
 import '../../../core/vexcore/web_vexcore.dart';
+import '../../venue/data/public_venue_content_filters.dart';
 import '../../venue_management/data/event_write_payload.dart';
 import '../../venue_management/models/bulk_event_patch.dart';
 import 'models/event_model.dart';
@@ -35,11 +36,18 @@ class VenueEventsRepository {
 
     return _venueEventDataService.watchPublicEvents(trimmedId).map((result) {
       return switch (result) {
-        DataSuccess(:final value) =>
-          value.map(eventModelFromVexVenueEvent).toList(),
+        DataSuccess(:final value) => _visibleEvents(value),
         DataFailure(:final error) => throw error,
       };
     });
+  }
+
+  List<EventModel> _visibleEvents(List<VenueEvent> events, {DateTime? now}) {
+    return events
+        .map(eventModelFromVexVenueEvent)
+        .where((event) => isPublicVisibleEvent(event, now: now))
+        .toList()
+      ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
   }
 
   Stream<List<EventModel>> watchManagementEvents(String venueId) async* {

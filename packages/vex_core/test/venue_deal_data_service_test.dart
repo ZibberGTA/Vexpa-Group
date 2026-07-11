@@ -115,9 +115,7 @@ void main() {
   });
 
   group('VenueDealDataService.loadPublicDeals', () {
-    test(
-      'valid venue returns visible deals sorted current before upcoming',
-      () async {
+    test('valid venue returns deals sorted by start date', () async {
         final now = DateTime.now();
         final repository = MockVenueDealRepository(
           publicDeals: [
@@ -147,7 +145,7 @@ void main() {
         final result = await service.loadPublicDeals('venue-1');
         final deals = (result as DataSuccess<List<VenueDeal>>).value;
 
-        expect(deals.map((deal) => deal.title), ['Current', 'Upcoming']);
+        expect(deals.map((deal) => deal.title), ['Current', 'Paused', 'Upcoming']);
         expect(repository.loadCalls, 1);
       },
     );

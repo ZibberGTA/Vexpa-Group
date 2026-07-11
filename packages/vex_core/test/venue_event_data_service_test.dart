@@ -116,7 +116,7 @@ void main() {
   });
 
   group('VenueEventDataService.loadPublicEvents', () {
-    test('valid venue returns visible events sorted by start date', () async {
+    test('valid venue returns events sorted by start date', () async {
       final now = DateTime.now();
       final repository = MockVenueEventRepository(
         publicEvents: [
@@ -146,7 +146,9 @@ void main() {
       final result = await service.loadPublicEvents('venue-1');
       final events = (result as DataSuccess<List<VenueEvent>>).value;
 
-      expect(events.map((event) => event.title), ['Current', 'Upcoming']);
+      expect(events.first.title, 'Current');
+      expect(events.map((event) => event.title), containsAll(['Upcoming', 'Draft']));
+      expect(events.length, 3);
       expect(repository.loadCalls, 1);
     });
 

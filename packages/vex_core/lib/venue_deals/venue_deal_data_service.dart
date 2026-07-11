@@ -1,7 +1,6 @@
 import '../data/data_result.dart';
 import 'venue_deal.dart';
 import 'venue_deal_repository.dart';
-import 'venue_deal_visibility.dart';
 
 /// Domain service for public venue deal reads.
 final class VenueDealDataService {
@@ -37,17 +36,12 @@ final class VenueDealDataService {
     });
   }
 
-  List<VenueDeal> _publicDeals(List<VenueDeal> deals, {DateTime? now}) {
-    final visible =
-        deals.where((deal) => isPublicVisibleVenueDeal(deal, now: now)).toList()
-          ..sort((a, b) {
-            final aUpcoming = isPublicUpcomingVenueDeal(a, now: now);
-            final bUpcoming = isPublicUpcomingVenueDeal(b, now: now);
-            if (aUpcoming != bUpcoming) return aUpcoming ? 1 : -1;
-            return (a.startDateTime ?? DateTime(2100)).compareTo(
-              b.startDateTime ?? DateTime(2100),
-            );
-          });
-    return visible;
+  List<VenueDeal> _publicDeals(List<VenueDeal> deals) {
+    return deals.toList()
+      ..sort(
+        (a, b) => (a.startDateTime ?? DateTime(2100)).compareTo(
+          b.startDateTime ?? DateTime(2100),
+        ),
+      );
   }
 }

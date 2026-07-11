@@ -1,4 +1,8 @@
-/// Provider-independent public deal visibility rules.
+/// Legacy VexCore deal visibility helpers.
+///
+/// Canonical rules live in `ExperienceDealVisibility` inside the Experience Engine.
+/// Public web reads filter through Experience Engine at the repository boundary.
+library;
 
 import 'venue_deal.dart';
 

@@ -1,4 +1,8 @@
-/// Provider-independent public event visibility rules.
+/// Legacy VexCore event visibility helpers.
+///
+/// Canonical rules live in `ExperienceEventVisibility` inside the Experience Engine.
+/// Public web reads filter through Experience Engine at the repository boundary.
+library;
 
 import 'venue_event.dart';
 

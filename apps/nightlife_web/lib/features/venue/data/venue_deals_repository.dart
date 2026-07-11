@@ -6,6 +6,7 @@ import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_deal_mapper.dart';
 import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue/data/models/deal_model.dart';
+import '../../venue/data/public_venue_content_filters.dart';
 import '../../venue_management/data/deal_write_payload.dart';
 import '../../venue_management/models/bulk_deal_patch.dart';
 import '../../venue_management/models/deal_types.dart';
@@ -36,11 +37,27 @@ class VenueDealsRepository {
 
     return _venueDealDataService.watchPublicDeals(trimmedId).map((result) {
       return switch (result) {
-        DataSuccess(:final value) =>
-          value.map(dealModelFromVexVenueDeal).toList(),
+        DataSuccess(:final value) => _visibleDeals(value),
         DataFailure(:final error) => throw error,
       };
     });
+  }
+
+  List<DealModel> _visibleDeals(List<VenueDeal> deals, {DateTime? now}) {
+    final visible = deals
+        .map(dealModelFromVexVenueDeal)
+        .where((deal) => isPublicVisibleDeal(deal, now: now))
+        .toList()
+      ..sort((a, b) {
+        final clock = now ?? DateTime.now();
+        final aUpcoming = isPublicUpcomingDeal(a, now: clock);
+        final bUpcoming = isPublicUpcomingDeal(b, now: clock);
+        if (aUpcoming != bUpcoming) return aUpcoming ? 1 : -1;
+        return (a.startDateTime ?? DateTime(2100)).compareTo(
+          b.startDateTime ?? DateTime(2100),
+        );
+      });
+    return visible;
   }
 
   /// All non-deleted deals for venue management (includes paused/expired).
