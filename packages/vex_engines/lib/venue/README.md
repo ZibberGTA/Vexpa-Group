@@ -85,7 +85,8 @@ the Master Blueprint is created.
 | 3 — Profile update orchestration | Complete | `VenueProfileUpdateService` prepares writes; Firebase adapter persists |
 | 4 — Dashboard orchestration | Complete | Active venue selection, whats-next, setup highlights, activity interpretation |
 | 5 — Mobile read convergence | Complete | Public catalog, details watch, branding/hours helpers via VexCore adapter |
-| 6 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
+| 6 — Mobile owner convergence | Complete | Owner list/create/update via VexCore write contract + engine validation |
+| 7 — Profile repository writes (web) | Planned | Broader management orchestration beyond profile fields |
 
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.

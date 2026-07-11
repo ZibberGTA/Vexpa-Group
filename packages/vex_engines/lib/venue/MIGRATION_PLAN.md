@@ -219,11 +219,20 @@ leave engine contracts unused.
 - `VenueService.getVenues()` and `VenueDetailsService.venueStream()` delegate to the adapter.
 - `StartupDataService` catalog preload uses `VenueRepository.loadPublicVenues()` (limit 100 preserved).
 - `VenueBrandingParser` delegates to `VenueImageFieldParser`; owner add/edit screens use `VenueProfileFieldCodec` and `VenueProfileConstants`.
-- Owner venue writes, owner catalog stream, map preload, and search paths remain direct Firestore (deferred).
+- Map preload and discovery search paths remain direct Firestore (deferred).
 
 Network calls unchanged on migrated paths (1 catalog query / 1 catalog listener / 1 doc listener).
 
-### Phase 5 — Broader management orchestration (next)
+### Phase 5 — Mobile owner convergence (complete)
+
+- Extended VexCore with `VenueWriteRepository`, `VenueWritePayload`, and `watchVenuesForOwner`.
+- Added `VenueOwnerProfileService` for validated owner create/update preparation.
+- Mobile `OwnerVenueService`, `FirebaseVenueWriteRepository`, and owner list adapter methods.
+- Owner add/edit screens delegate saves through engine + VexCore; delete cascade remains direct Firestore.
+
+Network calls unchanged on migrated owner paths (1 owner listener / 1 create add / 1 update per save).
+
+### Phase 6 — Broader management orchestration (next)
 
 - Extract write orchestration from `venue_profile_repository.dart` into `venue/application/`.
 - Keep Firestore adapters in web until a shared adapter strategy exists.

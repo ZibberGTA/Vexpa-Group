@@ -170,7 +170,7 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Tenant-scoped venue profile, management workflows, validation |
 | Version | 1 |
-| Status | ~90% — mobile read convergence complete; management writes planned |
+| Status | ~93% — mobile owner reads/writes converged; web management writes planned |
 | VexCore | Auth, identity, permissions, `VenueDataService`, storage |
 | Owns | Profile field rules, opening hours, media semantics, profile updates, dashboard guidance |
 | Consumes | VexCore public venue reads; Experience Engine owns drinks/deals/events content |

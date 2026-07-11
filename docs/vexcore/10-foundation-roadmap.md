@@ -120,6 +120,7 @@ See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pil
 | Phase 4 dashboard orchestration | Complete | Active venue, whats-next, highlights, activity interpretation |
 | Phase 5 management orchestration | Planned | Broader dashboard aggregation and management workflows |
 | Mobile venue read convergence | Complete | VexCore adapter for catalog, details watch, engine branding/hours helpers |
+| Mobile owner venue convergence | Complete | Owner list/create/update via VexCore write contract and Venue Engine validation |
 
 Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
 See [docs/master-blueprint.md](../master-blueprint.md) and [ADR-0005](../decisions/0005-engine-acceptance-rule.md).

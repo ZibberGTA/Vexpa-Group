@@ -41,12 +41,29 @@ Full model merge deferred — compatibility shims are safer than a risky unified
 | Home catalog stream | 1 × `venues` listener (`isDeleted==false`) | Same — 1 listener via adapter |
 | Startup preload | 1 × `venues` get (limit 100) | Same — 1 get via `loadPublicVenues` |
 | Details watch | 1 × venue doc listener | Same — 1 listener via adapter |
-| Owner catalog | 1 × owner query listener | Unchanged (direct Firestore) |
+| Owner catalog | 1 × owner query listener | Same — 1 listener via adapter |
+
+## Migrated in owner convergence batch
+
+| Path | Role |
+| --- | --- |
+| `lib/features/owner/services/owner_venue_service.dart` | Owner list/create/update facade |
+| `lib/core/vexcore/firebase_venue_write_repository.dart` | Firestore create/update adapter |
+| `packages/vex_core/lib/venue/venue_write_repository.dart` | Firebase-independent write contract |
+| `packages/vex_engines/.../venue_owner_profile_service.dart` | Validated owner create/update preparation |
+
+## Network calls (owner batch — before → after)
+
+| Flow | Before | After |
+| --- | --- | --- |
+| Owner venue list | 1 × owner query listener | Same — 1 listener via adapter |
+| Add venue save | 1 × Firestore add | Same — 1 add via write adapter |
+| Edit venue save | 1 × Firestore update | Same — 1 update via write adapter |
+| Edit venue delete cascade | Direct Firestore reads/writes | Unchanged (deferred) |
 
 ## Remaining direct Firestore (deferred)
 
-- Owner add/edit venue writes
-- `VenueService.getVenuesForOwner`
+- Owner venue delete cascade (edit screen)
 - Map screen venue preload
 - Venue discovery search preload
 - Trending/recommendation venue reads
