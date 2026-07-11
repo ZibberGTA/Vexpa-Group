@@ -72,6 +72,18 @@ Completion criteria:
 - Repository contracts do not contain Firebase paths.
 - Tenant context requirements are explicit.
 
+## Phase 6 — Entitlements (subscription access)
+
+Centralise subscription tier normalisation, feature entitlements, and media limits in `packages/vex_core/lib/entitlements/`.
+
+Completion criteria:
+
+- Web `MediaSubscriptionLimits` and gallery gates delegate to VexCore.
+- Mobile consumer feature gates delegate through `SubscriptionEntitlements` facade.
+- Admin CRM tier labels use VexCore normalisers.
+- No additional Firestore reads on entitlement evaluation paths.
+- Unit tests cover each tier, unknown/missing plans, and fail-closed consumer plans.
+
 ## Phase 7 — First Repository Migration
 
 Migrate one narrow repository method behind a VexCore data contract.

@@ -25,3 +25,18 @@ Foundation 1.0 is structural only:
 8. `08-migration-inventory.md`
 9. `09-risk-register.md`
 10. `10-foundation-roadmap.md`
+
+## Entitlements (subscription access)
+
+**Locked decision:** subscription **entitlements** (what a plan allows) are owned by VexCore at `packages/vex_core/lib/entitlements/`. Engines and apps must not compare raw subscription plan name strings for feature access — they call `EntitlementService` with plan ids already loaded by billing adapters.
+
+| Module | Purpose |
+| --- | --- |
+| `subscription_tier.dart` | Canonical venue tiers, consumer plans, normalisation, admin labels |
+| `entitlement.dart` | Feature flags and media library limit keys |
+| `entitlement_limits.dart` | Numeric limits (gallery/deal/event image caps) |
+| `entitlement_service.dart` | In-memory entitlement evaluation (no network I/O) |
+
+**Billing stays in apps:** Stripe/Firestore payment status, renewal dates, and checkout flows remain in mobile/web adapters. VexCore answers capability questions only.
+
+**Related ownership:** Claim Engine owns claim evidence workflows. VexCore owns document storage contracts, metadata, permissions, and retrieval. VexDocs remains a future shared platform service if document management expands beyond claims.
