@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
@@ -5,6 +7,7 @@ import 'package:vex_engines/venue/application/venue_profile_update.dart';
 import 'package:vex_engines/venue/data/venue_profile_write_repository.dart';
 
 import '../../core/firebase/vexda_firebase.dart';
+import 'web_vexcore.dart';
 
 /// Firebase adapter for prepared venue profile updates.
 final class FirebaseVenueProfileWriteRepository
@@ -53,6 +56,14 @@ final class FirebaseVenueProfileWriteRepository
           .collection('venues')
           .doc(trimmedId)
           .set(payload, SetOptions(merge: true));
+      unawaited(
+        WebVexCore.eventBus.publish(
+          VenueProfileUpdatedEvent(
+            venueId: trimmedId,
+            updatedByUid: update.fields['ownerId']?.toString() ?? '',
+          ),
+        ),
+      );
       return const DataSuccess(null);
     } on FirebaseException catch (error) {
       if (kDebugMode) {
