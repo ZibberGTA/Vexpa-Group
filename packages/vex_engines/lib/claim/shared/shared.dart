@@ -2,4 +2,6 @@
 library;
 
 export 'claim_domain_utils.dart';
+export 'claim_presentation_support.dart';
+export 'claim_record_support.dart';
 export 'claim_search_support.dart';
