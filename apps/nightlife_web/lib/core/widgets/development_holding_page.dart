@@ -1,8 +1,6 @@
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../constants/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../../shared/components/vexda_logo.dart';
@@ -10,9 +8,9 @@ import 'development_preview_sign_in_dialog.dart';
 
 /// Minimal branded screen shown while the private development gate is active.
 ///
-/// No app shell, navigation, or visible login UI — logo and status text only.
-/// A hidden preview sign-in dialog is revealed after five logo taps.
-class DevelopmentHoldingPage extends StatefulWidget {
+/// Logo, status text, and a subtle Login action that opens the preview sign-in
+/// dialog. No app shell or navigation.
+class DevelopmentHoldingPage extends StatelessWidget {
   const DevelopmentHoldingPage({
     super.key,
     this.showLoadingIndicator = false,
@@ -20,33 +18,40 @@ class DevelopmentHoldingPage extends StatefulWidget {
   });
 
   const DevelopmentHoldingPage.loading({super.key})
-      : showLoadingIndicator = true,
-        accessDeniedMessage = null;
+    : showLoadingIndicator = true,
+      accessDeniedMessage = null;
 
   final bool showLoadingIndicator;
   final String? accessDeniedMessage;
 
   static const String statusText = 'Vexda Coming Soon';
 
-  /// Original holding-page logo height before the ~500% enlargement.
-  static const double _baseLogoHeight = 72;
-
   @override
-  State<DevelopmentHoldingPage> createState() => _DevelopmentHoldingPageState();
+  Widget build(BuildContext context) {
+    // [DevelopmentGate] replaces the app navigator while gated, so this page
+    // needs its own navigator to present the preview sign-in dialog.
+    return Navigator(
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        builder: (routeContext) => _DevelopmentHoldingPageView(
+          showLoadingIndicator: showLoadingIndicator,
+          accessDeniedMessage: accessDeniedMessage,
+        ),
+      ),
+    );
+  }
 }
 
-class _DevelopmentHoldingPageState extends State<DevelopmentHoldingPage> {
-  static const int _requiredLogoClicks = 5;
-  static const Duration _clickResetWindow = Duration(seconds: 5);
+class _DevelopmentHoldingPageView extends StatelessWidget {
+  const _DevelopmentHoldingPageView({
+    required this.showLoadingIndicator,
+    required this.accessDeniedMessage,
+  });
 
-  int _logoClickCount = 0;
-  Timer? _clickResetTimer;
+  final bool showLoadingIndicator;
+  final String? accessDeniedMessage;
 
-  @override
-  void dispose() {
-    _clickResetTimer?.cancel();
-    super.dispose();
-  }
+  /// Original holding-page logo height before the ~500% enlargement.
+  static const double _baseLogoHeight = 72;
 
   /// Responsive logo footprint — visually dominant on desktop (~400–560px wide).
   Size _holdingLogoSize(BuildContext context) {
@@ -54,22 +59,13 @@ class _DevelopmentHoldingPageState extends State<DevelopmentHoldingPage> {
     final availableWidth = screenWidth - (AppSpacing.xl * 2);
 
     if (screenWidth >= 1200) {
-      return Size(
-        _clampLogoWidth(560, availableWidth),
-        DevelopmentHoldingPage._baseLogoHeight * 5,
-      );
+      return Size(_clampLogoWidth(560, availableWidth), _baseLogoHeight * 5);
     }
     if (screenWidth >= 900) {
-      return Size(
-        _clampLogoWidth(480, availableWidth),
-        DevelopmentHoldingPage._baseLogoHeight * 4.5,
-      );
+      return Size(_clampLogoWidth(480, availableWidth), _baseLogoHeight * 4.5);
     }
     if (screenWidth >= 600) {
-      return Size(
-        _clampLogoWidth(400, availableWidth),
-        DevelopmentHoldingPage._baseLogoHeight * 3.75,
-      );
+      return Size(_clampLogoWidth(400, availableWidth), _baseLogoHeight * 3.75);
     }
 
     final mobileWidth = (availableWidth * 0.88).clamp(220.0, 360.0);
@@ -80,63 +76,48 @@ class _DevelopmentHoldingPageState extends State<DevelopmentHoldingPage> {
     return target > available ? available : target;
   }
 
-  void _handleLogoTap() {
-    _clickResetTimer?.cancel();
-    final nextCount = _logoClickCount + 1;
-
-    if (kDebugMode) {
-      debugPrint('Development logo tapped: $nextCount');
-    }
-
-    if (nextCount >= _requiredLogoClicks) {
-      _clickResetTimer?.cancel();
-      setState(() => _logoClickCount = 0);
-      unawaited(_showPreviewSignInDialog());
-      return;
-    }
-
-    setState(() => _logoClickCount = nextCount);
-    _clickResetTimer = Timer(_clickResetWindow, () {
-      if (!mounted) return;
-      setState(() => _logoClickCount = 0);
-    });
-  }
-
-  Future<void> _showPreviewSignInDialog() async {
-    if (!mounted) return;
-
-    if (kDebugMode) {
-      debugPrint('Opening development login dialog');
-    }
-
-    await showDialog<void>(
+  Future<void> _showPreviewSignInDialog(BuildContext context) {
+    return showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => const DevelopmentPreviewSignInDialog(),
     );
-
-    if (!mounted) return;
-    setState(() => _logoClickCount = 0);
   }
 
-  Widget _buildTappableLogo(BuildContext context) {
+  Widget _buildLoginAction(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return TextButton(
+      onPressed: () => _showPreviewSignInDialog(context),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.textSecondary,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: Colors.transparent,
+        overlayColor: AppColors.textSecondary.withValues(alpha: 0.08),
+      ),
+      child: Text(
+        AppStrings.login,
+        style: textTheme.labelLarge?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo(BuildContext context) {
     final logoSize = _holdingLogoSize(context);
 
     return SizedBox(
       width: logoSize.width,
       height: logoSize.height,
-      child: Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: (_) => _handleLogoTap(),
-        child: Center(
-          child: IgnorePointer(
-            child: VexdaLogo(
-              height: logoSize.height,
-              visualScale: 1,
-            ),
-          ),
-        ),
-      ),
+      child: Center(child: VexdaLogo(height: logoSize.height, visualScale: 1)),
     );
   }
 
@@ -148,55 +129,66 @@ class _DevelopmentHoldingPageState extends State<DevelopmentHoldingPage> {
       child: ColoredBox(
         color: AppColors.background,
         child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTappableLogo(context),
-                  const SizedBox(height: AppSpacing.xxl),
-                  if (widget.showLoadingIndicator) ...[
-                    const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: AppColors.primaryPink,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                  ],
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          DevelopmentHoldingPage.statusText,
-                          textAlign: TextAlign.center,
-                          style: textTheme.titleMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                            letterSpacing: 0.4,
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
+                  child: _buildLoginAction(context),
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildLogo(context),
+                      const SizedBox(height: AppSpacing.xxl),
+                      if (showLoadingIndicator) ...[
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppColors.primaryPink,
                           ),
                         ),
-                        if (widget.accessDeniedMessage != null) ...[
-                          const SizedBox(height: AppSpacing.lg),
-                          Text(
-                            widget.accessDeniedMessage!,
-                            textAlign: TextAlign.center,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: AppColors.primaryPink,
-                            ),
-                          ),
-                        ],
+                        const SizedBox(height: AppSpacing.xl),
                       ],
-                    ),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              DevelopmentHoldingPage.statusText,
+                              textAlign: TextAlign.center,
+                              style: textTheme.titleMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                            if (accessDeniedMessage != null) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                accessDeniedMessage!,
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.primaryPink,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

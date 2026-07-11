@@ -44,8 +44,8 @@ Approved emails are configured in `lib/core/config/development_gate_config.dart`
 #### Preview access for approved testers
 
 1. Open the live holding page.
-2. Click or tap the Vexda logo **five times** within about five seconds.
-3. Sign in using an approved Firebase Auth account in the hidden dialog.
+2. Click **Login** at the top centre of the page.
+3. Sign in using an approved Firebase Auth account in the dialog.
 4. The full application loads only when the signed-in email is approved.
 
 Signing out from the normal in-app account controls returns visitors to the holding page. Refreshing the browser preserves access while the approved Firebase session remains valid.

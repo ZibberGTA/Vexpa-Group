@@ -7,7 +7,7 @@ import '../theme/app_spacing.dart';
 import '../../shared/components/drinkspot_button.dart';
 import '../../shared/widgets/glass_container.dart';
 
-/// Discreet preview sign-in surfaced from the holding page logo interaction.
+/// Preview sign-in dialog opened from the holding page Login action.
 class DevelopmentPreviewSignInDialog extends StatefulWidget {
   const DevelopmentPreviewSignInDialog({super.key});
 
