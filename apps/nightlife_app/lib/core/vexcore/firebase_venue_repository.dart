@@ -68,18 +68,73 @@ class FirebaseVenueRepository implements VenueRepository {
   /// Preserves full home [VenueModel] fields for existing mobile streams.
   Stream<List<VenueModel>> watchHomeVenueCatalog() {
     return _catalogQuery.snapshots().map((snapshot) {
-      final venues = <VenueModel>[];
-      for (final doc in snapshot.docs) {
-        final venue = MobileVenueDocumentMapper.parseHomeVenueModel(
-          doc.id,
-          doc.data(),
-        );
-        if (venue != null) {
-          venues.add(venue);
-        }
-      }
-      return venues;
+      return _mapHomeVenueModels(snapshot.docs);
     });
+  }
+
+  Stream<List<VenueModel>> watchOwnerHomeVenues(String ownerId) {
+    final trimmedOwnerId = ownerId.trim();
+    if (trimmedOwnerId.isEmpty) {
+      return Stream.value(const []);
+    }
+
+    return _db
+        .collection('venues')
+        .where('ownerId', isEqualTo: trimmedOwnerId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => _mapHomeVenueModels(snapshot.docs));
+  }
+
+  @override
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId) {
+    final trimmedOwnerId = ownerId.trim();
+    if (trimmedOwnerId.isEmpty) {
+      return Stream.value(const DataSuccess([]));
+    }
+
+    return _db
+        .collection('venues')
+        .where('ownerId', isEqualTo: trimmedOwnerId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map<DataResult<List<Venue>>>((snapshot) {
+          return DataSuccess(_mapVenueDocuments(snapshot.docs));
+        })
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleError: (Object error, StackTrace stackTrace, EventSink sink) {
+              _logFailure('watchVenuesForOwner', error, stackTrace);
+              sink.add(
+                DataFailure(
+                  VexException(
+                    'Failed to watch owner venues.',
+                    code: error is FirebaseException
+                        ? error.code
+                        : 'venue-watch-failed',
+                    cause: error,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+  }
+
+  List<VenueModel> _mapHomeVenueModels(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final venues = <VenueModel>[];
+    for (final doc in docs) {
+      final venue = MobileVenueDocumentMapper.parseHomeVenueModel(
+        doc.id,
+        doc.data(),
+      );
+      if (venue != null) {
+        venues.add(venue);
+      }
+    }
+    return venues;
   }
 
   Stream<VenueDetailsModel?> watchVenueDetails(String venueId) {
