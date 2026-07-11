@@ -154,10 +154,14 @@ Engine README until the Master Blueprint is created.
 | --- | --- | --- |
 | `features/venues/**` | **VE** (future) | Primary venue module; consolidate with web engine contracts |
 | `features/home/models/venue_model.dart` | **DECIDE** | Duplicate of venues model; merge before engine migration |
-| `features/home/services/venue_service.dart` | **VE/data** | Direct Firestore; replace with VexCore + engine |
-| `features/owner/**` (venue screens) | **WEB/MOB** | Presentation shell; orchestration → Venue Engine |
+| `features/home/services/venue_service.dart` | **MOB** | Migrated — delegates catalog stream to VexCore adapter |
+| `features/venues/services/venue_details_service.dart` | **MOB** | Migrated read path — watch delegates to adapter |
+| `core/vexcore/firebase_venue_repository.dart` | **MOB** | Mobile Firebase adapter implementing `VenueRepository` |
+| `core/vexcore/mobile_venue_document_mapper.dart` | **MOB** | Firestore → VexCore / mobile view model mapping |
+| `core/vexcore/mobile_vexcore.dart` | **MOB** | Composition root |
+| `features/owner/**` (venue screens) | **WEB/MOB** | Presentation shell; hours/crowd helpers delegate to Venue Engine |
 | `features/map/venue_map_screen.dart` | **MOB** + **DISC** | Map UI in app; discovery logic in Discovery Engine |
-| `core/utils/venue_branding_parser.dart` | **VE/shared** | Pure parser; early migration candidate |
+| `core/utils/venue_branding_parser.dart` | **VE/shared** | Re-export shim over `VenueImageFieldParser` |
 
 ---
 
@@ -209,7 +213,17 @@ Web changes:
 Rollback: point `VenueProfileRepository` methods back to inline Firestore writes;
 leave engine contracts unused.
 
-### Phase 4 — Broader management orchestration (next)
+### Phase 4 — Mobile read convergence (complete)
+
+- Added `apps/nightlife_app/lib/core/vexcore/` adapter layer (`FirebaseVenueRepository`, `MobileVenueDocumentMapper`, `MobileVexCore`).
+- `VenueService.getVenues()` and `VenueDetailsService.venueStream()` delegate to the adapter.
+- `StartupDataService` catalog preload uses `VenueRepository.loadPublicVenues()` (limit 100 preserved).
+- `VenueBrandingParser` delegates to `VenueImageFieldParser`; owner add/edit screens use `VenueProfileFieldCodec` and `VenueProfileConstants`.
+- Owner venue writes, owner catalog stream, map preload, and search paths remain direct Firestore (deferred).
+
+Network calls unchanged on migrated paths (1 catalog query / 1 catalog listener / 1 doc listener).
+
+### Phase 5 — Broader management orchestration (next)
 
 - Extract write orchestration from `venue_profile_repository.dart` into `venue/application/`.
 - Keep Firestore adapters in web until a shared adapter strategy exists.
@@ -221,13 +235,11 @@ leave engine contracts unused.
 - Keep `VenueDetailsPage` in web; inject engine view models.
 - Preserve single VexCore stream per section (no duplicate listeners).
 
-### Phase 4 — Mobile convergence
+### Phase 4 — Mobile convergence (complete)
 
-- Align duplicate `VenueModel` classes.
-- Route mobile reads through VexCore services.
-- Move shared orchestration to engine; keep screens in mobile shell.
+See **Phase 4 — Mobile read convergence** above.
 
-### Phase 5 — Adapter extraction (optional)
+### Phase 6 — Adapter extraction (optional)
 
 - Move Firebase adapters from `core/vexcore/` to a dedicated adapter package or engine `data/` implementations behind VexCore interfaces.
 

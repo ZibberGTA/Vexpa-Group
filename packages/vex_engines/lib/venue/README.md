@@ -83,8 +83,9 @@ the Master Blueprint is created.
 | 1 — Shared helpers | Complete | Contact utils, opening hours, image position, profile completion |
 | 2 — Domain rules | Complete | Profile field codec/constants, image field parser |
 | 3 — Profile update orchestration | Complete | `VenueProfileUpdateService` prepares writes; Firebase adapter persists |
-| 4 — Dashboard orchestration | Partial | Active venue selection, whats-next, setup highlights, activity interpretation |
-| 5 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
+| 4 — Dashboard orchestration | Complete | Active venue selection, whats-next, setup highlights, activity interpretation |
+| 5 — Mobile read convergence | Complete | Public catalog, details watch, branding/hours helpers via VexCore adapter |
+| 6 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
 
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.
