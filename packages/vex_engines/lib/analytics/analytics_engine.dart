@@ -1,0 +1,11 @@
+/// Analytics Engine — venue metrics, engagement, and aggregation (Version 1).
+///
+/// See [README.md] and [MIGRATION_PLAN.md] for boundaries and migration order.
+library;
+
+export 'data/data.dart';
+export 'domain/domain.dart';
+export 'shared/shared.dart';
+
+/// Marker used by package tests until runtime APIs are added.
+const bool analyticsEngineLibraryExists = true;
