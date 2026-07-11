@@ -3,6 +3,9 @@ import 'package:vex_core/venue_deals/venue_deal.dart';
 import 'package:vex_core/venue_deals/venue_deal_visibility.dart';
 import 'package:vex_core/venue_events/venue_event.dart';
 import 'package:vex_core/venue_events/venue_event_visibility.dart';
+import 'package:vex_engines/experience/application/experience_deal_scheduling.dart';
+import 'package:vex_engines/experience/application/experience_deal_status.dart';
+import 'package:vex_engines/experience/application/experience_event_status.dart';
 import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
 import 'package:vex_engines/experience/application/experience_deal_visibility.dart';
 import 'package:vex_engines/experience/application/experience_drink_validator.dart';
@@ -39,6 +42,73 @@ final class _DealRow {
 void main() {
   const orchestrator = ExperienceContentOrchestrator();
   final now = DateTime(2026, 7, 10, 12);
+
+  group('ExperienceDealScheduling', () {
+    test('resolves effective end from HH:mm fallback', () {
+      final end = ExperienceDealScheduling.resolveEffectiveEndDateTime(
+        endTime: '21:30',
+        now: DateTime(2026, 7, 10, 12),
+      );
+      expect(end, DateTime(2026, 7, 10, 21, 30));
+    });
+
+    test('detects expired and future starts', () {
+      final now = DateTime(2026, 7, 10, 12);
+      expect(
+        ExperienceDealScheduling.isExpired(
+          endDateTime: now.subtract(const Duration(hours: 1)),
+          endTime: '',
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        ExperienceDealScheduling.isFutureStart(
+          startDateTime: now.add(const Duration(days: 1)),
+          now: now,
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('ExperienceDealStatusRules', () {
+    test('maps lifecycle states for management tables', () {
+      final now = DateTime(2026, 7, 10, 12);
+      expect(
+        ExperienceDealStatusRules.compute(
+          isActive: false,
+          startDateTime: now,
+          endDateTime: now.add(const Duration(days: 1)),
+          now: now,
+        ),
+        ExperienceDealManagementStatus.paused,
+      );
+      expect(
+        ExperienceDealStatusRules.passesStatusFilters(
+          status: ExperienceDealManagementStatus.active,
+          featured: true,
+          selectedFilters: {'Featured'},
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('ExperienceEventStatusRules', () {
+    test('maps draft, live, and ended states', () {
+      final now = DateTime(2026, 7, 10, 12);
+      expect(
+        ExperienceEventStatusRules.compute(
+          isActive: true,
+          startDateTime: now.subtract(const Duration(hours: 1)),
+          endDateTime: now.add(const Duration(hours: 2)),
+          now: now,
+        ),
+        ExperienceEventManagementStatus.live,
+      );
+    });
+  });
 
   group('ExperienceDrinkVisibility', () {
     test('requires available and not deleted', () {
