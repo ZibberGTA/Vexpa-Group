@@ -37,6 +37,8 @@ final class VenueDrinkDataService {
   }
 
   List<VenueDrink> _publicDrinks(List<VenueDrink> drinks) {
+    // Legacy filter — canonical rules live in ExperienceDrinkVisibility.
+    // Do not add new business rules here.
     final visible = drinks
         .where((drink) => !drink.isDeleted && drink.available)
         .toList()

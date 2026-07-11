@@ -7,6 +7,10 @@ library;
 import 'venue_event.dart';
 
 /// Whether an event should appear under Current Events on the public venue page.
+@Deprecated(
+  'Use ExperienceEventVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicCurrentVenueEvent(VenueEvent event, {DateTime? now}) {
   final clock = now ?? DateTime.now();
   if (event.isDeleted || !event.isActive) return false;
@@ -17,6 +21,10 @@ bool isPublicCurrentVenueEvent(VenueEvent event, {DateTime? now}) {
 }
 
 /// Whether an event should appear under Upcoming Events on the public venue page.
+@Deprecated(
+  'Use ExperienceEventVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicUpcomingVenueEvent(VenueEvent event, {DateTime? now}) {
   final clock = now ?? DateTime.now();
   if (event.isDeleted || !event.isActive) return false;
@@ -26,6 +34,10 @@ bool isPublicUpcomingVenueEvent(VenueEvent event, {DateTime? now}) {
 }
 
 /// Whether an event is visible to customers at all on the public venue page.
+@Deprecated(
+  'Use ExperienceEventVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicVisibleVenueEvent(VenueEvent event, {DateTime? now}) =>
     isPublicCurrentVenueEvent(event, now: now) ||
     isPublicUpcomingVenueEvent(event, now: now);

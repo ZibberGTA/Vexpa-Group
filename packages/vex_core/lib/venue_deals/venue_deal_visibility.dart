@@ -7,6 +7,10 @@ library;
 import 'venue_deal.dart';
 
 /// Whether a deal should appear under Current Deals on the public venue page.
+@Deprecated(
+  'Use ExperienceDealVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicCurrentVenueDeal(VenueDeal deal, {DateTime? now}) {
   final clock = now ?? DateTime.now();
   if (deal.isDeleted || !deal.isActive) return false;
@@ -20,6 +24,10 @@ bool isPublicCurrentVenueDeal(VenueDeal deal, {DateTime? now}) {
 }
 
 /// Whether a deal should appear under Upcoming Deals on the public venue page.
+@Deprecated(
+  'Use ExperienceDealVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicUpcomingVenueDeal(VenueDeal deal, {DateTime? now}) {
   final clock = now ?? DateTime.now();
   if (deal.isDeleted || !deal.isActive) return false;
@@ -34,6 +42,10 @@ bool isPublicUpcomingVenueDeal(VenueDeal deal, {DateTime? now}) {
 }
 
 /// Whether a deal is visible to customers at all on the public venue page.
+@Deprecated(
+  'Use ExperienceDealVisibility in the Experience Engine. '
+  'Do not add new rules here.',
+)
 bool isPublicVisibleVenueDeal(VenueDeal deal, {DateTime? now}) =>
     isPublicCurrentVenueDeal(deal, now: now) ||
     isPublicUpcomingVenueDeal(deal, now: now);
