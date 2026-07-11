@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:vex_engines/claim/application/claim_evidence_interpretation.dart';
+import 'package:vex_engines/claim/application/claim_summary_service.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -27,6 +29,8 @@ class AdminVenueClaimsPage extends StatefulWidget {
 }
 
 class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
+  static const _claimSummaryService = ClaimSummaryService();
+
   late final VenueClaimRepository _repository =
       widget.repository ?? VenueClaimRepository();
   VenueClaim? _selectedClaim;
@@ -41,7 +45,9 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
       stream: _repository.watchClaimsForAdmin(),
       builder: (context, snapshot) {
         final claims = snapshot.data ?? const <VenueClaim>[];
-        final pending = claims.where((claim) => claim.isPending).length;
+        final metrics = _claimSummaryService.adminMetrics(
+          claims.map((claim) => claim.toClaimListEntry()),
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -50,18 +56,17 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
               metrics: [
                 VenuePageMetricCard(
                   label: 'Total Claims',
-                  value: '${claims.length}',
+                  value: '${metrics.total}',
                   icon: Icons.fact_check_rounded,
                 ),
                 VenuePageMetricCard(
                   label: 'Pending Review',
-                  value: '$pending',
+                  value: '${metrics.pendingReview}',
                   icon: Icons.hourglass_top_rounded,
                 ),
                 VenuePageMetricCard(
                   label: 'Auto Approved',
-                  value:
-                      '${claims.where((claim) => claim.autoApproved).length}',
+                  value: '${metrics.autoApproved}',
                   icon: Icons.flash_on_rounded,
                 ),
               ],
@@ -114,6 +119,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: confirmed,
         currentStatus: claim.status,
+        reviewerCanApprove: _canReview,
       ),
       'Claim approved and draft published.',
     );
@@ -132,6 +138,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: notes,
         currentStatus: claim.status,
+        reviewerCanApprove: _canReview,
       ),
       'Claim rejected. Draft work was kept.',
     );
@@ -150,6 +157,7 @@ class _AdminVenueClaimsPageState extends State<AdminVenueClaimsPage> {
         reviewerUid: FirebaseAuth.instance.currentUser?.uid ?? 'admin',
         notes: notes,
         currentStatus: claim.status,
+        reviewerCanApprove: _canReview,
       ),
       'More information requested.',
     );
@@ -529,26 +537,20 @@ class _ClaimDetailPanel extends StatelessWidget {
 }
 
 class _EvidenceList extends StatelessWidget {
-  const _EvidenceList({required this.claim});
+  const _EvidenceList({
+    required this.claim,
+    this.interpretation = const ClaimEvidenceInterpretation(),
+  });
 
   final VenueClaim claim;
+  final ClaimEvidenceInterpretation interpretation;
 
   @override
   Widget build(BuildContext context) {
-    final evidence = claim.submittedEvidence;
-    final rows = [
-      ('Business Email', evidence.businessEmail),
-      ('Website', evidence.website),
-      ('Phone', evidence.phone),
-      ('Company Registration', evidence.companyRegistration),
-      ('Notes', evidence.notes),
-      (
-        'Uploaded Documents',
-        evidence.documentUrls.isEmpty
-            ? 'None'
-            : evidence.documentUrls.join('\n'),
-      ),
-    ];
+    final rows = interpretation
+        .reviewFields(claim.submittedEvidence)
+        .map((field) => (field.label, field.displayValue))
+        .toList(growable: false);
     return _InfoBlock(title: 'Evidence Submitted', rows: rows);
   }
 }

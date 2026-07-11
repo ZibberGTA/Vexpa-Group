@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_engines/claim/domain/claim_confidence_score.dart';
 import 'package:vex_engines/claim/domain/claim_evidence.dart';
+import 'package:vex_engines/claim/domain/claim_list_entry.dart';
 import 'package:vex_engines/claim/domain/claim_search_candidate.dart';
 import 'package:vex_engines/claim/domain/claim_status.dart';
+import 'package:vex_engines/claim/shared/claim_presentation_support.dart';
+import 'package:vex_engines/claim/shared/claim_record_support.dart';
 
 export 'package:vex_engines/claim/domain/claim_confidence_score.dart';
 export 'package:vex_engines/claim/domain/claim_evidence.dart';
@@ -91,29 +94,15 @@ class VenueClaimSearchResult implements ClaimSearchCandidate {
   @override
   final Map<String, dynamic> rawData;
 
-  String get displayAddress {
-    final parts = [
-      address,
-      city,
-      postcode,
-    ].map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
-    return parts.isEmpty ? 'Address not listed' : parts.join(', ');
-  }
+  String get displayAddress => ClaimPresentationSupport.formatDisplayAddress(
+    address: address,
+    city: city,
+    postcode: postcode,
+  );
 
   /// Human-readable claim status for search cards.
-  String get claimStatusLabel {
-    final status = (rawData['claimStatus'] ?? rawData['claimedStatus'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    if (status.isEmpty || status == 'unclaimed' || status == 'available') {
-      return 'Unclaimed';
-    }
-    if (status == 'pending' || status == 'pending_review') {
-      return 'Pending review';
-    }
-    return status[0].toUpperCase() + status.substring(1);
-  }
+  String get claimStatusLabel =>
+      ClaimPresentationSupport.directoryClaimStatusLabel(rawData);
 
   factory VenueClaimSearchResult.fromFirestore(
     String venueId,
@@ -206,7 +195,39 @@ class VenueClaim {
   bool get isPending => status.isPending;
   bool get isApproved => status.isApproved;
 
+  ClaimListEntry toClaimListEntry() {
+    return ClaimListEntry(
+      id: id,
+      venueId: venueId,
+      venueName: venueName,
+      claimantUid: claimantUid,
+      claimantEmail: claimantEmail,
+      status: status,
+      autoApproved: autoApproved,
+      confidenceScore: confidenceScore,
+      evidence: submittedEvidence,
+      submittedAt: submittedAt,
+      reviewNotes: reviewNotes,
+    );
+  }
+
   factory VenueClaim.fromFirestore(String id, Map<String, dynamic> data) {
+    if (ClaimRecordSupport.isMalformedClaimRecord(data)) {
+      return VenueClaim(
+        id: id,
+        venueId: (data['venueId'] ?? '').toString(),
+        claimantUid: (data['claimantUid'] ?? '').toString(),
+        status: ClaimRecordSupport.parseStatusSafely(data['status']),
+        confidenceScore: 0,
+        submittedEvidence: const ClaimEvidence(),
+        draftVenueData: const {},
+        autoApproved: false,
+        submittedAt: null,
+        createdAt: null,
+        updatedAt: null,
+      );
+    }
+
     final score = data['confidenceScore'];
     final rawSignals = data['confidenceSignals'];
     return VenueClaim(

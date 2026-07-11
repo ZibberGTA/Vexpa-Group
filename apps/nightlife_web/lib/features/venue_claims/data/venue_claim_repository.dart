@@ -4,15 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_engines/claim/application/claim_confidence_scorer.dart';
 import 'package:vex_engines/claim/application/claim_review_service.dart';
+import 'package:vex_engines/claim/application/claim_search_service.dart';
 import 'package:vex_engines/claim/application/claim_submission_service.dart';
 import 'package:vex_engines/claim/domain/claim_evidence.dart';
 import 'package:vex_engines/claim/domain/claim_result.dart';
 import 'package:vex_engines/claim/domain/claim_status.dart';
+import 'package:vex_engines/claim/shared/claim_search_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/venue_claim.dart';
 import '../models/venue_claim_search_response.dart';
-import 'venue_claim_search_support.dart';
 
 class VenueClaimSubmissionResult {
   const VenueClaimSubmissionResult({
@@ -38,12 +39,12 @@ class VenueClaimRepository {
     ClaimSubmissionService? submissionService,
     ClaimReviewService? reviewService,
     ClaimConfidenceScorer? confidenceScorer,
-  })  : _firestoreOverride = firestore,
-        _submissionService =
-            submissionService ?? const ClaimSubmissionService(),
-        _reviewService = reviewService ?? const ClaimReviewService(),
-        _confidenceScorer =
-            confidenceScorer ?? const ClaimConfidenceScorer();
+    ClaimSearchService? searchService,
+  }) : _firestoreOverride = firestore,
+       _submissionService = submissionService ?? const ClaimSubmissionService(),
+       _reviewService = reviewService ?? const ClaimReviewService(),
+       _confidenceScorer = confidenceScorer ?? const ClaimConfidenceScorer(),
+       _searchService = searchService ?? const ClaimSearchService();
 
   static const int autoApprovalThreshold = 75;
 
@@ -51,6 +52,7 @@ class VenueClaimRepository {
   final ClaimSubmissionService _submissionService;
   final ClaimReviewService _reviewService;
   final ClaimConfidenceScorer _confidenceScorer;
+  final ClaimSearchService _searchService;
   FirebaseFirestore? _firestore;
 
   FirebaseFunctions get _functions => FirebaseFunctions.instance;
@@ -61,10 +63,6 @@ class VenueClaimRepository {
     return _firestore ??= FirebaseFirestore.instance;
   }
 
-  static const int _fallbackBatchSize = 150;
-  static const int _fallbackMaxDocs = 900;
-  static const int _maxResults = 40;
-
   Future<VenueClaimSearchResponse> searchVenues(String query) async {
     final firestore = _resolveFirestore();
     if (firestore == null) {
@@ -74,23 +72,23 @@ class VenueClaimRepository {
       );
     }
 
-    final normalized = query.trim().toLowerCase();
-    if (normalized.length < 2) {
+    final interpretation = _searchService.interpretQuery(query);
+    if (interpretation is ClaimSearchTooShort) {
       return VenueClaimSearchResponse.ok(const [], source: 'query-too-short');
     }
 
-    final tokens = VenueClaimSearchSupport.tokenize(normalized);
+    final searchQuery = (interpretation as ClaimSearchReady).query;
     if (kDebugMode) {
       debugPrint(
-        '[VenueClaimRepository] search term="$normalized" tokens=$tokens',
+        '[VenueClaimRepository] search term="${searchQuery.normalized}" '
+        'tokens=${searchQuery.tokens}',
       );
     }
 
     try {
       final directoryResults = await _searchClaimDirectory(
         firestore,
-        normalized,
-        tokens,
+        searchQuery,
       );
       if (directoryResults.isNotEmpty) {
         if (kDebugMode) {
@@ -104,11 +102,7 @@ class VenueClaimRepository {
         );
       }
 
-      final indexedResults = await _searchIndexedVenues(
-        firestore,
-        normalized,
-        tokens,
-      );
+      final indexedResults = await _searchIndexedVenues(firestore, searchQuery);
       if (indexedResults.isNotEmpty) {
         if (kDebugMode) {
           debugPrint(
@@ -121,11 +115,7 @@ class VenueClaimRepository {
         );
       }
 
-      final fallback = await _searchVenuesFallback(
-        firestore,
-        normalized,
-        tokens,
-      );
+      final fallback = await _searchVenuesFallback(firestore, searchQuery);
       if (kDebugMode) {
         debugPrint(
           '[VenueClaimRepository] fallback scanned=${fallback.scannedCount} '
@@ -136,7 +126,8 @@ class VenueClaimRepository {
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint(
-          '[VenueClaimRepository] search failed path=venues term="$normalized" '
+          '[VenueClaimRepository] search failed path=venues '
+          'term="${searchQuery.normalized}" '
           'code=${error.code} message=${error.message}',
         );
       }
@@ -149,31 +140,30 @@ class VenueClaimRepository {
 
   Future<List<VenueClaimSearchResult>> _searchClaimDirectory(
     FirebaseFirestore firestore,
-    String normalizedQuery,
-    List<String> tokens,
+    ClaimSearchQuery searchQuery,
   ) async {
     try {
       final snapshot = await firestore
           .collection('venue_claim_directory')
-          .limit(400)
+          .limit(ClaimSearchLimits.directoryFetchLimit)
           .get();
 
       final results = <VenueClaimSearchResult>[];
       for (final doc in snapshot.docs) {
         final data = doc.data();
-        if (!VenueClaimSearchSupport.isClaimableVenue(data)) continue;
+        if (!ClaimSearchSupport.isClaimableVenue(data)) continue;
 
         final venueId = (data['venueId'] ?? doc.id).toString();
         final venue = VenueClaimSearchResult.fromFirestore(venueId, data);
-        if (!VenueClaimSearchSupport.matchesQuery(
+        if (!ClaimSearchSupport.matchesQuery(
           venue,
-          normalizedQuery,
-          tokens,
+          searchQuery.normalized,
+          searchQuery.tokens,
         )) {
           continue;
         }
         results.add(venue);
-        if (results.length >= _maxResults) break;
+        if (!_searchService.shouldCollectMore(results.length)) break;
       }
       return results;
     } on FirebaseException catch (error) {
@@ -192,8 +182,7 @@ class VenueClaimRepository {
 
   Future<List<VenueClaimSearchResult>> _searchIndexedVenues(
     FirebaseFirestore firestore,
-    String normalizedQuery,
-    List<String> tokens,
+    ClaimSearchQuery searchQuery,
   ) async {
     final matches = <String, VenueClaimSearchResult>{};
 
@@ -205,8 +194,7 @@ class VenueClaimRepository {
         final snapshot = await query();
         _collectSearchMatches(
           snapshot: snapshot,
-          normalizedQuery: normalizedQuery,
-          tokens: tokens,
+          searchQuery: searchQuery,
           matches: matches,
         );
         if (kDebugMode) {
@@ -224,9 +212,7 @@ class VenueClaimRepository {
       }
     }
 
-    final queryTokens = tokens.isEmpty
-        ? <String>[normalizedQuery]
-        : tokens.take(3).toList(growable: false);
+    final queryTokens = _searchService.indexedQueryTokens(searchQuery);
 
     for (final token in queryTokens) {
       await runQuery(
@@ -234,63 +220,71 @@ class VenueClaimRepository {
         () => firestore
             .collection('venues')
             .where('searchKeywords', arrayContains: token)
-            .limit(50)
+            .limit(ClaimSearchLimits.indexedTokenQueryLimit)
             .get(),
       );
-      if (matches.length >= _maxResults) break;
+      if (!_searchService.shouldCollectMore(matches.length)) break;
     }
 
-    if (matches.length < _maxResults) {
+    if (_searchService.shouldCollectMore(matches.length)) {
       await runQuery(
         'nameLower-prefix',
         () => firestore
             .collection('venues')
-            .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
-            .where('nameLower', isLessThan: '$normalizedQuery\uf8ff')
-            .limit(40)
+            .where('nameLower', isGreaterThanOrEqualTo: searchQuery.normalized)
+            .where('nameLower', isLessThan: '${searchQuery.normalized}\uf8ff')
+            .limit(ClaimSearchLimits.indexedPrefixQueryLimit)
             .get(),
       );
     }
 
-    if (matches.length < _maxResults) {
+    if (_searchService.shouldCollectMore(matches.length)) {
       await runQuery(
         'postcodeLower-prefix',
         () => firestore
             .collection('venues')
-            .where('postcodeLower', isGreaterThanOrEqualTo: normalizedQuery)
-            .where('postcodeLower', isLessThan: '$normalizedQuery\uf8ff')
-            .limit(40)
+            .where(
+              'postcodeLower',
+              isGreaterThanOrEqualTo: searchQuery.normalized,
+            )
+            .where(
+              'postcodeLower',
+              isLessThan: '${searchQuery.normalized}\uf8ff',
+            )
+            .limit(ClaimSearchLimits.indexedPrefixQueryLimit)
             .get(),
       );
     }
 
-    if (matches.length < _maxResults) {
+    if (_searchService.shouldCollectMore(matches.length)) {
       await runQuery(
         'isClaimed:false',
         () => firestore
             .collection('venues')
             .where('isClaimed', isEqualTo: false)
-            .limit(120)
+            .limit(ClaimSearchLimits.indexedUnclaimedLimit)
             .get(),
       );
     }
 
-    return matches.values.take(_maxResults).toList(growable: false);
+    return _searchService.finalizeResults(matches.values, searchQuery);
   }
 
   Future<VenueClaimSearchResponse> _searchVenuesFallback(
     FirebaseFirestore firestore,
-    String normalizedQuery,
-    List<String> tokens,
+    ClaimSearchQuery searchQuery,
   ) async {
     final matches = <String, VenueClaimSearchResult>{};
     DocumentSnapshot<Map<String, dynamic>>? lastDocument;
     var scanned = 0;
 
-    while (scanned < _fallbackMaxDocs && matches.length < _maxResults) {
+    while (_searchService.shouldContinueFallback(
+      scannedDocuments: scanned,
+      matchCount: matches.length,
+    )) {
       Query<Map<String, dynamic>> query = firestore
           .collection('venues')
-          .limit(_fallbackBatchSize);
+          .limit(ClaimSearchLimits.fallbackBatchSize);
       if (lastDocument != null) {
         query = query.startAfterDocument(lastDocument);
       }
@@ -303,14 +297,13 @@ class VenueClaimRepository {
 
       _collectSearchMatches(
         snapshot: snapshot,
-        normalizedQuery: normalizedQuery,
-        tokens: tokens,
+        searchQuery: searchQuery,
         matches: matches,
       );
     }
 
     return VenueClaimSearchResponse.ok(
-      matches.values.take(_maxResults).toList(growable: false),
+      _searchService.finalizeResults(matches.values, searchQuery),
       source: 'venues-fallback',
       scannedCount: scanned,
     );
@@ -318,25 +311,19 @@ class VenueClaimRepository {
 
   void _collectSearchMatches({
     required QuerySnapshot<Map<String, dynamic>> snapshot,
-    required String normalizedQuery,
-    required List<String> tokens,
+    required ClaimSearchQuery searchQuery,
     required Map<String, VenueClaimSearchResult> matches,
   }) {
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      if (!VenueClaimSearchSupport.isClaimableVenue(data)) continue;
-
       final venue = VenueClaimSearchResult.fromFirestore(doc.id, data);
-      if (!VenueClaimSearchSupport.matchesQuery(
-        venue,
-        normalizedQuery,
-        tokens,
-      )) {
-        continue;
-      }
-
-      matches[venue.venueId] = venue;
-      if (matches.length >= _maxResults) return;
+      _searchService.tryMergeCandidate(
+        matches: matches,
+        candidate: venue,
+        normalizedQuery: searchQuery.normalized,
+        tokens: searchQuery.tokens,
+      );
+      if (!_searchService.shouldCollectMore(matches.length)) return;
     }
   }
 
@@ -412,8 +399,7 @@ class VenueClaimRepository {
       throw VenueClaimBackendException(preparation.message);
     }
 
-    final payload =
-        (preparation as ClaimSuccess<ClaimSubmissionPayload>).value;
+    final payload = (preparation as ClaimSuccess<ClaimSubmissionPayload>).value;
     final response = await _callFunction(
       'submitVenueClaim',
       payload.toFunctionPayload(),
@@ -475,13 +461,14 @@ class VenueClaimRepository {
     required String reviewerUid,
     String notes = '',
     ClaimStatus currentStatus = ClaimStatus.pendingReview,
+    bool reviewerCanApprove = true,
   }) async {
     final review = _reviewService.prepareReview(
       claimId: claimId,
       action: ClaimReviewAction.approve,
       currentStatus: currentStatus,
       notes: notes,
-      reviewerCanApprove: true,
+      reviewerCanApprove: reviewerCanApprove,
     );
     if (review is ClaimFailure<ClaimReviewPayload>) {
       throw VenueClaimBackendException(review.message);
@@ -495,13 +482,14 @@ class VenueClaimRepository {
     required String reviewerUid,
     required String notes,
     ClaimStatus currentStatus = ClaimStatus.pendingReview,
+    bool reviewerCanApprove = true,
   }) async {
     final review = _reviewService.prepareReview(
       claimId: claimId,
       action: ClaimReviewAction.reject,
       currentStatus: currentStatus,
       notes: notes,
-      reviewerCanApprove: true,
+      reviewerCanApprove: reviewerCanApprove,
     );
     if (review is ClaimFailure<ClaimReviewPayload>) {
       throw VenueClaimBackendException(review.message);
@@ -515,13 +503,33 @@ class VenueClaimRepository {
     required String reviewerUid,
     required String notes,
     ClaimStatus currentStatus = ClaimStatus.pendingReview,
+    bool reviewerCanApprove = true,
   }) async {
     final review = _reviewService.prepareReview(
       claimId: claimId,
       action: ClaimReviewAction.requestMoreInfo,
       currentStatus: currentStatus,
       notes: notes,
-      reviewerCanApprove: true,
+      reviewerCanApprove: reviewerCanApprove,
+    );
+    if (review is ClaimFailure<ClaimReviewPayload>) {
+      throw VenueClaimBackendException(review.message);
+    }
+    final payload = (review as ClaimSuccess<ClaimReviewPayload>).value;
+    await _callFunction(payload.functionName, payload.toFunctionPayload());
+  }
+
+  Future<void> withdrawClaim({
+    required String claimId,
+    String notes = '',
+    ClaimStatus currentStatus = ClaimStatus.pendingReview,
+  }) async {
+    final review = _reviewService.prepareReview(
+      claimId: claimId,
+      action: ClaimReviewAction.withdraw,
+      currentStatus: currentStatus,
+      notes: notes,
+      reviewerCanApprove: false,
     );
     if (review is ClaimFailure<ClaimReviewPayload>) {
       throw VenueClaimBackendException(review.message);
@@ -557,8 +565,7 @@ class VenueClaimRepository {
   VenueClaimScore scoreClaim({
     required VenueClaimSearchResult venue,
     required VenueClaimEvidence evidence,
-  }) =>
-      _confidenceScorer.score(venue: venue, evidence: evidence);
+  }) => _confidenceScorer.score(venue: venue, evidence: evidence);
 
   FirebaseFirestore _requireFirestore() {
     final firestore = _resolveFirestore();
