@@ -1,5 +1,7 @@
 # VexCore Foundation 1.0
 
+> **Platform entry point:** [Master Blueprint](../master-blueprint.md) · [Documentation index](../README.md)
+
 This documentation set records the approved VexCore package boundary, dependency rules, current Firebase access audit, identity/permission audit, duplication audit, migration inventory, risk register, and foundation roadmap.
 
 Foundation 1.0 is structural only:

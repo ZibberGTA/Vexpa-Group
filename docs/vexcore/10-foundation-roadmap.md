@@ -107,7 +107,7 @@ See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pil
 | Phase 4 orchestration | Planned | Dashboard aggregation and broader management workflows |
 
 Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
-`docs/master-blueprint.md` still needs to be created.
+See [docs/master-blueprint.md](../master-blueprint.md) and [ADR-0005](../decisions/0005-engine-acceptance-rule.md).
 
 ### Discovery Engine structure (in progress)
 
@@ -118,6 +118,7 @@ Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
 | Application orchestration | Complete | Venue search merge, ranking, unified composer |
 | Web runtime slice | Complete | `VenueSearchDataSource` + `UnifiedSearchService` wired |
 | Shared web/mobile logic | Complete | Related venues, trending/recommendation scorers, mobile search rules |
+| Venue search consolidation (Batch C) | Complete | Shared matcher, search-term builder, nearby sorter, filter state, map geometry |
 | Presentation + cross-entity | Planned | Pages/widgets and VexCore discovery repos |
 
 Network calls unchanged on venue search path (1 catalog + 1 index lookup per search).
@@ -131,7 +132,8 @@ See `packages/vex_engines/lib/discovery/MIGRATION_PLAN.md`.
 | Shared rules batch | Complete | Visibility, featured limits, search terms, scheduling, orchestration |
 | Web write facades | Complete | Write payloads and public filters delegate to engine |
 | VexCore parity tests | Complete | Engine visibility matches VexCore deal/event rules |
-| Write contracts + mobile | Planned | Engine-owned write prep; mobile adoption |
+| Write contracts + mobile | Complete | Batch B: catalogs, grouping, write prep, orchestrator, mobile adoption |
+| Remaining experience work | Planned | Mobile write adoption, presentation layer |
 
 The Experience Engine replaces separate Drink, Deal, and Event engines for Version 1.
 VexCore read modules (`venue_drinks`, `venue_deals`, `venue_events`) remain generic contracts.
@@ -150,6 +152,21 @@ See `packages/vex_engines/lib/experience/MIGRATION_PLAN.md`.
 The Claim Engine owns venue-claim lifecycle rules. VexCore continues to own auth,
 identity, permissions, and storage contracts. Firebase adapters remain in app shells.
 See `packages/vex_engines/lib/claim/MIGRATION_PLAN.md`.
+
+### Analytics Engine structure (Version 1 launch engine)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/analytics/` |
+| Shared rules batch | Complete | Metrics composer, percent change, chart buckets |
+| Aggregation services | Complete | Top entities, weekly growth, engagement |
+| Web runtime slice | Complete | `VenueAnalyticsService` dashboard snapshot |
+| Mobile runtime slice | Complete | `AnalyticsService` summary and growth |
+| VexCore read contracts | Planned | Optional analytics data service pilot |
+
+The Analytics Engine owns venue metrics and aggregation rules for Version 1.
+VexCore continues to own permissions; Firebase adapters remain in app shells.
+See `packages/vex_engines/lib/analytics/MIGRATION_PLAN.md`.
 
 ## Phase 8 — Event Bus Foundation
 

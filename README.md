@@ -13,7 +13,10 @@ vexda/
 │   ├── vex_core/          # Shared infrastructure contracts (VexCore)
 │   └── vex_engines/       # Future business engine placeholders
 └── docs/
-    └── vexcore/           # VexCore Foundation documentation
+    ├── master-blueprint.md   # CEO handbook — start here for platform overview
+    ├── engines/              # Engine catalogue (one page per engine)
+    ├── decisions/            # Architecture Decision Records (ADRs)
+    └── vexcore/              # VexCore Foundation documentation
 ```
 
 ## Run the mobile app
@@ -83,6 +86,17 @@ Applications depend on VexCore via:
 vex_core:
   path: ../../packages/vex_core
 ```
+
+## Documentation
+
+| Start here | Path |
+| --- | --- |
+| Master Blueprint (CEO handbook) | [docs/master-blueprint.md](docs/master-blueprint.md) |
+| Documentation index | [docs/README.md](docs/README.md) |
+| Engine catalogue | [docs/engines/README.md](docs/engines/README.md) |
+| Architecture decisions (ADRs) | [docs/decisions/README.md](docs/decisions/README.md) |
+| VexCore foundation | [docs/vexcore/README.md](docs/vexcore/README.md) |
+| Web product principles | [apps/nightlife_web/docs/VEXDA_PRODUCT_PRINCIPLES.md](apps/nightlife_web/docs/VEXDA_PRODUCT_PRINCIPLES.md) |
 
 ## Validation
 
