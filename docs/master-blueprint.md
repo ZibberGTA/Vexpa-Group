@@ -130,7 +130,7 @@ Pure Dart contracts in `packages/vex_core` — no Firebase or Flutter imports in
 
 Completed pilots include public venue catalog, details, drinks, deals, events reads, web admin route guard, mobile AuthGate adoption, mobile auth/identity/permission composition roots, in-process event bus, document storage contracts, configuration/logging defaults, and **web storage adapter pilots** (venue branding upload + claim evidence path).
 
-**Foundation 1.0 — Locked (2026-07-11).** Contract surface frozen; storage adapter adoption is post-lock work — see [11-foundation-lock.md](./vexcore/11-foundation-lock.md).
+**Foundation 1.0 — Locked (2026-07-11).** Contract surface frozen; storage adapter adoption complete on web; claim evidence Storage rules drafted in [ADR-0010](./decisions/0010-claim-evidence-storage-security.md).
 
 ### Future migration strategy
 

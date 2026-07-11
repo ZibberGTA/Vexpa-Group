@@ -54,7 +54,7 @@ Do not add new business rules to deprecated modules.
 
 **In progress (2026-07-11):** Web Firebase storage adapters wired through `WebVexCore.storage` and `WebVexCore.documentStorage`. Venue logo/banner upload and gallery delete delegate to `VexStorageService`. Claim evidence upload path uses `VexDocumentStorageService` + Claim Engine document policy.
 
-**Blocked pending Firebase Rules ADR:** Live claim evidence uploads to `claims/{uid}/evidence/*` — current `storage.rules` default-deny all non-venue media paths. Do not weaken rules in adoption work.
+**Blocked pending Firebase Rules ADR:** ~~Live claim evidence uploads~~ **Rules drafted (ADR-0010)** — deploy `storage.rules` to enable live uploads. Application path is complete.
 
 **Remaining:**
 

@@ -215,6 +215,8 @@ Any collection not listed above is blocked.
 
 ## Storage rules
 
+### Venue media (unchanged)
+
 Path: `venues/{venueId}/media/{mediaType}/{fileName}`
 
 | Operation | Who |
@@ -222,6 +224,19 @@ Path: `venues/{venueId}/media/{mediaType}/{fileName}`
 | Read | Public venues, venue media managers, admin |
 | Upload / update | Venue media managers; images only; max 10 MB |
 | Delete | Venue media managers or admin |
+
+### Claim evidence (private)
+
+Path: `claims/{claimantUid}/evidence/{fileName}` — see [ADR-0010](../../../docs/decisions/0010-claim-evidence-storage-security.md)
+
+| Operation | Who |
+|-----------|-----|
+| Read | Claimant (`request.auth.uid == claimantUid`) or admin (level ≥ 30 via staff doc/claims) |
+| Create | Claimant only; jpeg/png/webp/pdf; max 10 MB; **no overwrite** |
+| Update | Denied |
+| Delete | Claimant or admin |
+
+Parity: `ClaimEvidenceDocumentPolicy.maxFileSizeBytes` and `allowedContentTypes` in the Claim Engine.
 
 **Default deny** on all other paths.
 
@@ -235,6 +250,7 @@ From `nightlife_app/tests`:
 cd tests
 npm install
 npm run test:rules
+npm run test:storage-rules
 ```
 
 Tests cover:
@@ -244,6 +260,8 @@ Tests cover:
 - Venue owner blocked from user list
 - Admin (via `staff/{uid}` without custom claims) allowed to list users/venues/claims
 - Default deny on unknown collections
+- Claim evidence upload/read/delete (private path)
+- Venue media storage parity
 
 ## Deploy rules
 

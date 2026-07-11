@@ -15,6 +15,7 @@ Locked decisions for Vexda. Read relevant ADRs **before** changing engine bounda
 | [0007](./0007-admin-portal.md) | Admin Portal Architecture | Accepted |
 | [0008](./0008-distribution-platform.md) | Distribution Platform Strategy | Accepted |
 | [0009](./0009-documentation-policy.md) | Documentation Policy | Accepted |
+| [0010](./0010-claim-evidence-storage-security.md) | Claim Evidence Storage Security | Accepted |
 
 ## How to add a decision
 
