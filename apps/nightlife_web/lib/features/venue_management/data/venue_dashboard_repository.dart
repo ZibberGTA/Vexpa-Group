@@ -1,7 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:vex_engines/analytics/application/analytics_dashboard_highlight_composer.dart';
+import 'package:vex_engines/analytics/application/analytics_dashboard_stats_composer.dart';
+import 'package:vex_engines/analytics/domain/analytics_venue_metrics.dart';
+import 'package:vex_engines/venue/application/venue_active_venue_selector.dart';
+import 'package:vex_engines/venue/application/venue_dashboard_composer.dart';
+import 'package:vex_engines/venue/domain/venue_dashboard_models.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../auth/services/auth_service.dart';
@@ -10,10 +15,7 @@ import '../../venues/models/venue_model.dart';
 import '../models/venue_dashboard_context.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_dashboard_home_data.dart';
-import '../models/venue_dashboard_performance_highlight.dart';
-import '../models/venue_dashboard_stat.dart';
-import '../models/venue_dashboard_tab.dart';
-import '../models/venue_dashboard_whats_next_action.dart';
+import '../services/venue_dashboard_engine_mapper.dart';
 import '../services/venue_profile_completion_calculator.dart';
 import 'venue_activity_service.dart';
 import 'venue_analytics_service.dart';
@@ -24,13 +26,29 @@ class VenueDashboardRepository {
     FirebaseFirestore? firestore,
     VenueAnalyticsService? analyticsService,
     VenueActivitySource? activityService,
+    VenueActiveVenueSelector? activeVenueSelector,
+    AnalyticsDashboardStatsComposer? statsComposer,
+    AnalyticsDashboardHighlightComposer? highlightComposer,
+    VenueDashboardHighlightComposer? dashboardHighlightComposer,
+    VenueWhatsNextComposer? whatsNextComposer,
   })  : _firestoreOverride = firestore,
         _analyticsService = analyticsService ?? VenueAnalyticsService(firestore: firestore),
-        _activityService = activityService ?? VenueActivityService(firestore: firestore);
+        _activityService = activityService ?? VenueActivityService(firestore: firestore),
+        _activeVenueSelector = activeVenueSelector ?? const VenueActiveVenueSelector(),
+        _statsComposer = statsComposer ?? const AnalyticsDashboardStatsComposer(),
+        _highlightComposer = highlightComposer ?? const AnalyticsDashboardHighlightComposer(),
+        _dashboardHighlightComposer =
+            dashboardHighlightComposer ?? const VenueDashboardHighlightComposer(),
+        _whatsNextComposer = whatsNextComposer ?? const VenueWhatsNextComposer();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueAnalyticsService _analyticsService;
   final VenueActivitySource _activityService;
+  final VenueActiveVenueSelector _activeVenueSelector;
+  final AnalyticsDashboardStatsComposer _statsComposer;
+  final AnalyticsDashboardHighlightComposer _highlightComposer;
+  final VenueDashboardHighlightComposer _dashboardHighlightComposer;
+  final VenueWhatsNextComposer _whatsNextComposer;
 
   FirebaseFirestore? get _db {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -85,42 +103,13 @@ class VenueDashboardRepository {
       range: dateRange,
     );
 
-    final stats = VenueDashboardStatsData.fromAnalytics(
-      profileViews: analytics.current.profileViews,
-      saves: analytics.current.saves,
-      drinkViews: analytics.current.drinkViews,
-      dealViews: analytics.current.dealViews,
-      eventViews: analytics.current.eventViews,
-      profileViewsChange: analytics.previous == null
-          ? null
-          : VenueAnalyticsService.percentChange(
-              analytics.current.profileViews,
-              analytics.previous!.profileViews,
-            ),
-      savesChange: analytics.previous == null
-          ? null
-          : VenueAnalyticsService.percentChange(
-              analytics.current.saves,
-              analytics.previous!.saves,
-            ),
-      drinkViewsChange: analytics.previous == null
-          ? null
-          : VenueAnalyticsService.percentChange(
-              analytics.current.drinkViews,
-              analytics.previous!.drinkViews,
-            ),
-      dealViewsChange: analytics.previous == null
-          ? null
-          : VenueAnalyticsService.percentChange(
-              analytics.current.dealViews,
-              analytics.previous!.dealViews,
-            ),
-      eventViewsChange: analytics.previous == null
-          ? null
-          : VenueAnalyticsService.percentChange(
-              analytics.current.eventViews,
-              analytics.previous!.eventViews,
-            ),
+    final stats = VenueDashboardEngineMapper.statsFromEngine(
+      _statsComposer.compose(
+        current: _toEngineMetrics(analytics.current),
+        previous: analytics.previous == null
+            ? null
+            : _toEngineMetrics(analytics.previous!),
+      ),
     );
 
     final drinkCount = await _countDrinks(venue.id);
@@ -132,24 +121,55 @@ class VenueDashboardRepository {
       venueId: venue.id,
     );
 
+    final analyticsHighlights = analytics.hasData
+        ? VenueDashboardEngineMapper.analyticsHighlightsFromEngine(
+            _highlightComposer.compose(
+              current: _toEngineMetrics(analytics.current),
+              previous: analytics.previous == null
+                  ? null
+                  : _toEngineMetrics(analytics.previous!),
+            ),
+          )
+        : const <VenueDashboardHighlight>[];
+
     return VenueDashboardHomeData(
       dateRange: dateRange,
       stats: stats,
       chartPoints: analytics.chartPoints,
       profileCompletion: profileCompletion,
-      highlights: analytics.hasData
-          ? _analyticsHighlights(analytics)
-          : VenueDashboardInsightsBuilder.setupHighlights(),
-      whatsNext: _buildWhatsNext(
-        venue: venue,
-        profileCompletion: profileCompletion,
-        drinkCount: drinkCount,
-        dealCount: dealCount,
-        eventCount: eventCount,
-        hasUpcomingEvent: hasUpcomingEvent,
+      highlights: VenueDashboardEngineMapper.highlightsFromEngine(
+        _dashboardHighlightComposer.compose(
+          analyticsAvailable: analytics.hasData,
+          analyticsHighlights: analyticsHighlights,
+        ),
+      ),
+      whatsNext: VenueDashboardEngineMapper.whatsNextFromEngine(
+        _whatsNextComposer.compose(
+          venue: VenueDashboardVenueSnapshot(
+            venueId: venue.id,
+            galleryImageCount: venue.galleryImageUrls.length,
+          ),
+          profileCompletion: profileCompletion,
+          counts: VenueDashboardContentCounts(
+            drinkCount: drinkCount,
+            dealCount: dealCount,
+            eventCount: eventCount,
+            hasUpcomingEvent: hasUpcomingEvent,
+          ),
+        ),
       ),
       recentActivity: recentActivity,
       analyticsAvailable: analytics.hasData,
+    );
+  }
+
+  AnalyticsVenueMetrics _toEngineMetrics(VenueAnalyticsCounts counts) {
+    return AnalyticsVenueMetrics(
+      profileViews: counts.profileViews,
+      saves: counts.saves,
+      drinkViews: counts.drinkViews,
+      dealViews: counts.dealViews,
+      eventViews: counts.eventViews,
     );
   }
 
@@ -234,19 +254,13 @@ class VenueDashboardRepository {
     required UserRoleProfile roleProfile,
     String? preferredVenueId,
   }) {
-    if (preferredVenueId != null) {
-      final match = venues.where((venue) => venue.id == preferredVenueId);
-      if (match.isNotEmpty) return match.first;
-    }
+    final selectedId = _activeVenueSelector.selectVenueId(
+      accessibleVenueIds: venues.map((venue) => venue.id).toList(),
+      roleVenueIds: roleProfile.venueIds,
+      preferredVenueId: preferredVenueId,
+    );
 
-    if (roleProfile.venueIds.isNotEmpty) {
-      for (final id in roleProfile.venueIds) {
-        final match = venues.where((venue) => venue.id == id);
-        if (match.isNotEmpty) return match.first;
-      }
-    }
-
-    return venues.first;
+    return venues.firstWhere((venue) => venue.id == selectedId);
   }
 
   Future<Map<String, dynamic>?> _loadUserDocument(String uid) async {
@@ -352,131 +366,6 @@ class VenueDashboardRepository {
     } on FirebaseException {
       return false;
     }
-  }
-
-  List<VenueDashboardPerformanceHighlight> _analyticsHighlights(
-    VenueAnalyticsSnapshot analytics,
-  ) {
-    final highlights = <VenueDashboardPerformanceHighlight>[];
-    final previous = analytics.previous;
-
-    if (previous != null) {
-      final profileChange = VenueAnalyticsService.percentChange(
-        analytics.current.profileViews,
-        previous.profileViews,
-      );
-      if (profileChange != null && analytics.current.profileViews > 0) {
-        highlights.add(
-          VenueDashboardPerformanceHighlight(
-            message:
-                'Your profile views are ${profileChange.abs().toStringAsFixed(0)}% ${profileChange >= 0 ? 'higher' : 'lower'} than the previous period.',
-            buttonLabel: 'View Analytics',
-            icon: Icons.visibility_outlined,
-            targetTab: VenueDashboardTab.analytics,
-            accent: VenueDashboardHighlightAccent.blue,
-          ),
-        );
-      }
-
-      final savesChange = VenueAnalyticsService.percentChange(
-        analytics.current.saves,
-        previous.saves,
-      );
-      if (savesChange != null && analytics.current.saves > 0) {
-        highlights.add(
-          VenueDashboardPerformanceHighlight(
-            message:
-                'Customers saved your venue ${savesChange >= 0 ? '$savesChange% more' : '${savesChange.abs()}% less'} than the previous period.',
-            buttonLabel: 'View Analytics',
-            icon: Icons.bookmark_outline_rounded,
-            targetTab: VenueDashboardTab.analytics,
-            accent: VenueDashboardHighlightAccent.pink,
-          ),
-        );
-      }
-    }
-
-    if (highlights.length < 4) {
-      highlights.addAll(
-        VenueDashboardInsightsBuilder.setupHighlights().take(4 - highlights.length),
-      );
-    }
-
-    return highlights.take(4).toList();
-  }
-
-  List<VenueDashboardWhatsNextAction> _buildWhatsNext({
-    required VenueModel venue,
-    required VenueProfileCompletion profileCompletion,
-    required int drinkCount,
-    required int dealCount,
-    required int eventCount,
-    required bool hasUpcomingEvent,
-  }) {
-    final actions = <VenueDashboardWhatsNextAction>[];
-
-    if (venue.galleryImageUrls.isEmpty) {
-      actions.add(
-        const VenueDashboardWhatsNextAction(
-          title: 'Add more photos',
-          message: 'Venues with more photos get more views.',
-          buttonLabel: 'Upload photos',
-          icon: Icons.photo_library_outlined,
-          targetTab: VenueDashboardTab.gallery,
-        ),
-      );
-    }
-
-    if (dealCount == 0) {
-      actions.add(
-        const VenueDashboardWhatsNextAction(
-          title: 'Create a new deal',
-          message: 'Deals increase customer engagement.',
-          buttonLabel: 'Create deal',
-          icon: Icons.local_offer_outlined,
-          targetTab: VenueDashboardTab.deals,
-        ),
-      );
-    }
-
-    if (!hasUpcomingEvent) {
-      actions.add(
-        const VenueDashboardWhatsNextAction(
-          title: 'Add an upcoming event',
-          message: 'Events bring more people through the door.',
-          buttonLabel: 'Add event',
-          icon: Icons.event_outlined,
-          targetTab: VenueDashboardTab.events,
-        ),
-      );
-    }
-
-    if (profileCompletion.completedSteps < profileCompletion.totalSteps) {
-      actions.add(
-        VenueDashboardWhatsNextAction(
-          title: 'Complete your profile',
-          message:
-              'Finish ${profileCompletion.totalSteps - profileCompletion.completedSteps} more steps to boost visibility.',
-          buttonLabel: 'Go to profile',
-          icon: Icons.storefront_outlined,
-          targetTab: VenueDashboardTab.venueProfile,
-        ),
-      );
-    }
-
-    if (drinkCount == 0) {
-      actions.add(
-        const VenueDashboardWhatsNextAction(
-          title: 'Add your drinks menu',
-          message: 'Help customers discover what you serve.',
-          buttonLabel: 'Add drinks',
-          icon: Icons.local_bar_outlined,
-          targetTab: VenueDashboardTab.drinks,
-        ),
-      );
-    }
-
-    return actions.take(4).toList();
   }
 }
 

@@ -3,13 +3,14 @@ import 'package:vex_engines/analytics/application/analytics_chart_series_builder
 import 'package:vex_engines/analytics/application/analytics_metrics_composer.dart';
 import 'package:vex_engines/analytics/application/analytics_percent_change.dart';
 import 'package:vex_engines/analytics/application/analytics_top_entity_aggregator.dart';
-import 'package:vex_engines/analytics/domain/analytics_chart_period.dart';
+import 'package:vex_engines/analytics/domain/analytics_dashboard_date_range.dart';
 import 'package:vex_engines/analytics/domain/analytics_event_record.dart';
 import 'package:vex_engines/analytics/domain/analytics_venue_metrics.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_profile_views_chart_data.dart';
+import '../services/venue_dashboard_engine_mapper.dart';
 
 /// Reads venue analytics events from the shared `analytics` collection.
 class VenueAnalyticsService {
@@ -18,17 +19,21 @@ class VenueAnalyticsService {
     AnalyticsMetricsComposer? metricsComposer,
     AnalyticsChartSeriesBuilder? chartSeriesBuilder,
     AnalyticsTopEntityAggregator? topEntityAggregator,
+    AnalyticsDashboardPeriodCalculator? periodCalculator,
   })  : _firestoreOverride = firestore,
         _metricsComposer = metricsComposer ?? const AnalyticsMetricsComposer(),
         _chartSeriesBuilder =
             chartSeriesBuilder ?? const AnalyticsChartSeriesBuilder(),
         _topEntityAggregator =
-            topEntityAggregator ?? const AnalyticsTopEntityAggregator();
+            topEntityAggregator ?? const AnalyticsTopEntityAggregator(),
+        _periodCalculator =
+            periodCalculator ?? const AnalyticsDashboardPeriodCalculator();
 
   final FirebaseFirestore? _firestoreOverride;
   final AnalyticsMetricsComposer _metricsComposer;
   final AnalyticsChartSeriesBuilder _chartSeriesBuilder;
   final AnalyticsTopEntityAggregator _topEntityAggregator;
+  final AnalyticsDashboardPeriodCalculator _periodCalculator;
 
   FirebaseFirestore? get _db {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -77,8 +82,9 @@ class VenueAnalyticsService {
     required String venueId,
     required VenueDashboardDateRange range,
   }) async {
-    final since = range.since;
-    final previousSince = range.previousPeriodSince;
+    final analyticsRange = VenueDashboardEngineMapper.toAnalyticsRange(range);
+    final since = _periodCalculator.since(range: analyticsRange);
+    final previousSince = _periodCalculator.previousPeriodSince(range: analyticsRange);
 
     final current = await _loadCounts(venueId: venueId, since: since);
     VenueAnalyticsCounts? previous;
@@ -170,7 +176,9 @@ class VenueAnalyticsService {
 
       final series = _chartSeriesBuilder.buildProfileViewsSeries(
         timestamps: timestamps,
-        period: _chartPeriod(range),
+        period: _periodCalculator.chartPeriod(
+          VenueDashboardEngineMapper.toAnalyticsRange(range),
+        ),
       );
 
       return series
@@ -190,7 +198,9 @@ class VenueAnalyticsService {
       AnalyticsPercentChange.calculate(current, previous);
 
   Future<VenueAnalyticsCounts> loadTodayCounts({required String venueId}) async {
-    final since = VenueDashboardDateRange.today.since;
+    final since = _periodCalculator.since(
+      range: AnalyticsDashboardDateRange.today,
+    );
     return _loadCounts(venueId: venueId, since: since);
   }
 
@@ -202,7 +212,9 @@ class VenueAnalyticsService {
       return const VenueAnalyticsTopEntities();
     }
 
-    final since = VenueDashboardDateRange.today.since;
+    final since = _periodCalculator.since(
+      range: AnalyticsDashboardDateRange.today,
+    );
     if (since == null) return const VenueAnalyticsTopEntities();
 
     try {
@@ -238,17 +250,6 @@ class VenueAnalyticsService {
     } on FirebaseException {
       return const VenueAnalyticsTopEntities();
     }
-  }
-
-  static AnalyticsChartPeriod _chartPeriod(VenueDashboardDateRange range) {
-    return switch (range) {
-      VenueDashboardDateRange.today => AnalyticsChartPeriod.today,
-      VenueDashboardDateRange.last3Days => AnalyticsChartPeriod.last3Days,
-      VenueDashboardDateRange.last7Days => AnalyticsChartPeriod.last7Days,
-      VenueDashboardDateRange.lastMonth => AnalyticsChartPeriod.lastMonth,
-      VenueDashboardDateRange.allTime => AnalyticsChartPeriod.allTime,
-      VenueDashboardDateRange.custom => AnalyticsChartPeriod.custom,
-    };
   }
 }
 

@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:vex_engines/analytics/application/analytics_activity_aggregator.dart';
+import 'package:vex_engines/analytics/domain/analytics_dashboard_models.dart';
+import 'package:vex_engines/venue/application/venue_activity_interpreter.dart';
+import 'package:vex_engines/venue/domain/venue_dashboard_models.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/venue_dashboard_activity.dart';
+import '../services/venue_dashboard_engine_mapper.dart';
 
 /// Loads recent venue activity from analytics and content collections.
 abstract class VenueActivitySource {
@@ -13,10 +17,21 @@ abstract class VenueActivitySource {
 }
 
 class VenueActivityService implements VenueActivitySource {
-  VenueActivityService({FirebaseFirestore? firestore})
-      : _firestoreOverride = firestore;
+  VenueActivityService({
+    FirebaseFirestore? firestore,
+    AnalyticsActivityAggregator? activityAggregator,
+    AnalyticsRelativeTimeFormatter? relativeTimeFormatter,
+    VenueActivityInterpreter? activityInterpreter,
+  })  : _firestoreOverride = firestore,
+        _activityAggregator = activityAggregator ?? const AnalyticsActivityAggregator(),
+        _relativeTimeFormatter =
+            relativeTimeFormatter ?? const AnalyticsRelativeTimeFormatter(),
+        _activityInterpreter = activityInterpreter ?? const VenueActivityInterpreter();
 
   final FirebaseFirestore? _firestoreOverride;
+  final AnalyticsActivityAggregator _activityAggregator;
+  final AnalyticsRelativeTimeFormatter _relativeTimeFormatter;
+  final VenueActivityInterpreter _activityInterpreter;
 
   FirebaseFirestore? get _db {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -32,17 +47,34 @@ class VenueActivityService implements VenueActivitySource {
     final trimmedId = venueId.trim();
     if (trimmedId.isEmpty) return const [];
 
-    final items = <_ActivityEntry>[];
+    final entries = <AnalyticsActivityEntry>[];
+    entries.addAll(await _loadAnalyticsActivity(trimmedId));
+    entries.addAll(await _loadContentActivity(trimmedId));
 
-    items.addAll(await _loadAnalyticsActivity(trimmedId));
-    items.addAll(await _loadContentActivity(trimmedId));
+    final limited = _activityAggregator.sortAndLimit(entries, limit: limit);
+    final interpreted = <VenueActivityItem>[];
 
-    items.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    for (final entry in limited) {
+      final sourceEntry = _toSourceEntry(entry);
+      final item = _activityInterpreter.interpret(sourceEntry);
+      if (item != null) interpreted.add(item);
+    }
 
-    return items.take(limit).map((entry) => entry.activity).toList();
+    return VenueDashboardEngineMapper.activityFromEngine(interpreted);
   }
 
-  Future<List<_ActivityEntry>> _loadAnalyticsActivity(String venueId) async {
+  VenueActivitySourceEntry _toSourceEntry(AnalyticsActivityEntry entry) {
+    return VenueActivitySourceEntry(
+      occurredAt: entry.occurredAt,
+      source: entry.source,
+      timestampLabel: _relativeTimeFormatter.format(entry.occurredAt),
+      eventType: entry.eventType,
+      payload: entry.payload,
+      contentTitle: entry.contentTitle,
+    );
+  }
+
+  Future<List<AnalyticsActivityEntry>> _loadAnalyticsActivity(String venueId) async {
     final db = _db;
     if (db == null) return const [];
 
@@ -56,14 +88,14 @@ class VenueActivityService implements VenueActivitySource {
 
       return snapshot.docs
           .map((doc) => _mapAnalyticsDoc(doc))
-          .whereType<_ActivityEntry>()
+          .whereType<AnalyticsActivityEntry>()
           .toList();
     } on FirebaseException {
       return const [];
     }
   }
 
-  _ActivityEntry? _mapAnalyticsDoc(
+  AnalyticsActivityEntry? _mapAnalyticsDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
@@ -74,41 +106,31 @@ class VenueActivityService implements VenueActivitySource {
     final payload = data['data'];
     final payloadMap = payload is Map ? Map<String, dynamic>.from(payload) : null;
 
-    final mapped = switch (type) {
-      'drink_view' => (
-          'Drink viewed: ${payloadMap?['drinkName'] ?? 'Menu item'}',
-          Icons.local_bar_outlined,
-        ),
-      'deal_view' => (
-          'Deal viewed: ${payloadMap?['dealTitle'] ?? 'Promotion'}',
-          Icons.local_offer_outlined,
-        ),
-      'event_view' => (
-          'Event viewed: ${payloadMap?['eventTitle'] ?? 'Event'}',
-          Icons.event_outlined,
-        ),
-      'favourite_tap' => ('Venue saved by a customer', Icons.bookmark_outline_rounded),
-      'crowd_update' => ('Crowd level updated', Icons.groups_outlined),
-      _ => null,
+    final supported = switch (type) {
+      'drink_view' ||
+      'deal_view' ||
+      'event_view' ||
+      'favourite_tap' ||
+      'crowd_update' => true,
+      _ => false,
     };
+    if (!supported) return null;
 
-    if (mapped == null) return null;
-
-    return _ActivityEntry(
+    return AnalyticsActivityEntry(
       occurredAt: createdAt.toDate(),
-      activity: VenueDashboardActivity(
-        title: mapped.$1,
-        timestampLabel: _relativeTimeLabel(createdAt.toDate()),
-        icon: mapped.$2,
-      ),
+      source: 'analytics',
+      eventType: type,
+      payload: {
+        if (payloadMap != null) ...payloadMap,
+      },
     );
   }
 
-  Future<List<_ActivityEntry>> _loadContentActivity(String venueId) async {
+  Future<List<AnalyticsActivityEntry>> _loadContentActivity(String venueId) async {
     final db = _db;
     if (db == null) return const [];
 
-    final entries = <_ActivityEntry>[];
+    final entries = <AnalyticsActivityEntry>[];
 
     try {
       final events = await db
@@ -127,13 +149,10 @@ class VenueActivityService implements VenueActivitySource {
         if (title == null || title.isEmpty) continue;
 
         entries.add(
-          _ActivityEntry(
+          AnalyticsActivityEntry(
             occurredAt: createdAt.toDate(),
-            activity: VenueDashboardActivity(
-              title: 'Event added: $title',
-              timestampLabel: _relativeTimeLabel(createdAt.toDate()),
-              icon: Icons.event_outlined,
-            ),
+            source: 'content_event',
+            contentTitle: title,
           ),
         );
       }
@@ -143,24 +162,4 @@ class VenueActivityService implements VenueActivitySource {
 
     return entries;
   }
-
-  static String _relativeTimeLabel(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutes ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
-  }
-}
-
-class _ActivityEntry {
-  const _ActivityEntry({
-    required this.occurredAt,
-    required this.activity,
-  });
-
-  final DateTime occurredAt;
-  final VenueDashboardActivity activity;
 }

@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
-
 import 'venue_dashboard_activity.dart';
+import 'package:vex_engines/venue/application/venue_dashboard_composer.dart';
+
 import 'venue_dashboard_date_range.dart';
 import 'venue_dashboard_performance_highlight.dart';
 import 'venue_dashboard_stat.dart';
-import 'venue_dashboard_tab.dart';
 import 'venue_dashboard_whats_next_action.dart';
 import 'venue_profile_completion.dart';
 import 'venue_profile_views_chart_data.dart';
+import '../services/venue_dashboard_engine_mapper.dart';
 
 /// Real dashboard home content for the active venue.
 class VenueDashboardHomeData {
@@ -53,35 +53,8 @@ class VenueDashboardInsightsBuilder {
   VenueDashboardInsightsBuilder._();
 
   static List<VenueDashboardPerformanceHighlight> setupHighlights() {
-    return const [
-      VenueDashboardPerformanceHighlight(
-        message: 'Add more photos to improve visibility.',
-        buttonLabel: 'Add Photos',
-        icon: Icons.photo_library_outlined,
-        targetTab: VenueDashboardTab.gallery,
-        accent: VenueDashboardHighlightAccent.blue,
-      ),
-      VenueDashboardPerformanceHighlight(
-        message: 'Add drinks so customers can discover your venue.',
-        buttonLabel: 'Add Drinks',
-        icon: Icons.local_bar_outlined,
-        targetTab: VenueDashboardTab.drinks,
-        accent: VenueDashboardHighlightAccent.gold,
-      ),
-      VenueDashboardPerformanceHighlight(
-        message: 'Create a deal to attract more customers.',
-        buttonLabel: 'Create Deal',
-        icon: Icons.local_offer_outlined,
-        targetTab: VenueDashboardTab.deals,
-        accent: VenueDashboardHighlightAccent.pink,
-      ),
-      VenueDashboardPerformanceHighlight(
-        message: 'Add an event to increase engagement.',
-        buttonLabel: 'Add Event',
-        icon: Icons.event_outlined,
-        targetTab: VenueDashboardTab.events,
-        accent: VenueDashboardHighlightAccent.emerald,
-      ),
-    ];
+    return VenueDashboardEngineMapper.highlightsFromEngine(
+      const VenueDashboardSetupHighlights().build(),
+    );
   }
 }
