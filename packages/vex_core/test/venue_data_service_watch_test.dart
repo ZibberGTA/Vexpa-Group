@@ -53,6 +53,12 @@ final class _WatchMockVenueRepository implements VenueRepository {
   Stream<DataResult<Venue?>> watchById(String venueId) {
     return Stream.value(const DataSuccess(null));
   }
+
+  @override
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId) {
+    watchCalls++;
+    return Stream.value(DataSuccess(publicVenues));
+  }
 }
 
 Venue _venue({required String id, required String name}) {

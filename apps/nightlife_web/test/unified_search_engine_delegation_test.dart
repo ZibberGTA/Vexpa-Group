@@ -121,6 +121,11 @@ class _EmptyIndexVenueRepository implements VenueRepository {
   }
 
   @override
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId) {
+    return Stream.value(const DataSuccess([]));
+  }
+
+  @override
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   }) async {

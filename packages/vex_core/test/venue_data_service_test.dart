@@ -47,6 +47,15 @@ final class MockVenueRepository implements VenueRepository {
   }
 
   @override
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId) {
+    loadCalls++;
+    if (loadError != null) {
+      return Stream.value(DataFailure(loadError!));
+    }
+    return Stream.value(DataSuccess(publicVenues));
+  }
+
+  @override
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   }) async {
