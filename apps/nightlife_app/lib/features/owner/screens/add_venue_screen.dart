@@ -4,27 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
+import 'package:vex_engines/venue/domain/venue_profile_constants.dart';
+import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../auth/services/auth_service.dart';
 import '../../venues/screens/pick_location_screen.dart';
-
-int _crowdScoreForLevel(String level) {
-  switch (level.toLowerCase()) {
-    case 'quiet':
-      return 1;
-    case 'steady':
-      return 2;
-    case 'medium':
-      return 3;
-    case 'busy':
-      return 4;
-    case 'packed':
-      return 5;
-    default:
-      return 1;
-  }
-}
-
 
 class _TimeTextInputFormatter extends TextInputFormatter {
   @override
@@ -137,20 +121,8 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
 
 
 
-  String _normaliseTimeInput(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return '';
-
-    final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length == 3) {
-      return '0${digits[0]}:${digits.substring(1)}';
-    }
-    if (digits.length == 4) {
-      return '${digits.substring(0, 2)}:${digits.substring(2)}';
-    }
-
-    return trimmed;
-  }
+  String _normaliseTimeInput(String value) =>
+      VenueProfileFieldCodec.normaliseTimeInput(value);
 
   void _normaliseOpeningHourControllers() {
     for (final day in _openingDayKeys) {
@@ -166,24 +138,19 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
     }
   }
 
-  bool _isValidTime(String value) {
-    final normalised = _normaliseTimeInput(value);
-    final match = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').firstMatch(normalised);
-    return match != null;
-  }
+  bool _isValidTime(String value) => VenueProfileFieldCodec.isValidTime(value);
 
-  Map<String, Map<String, dynamic>> _buildOpeningHoursMap() {
+  Map<String, Map<String, dynamic>> _buildOpeningHoursMap() =>
+      VenueProfileFieldCodec.buildOpeningHoursMap(_openingHoursDraft());
+
+  Map<String, Map<String, dynamic>> _openingHoursDraft() {
     final result = <String, Map<String, dynamic>>{};
 
     for (final day in _openingDayKeys) {
-      final isClosed = openingClosedDays[day] ?? false;
-      final open = _normaliseTimeInput(openingOpenControllers[day]?.text ?? '');
-      final close = _normaliseTimeInput(openingCloseControllers[day]?.text ?? '');
-
       result[day] = {
-        'closed': isClosed,
-        'open': open,
-        'close': close,
+        'closed': openingClosedDays[day] ?? false,
+        'open': openingOpenControllers[day]?.text ?? '',
+        'close': openingCloseControllers[day]?.text ?? '',
       };
     }
 
@@ -192,16 +159,10 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
 
   bool _validateOpeningHours() {
     _normaliseOpeningHourControllers();
-
-    for (final day in _openingDayKeys) {
-      if (openingClosedDays[day] == true) continue;
-      final label = _openingDayLabels[day] ?? day;
-      final open = _normaliseTimeInput(openingOpenControllers[day]?.text ?? '');
-      final close = _normaliseTimeInput(openingCloseControllers[day]?.text ?? '');
-      if (!_isValidTime(open) || !_isValidTime(close)) {
-        _showMessage('$label opening times must use 24-hour format, for example 18:00 or 02:00.');
-        return false;
-      }
+    final error = VenueProfileFieldCodec.validateOpeningHours(_openingHoursDraft());
+    if (error != null) {
+      _showMessage(error);
+      return false;
     }
     return true;
   }
@@ -321,7 +282,7 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
         'category': category,
         'crowdLevel': crowdLevel,
       'currentCrowdLevel': crowdLevel,
-      'currentCrowdScore': _crowdScoreForLevel(crowdLevel),
+      'currentCrowdScore': VenueProfileConstants.crowdScoreForLevel(crowdLevel),
         'bannerImageUrl': bannerImageUrl,
         'logoUrl': logoUrl,
         'websiteUrl': websiteUrl,

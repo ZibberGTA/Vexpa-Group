@@ -1,65 +1,27 @@
+import 'package:vex_engines/venue/shared/venue_image_field_parser.dart';
+
 /// Parses logo and banner URLs from Firestore venue documents.
 ///
-/// The image engine denormalizes current branding to [logoUrl] and
-/// [bannerImageUrl]. Legacy field names remain supported as fallbacks.
+/// Delegates to the Venue Engine field parser for shared branding rules.
 class VenueBrandingParser {
   VenueBrandingParser._();
 
-  static const bannerFieldPriority = <String>[
-    'bannerImageUrl',
-    'bannerUrl',
-    'bannerImage',
-    'coverImageUrl',
-    'headerImageUrl',
-    'imageUrl',
-  ];
-
-  static const logoFieldPriority = <String>[
-    'logoUrl',
-    'logoImageUrl',
-    'venueLogoUrl',
-  ];
+  static const bannerFieldPriority = VenueImageFieldParser.bannerFieldPriority;
+  static const logoFieldPriority = VenueImageFieldParser.logoFieldPriority;
 
   static String resolveBannerImageUrl(Map<String, dynamic> map) {
-    return _resolveFromFields(map, bannerFieldPriority);
+    return VenueImageFieldParser.resolveVenueBannerUrl(map);
   }
 
   static String resolveLogoUrl(Map<String, dynamic> map) {
-    return _resolveFromFields(map, logoFieldPriority);
-  }
-
-  static String _resolveFromFields(
-    Map<String, dynamic> map,
-    List<String> fieldNames,
-  ) {
-    for (final field in fieldNames) {
-      if (!map.containsKey(field)) continue;
-      final resolved = parseImageField(map[field]);
-      if (resolved != null) return resolved;
-    }
-    return '';
+    return VenueImageFieldParser.resolveVenueLogoUrl(map);
   }
 
   static String? parseImageField(dynamic value) {
-    if (value == null) return null;
-
-    if (value is Map) {
-      final map = Map<String, dynamic>.from(value);
-      for (final nestedKey in ['url', 'downloadUrl', 'uri', 'src']) {
-        final nested = parseImageField(map[nestedKey]);
-        if (nested != null) return nested;
-      }
-      return null;
-    }
-
-    final trimmed = value.toString().trim();
-    if (trimmed.isEmpty || trimmed == 'null') return null;
-    return isValidImageUrl(trimmed) ? trimmed : null;
+    return VenueImageFieldParser.parseImageField(value);
   }
 
   static bool isValidImageUrl(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return false;
-    return uri.scheme == 'http' || uri.scheme == 'https';
+    return VenueImageFieldParser.isValidImageUrl(url);
   }
 }
