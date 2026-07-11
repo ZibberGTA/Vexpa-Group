@@ -89,6 +89,9 @@ class UserRoleService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static UserRoleSnapshot? _lastSnapshot;
+  static String? _broadcastUid;
+  static StreamController<AppUserRole>? _roleBroadcast;
+  static StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _usersDocSub;
 
   static UserRoleSnapshot? peekLastSnapshot(String uid) {
     final snapshot = _lastSnapshot;
@@ -108,6 +111,22 @@ class UserRoleService {
 
   static void _cacheSnapshot(UserRoleSnapshot snapshot) {
     _lastSnapshot = snapshot;
+  }
+
+  /// Clears cached identity and shared role stream state — call on logout.
+  static Future<void> resetSession() async {
+    _lastSnapshot = null;
+    _tearDownRoleBroadcast();
+  }
+
+  static void _tearDownRoleBroadcast() {
+    _broadcastUid = null;
+    final sub = _usersDocSub;
+    _usersDocSub = null;
+    sub?.cancel();
+    final controller = _roleBroadcast;
+    _roleBroadcast = null;
+    controller?.close();
   }
 
   static AppUserRole parseRole(dynamic value) {
@@ -510,37 +529,49 @@ class UserRoleService {
     return resolved;
   }
 
-  static Stream<AppUserRole> _watchUserRole(User user) {
-    late StreamSubscription<DocumentSnapshot<Map<String, dynamic>>> subscription;
-    final controller = StreamController<AppUserRole>();
+  static Stream<AppUserRole> _sharedUserRoleStream(User user) {
+    if (_broadcastUid == user.uid && _roleBroadcast != null) {
+      return _roleBroadcast!.stream;
+    }
+
+    _tearDownRoleBroadcast();
+    _broadcastUid = user.uid;
+    _roleBroadcast = StreamController<AppUserRole>.broadcast();
 
     Future<void> publish() async {
-      if (controller.isClosed) return;
+      final controller = _roleBroadcast;
+      if (controller == null || controller.isClosed) return;
       controller.add(await resolveRoleForUserSafely(user));
     }
 
-    controller.onListen = () {
-      publish();
-      subscription = _db.collection('users').doc(user.uid).snapshots().listen(
-        (_) => publish(),
-        onError: (Object error, StackTrace stackTrace) {
-          if (kDebugMode) {
-            debugPrint(
-              '[UserRoleService] users/${user.uid} snapshot error: $error',
-            );
-            debugPrint('[UserRoleService] continuing role resolution via get()');
-          }
-          publish();
-        },
-      );
-    };
+    publish();
+    _usersDocSub = _db.collection('users').doc(user.uid).snapshots().listen(
+      (_) => publish(),
+      onError: (Object error, StackTrace stackTrace) {
+        if (kDebugMode) {
+          debugPrint(
+            '[UserRoleService] users/${user.uid} snapshot error: $error',
+          );
+          debugPrint('[UserRoleService] continuing role resolution via get()');
+        }
+        publish();
+      },
+    );
 
-    controller.onCancel = () async {
-      await subscription.cancel();
-      await controller.close();
-    };
+    return _roleBroadcast!.stream;
+  }
 
-    return controller.stream;
+  /// Live role stream driven by `users/{uid}` — safe for venue owners.
+  ///
+  /// Uses one shared Firestore listener per signed-in uid across app surfaces.
+  static Stream<AppUserRole> currentUserRoleStream() {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      return Stream.value(AppUserRole.user);
+    }
+
+    return _sharedUserRoleStream(user);
   }
 
   /// Safe wrapper — post-login and streams must not throw on role resolution.
@@ -571,17 +602,6 @@ class UserRoleService {
     final user = _auth.currentUser;
     if (user == null) return AppUserRole.user;
     return resolveRoleForUserSafely(user);
-  }
-
-  /// Live role stream driven by `users/{uid}` — safe for venue owners.
-  static Stream<AppUserRole> currentUserRoleStream() {
-    final user = _auth.currentUser;
-
-    if (user == null) {
-      return Stream.value(AppUserRole.user);
-    }
-
-    return _watchUserRole(user);
   }
 
   static Future<void> setCurrentUserRole(AppUserRole role) async {

@@ -94,6 +94,7 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    await UserRoleService.resetSession();
     await _auth.signOut();
   }
 

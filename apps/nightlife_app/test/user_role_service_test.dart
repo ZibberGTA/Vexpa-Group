@@ -25,15 +25,18 @@ void main() {
   });
 
   group('UserRoleService.resolveFromUserContext', () {
-    test('grants owner when owned venues exist', () {
+    test('grants owner when owned venues exist without user document', () {
       expect(
         UserRoleService.resolveFromUserContext(
-          data: const {'role': 'user'},
+          data: null,
           venueIdsCount: 0,
           ownedVenuesCount: 1,
         ),
         AppUserRole.owner,
       );
+    });
+
+    test('grants owner when user document role is owner', () {
       expect(
         UserRoleService.resolveFromUserContext(
           data: const {'role': 'owner'},
