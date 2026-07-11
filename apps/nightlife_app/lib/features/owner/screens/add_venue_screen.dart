@@ -1,13 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-
-import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
-import 'package:vex_engines/venue/domain/venue_profile_constants.dart';
+import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/venue/application/venue_owner_profile_service.dart';
 import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../auth/services/auth_service.dart';
+import '../../owner/services/owner_venue_service.dart';
 import '../../venues/screens/pick_location_screen.dart';
 
 class _TimeTextInputFormatter extends TextInputFormatter {
@@ -138,11 +137,6 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
     }
   }
 
-  bool _isValidTime(String value) => VenueProfileFieldCodec.isValidTime(value);
-
-  Map<String, Map<String, dynamic>> _buildOpeningHoursMap() =>
-      VenueProfileFieldCodec.buildOpeningHoursMap(_openingHoursDraft());
-
   Map<String, Map<String, dynamic>> _openingHoursDraft() {
     final result = <String, Map<String, dynamic>>{};
 
@@ -155,16 +149,6 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
     }
 
     return result;
-  }
-
-  bool _validateOpeningHours() {
-    _normaliseOpeningHourControllers();
-    final error = VenueProfileFieldCodec.validateOpeningHours(_openingHoursDraft());
-    if (error != null) {
-      _showMessage(error);
-      return false;
-    }
-    return true;
   }
 
   Widget _buildOpeningHoursSection() {
@@ -244,25 +228,24 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
     );
   }
 
+  VenueOwnerProfileDraft _buildDraft() {
+    return VenueOwnerProfileDraft(
+      name: nameController.text,
+      description: descriptionController.text,
+      address: addressController.text,
+      category: categoryController.text,
+      crowdLevel: crowdLevel,
+      bannerImageUrl: bannerImageUrlController.text,
+      logoUrl: logoUrlController.text,
+      websiteUrl: websiteUrlController.text,
+      openingHours: _openingHoursDraft(),
+      latitude: selectedLocation?.latitude,
+      longitude: selectedLocation?.longitude,
+    );
+  }
+
   Future<void> _saveVenue() async {
-    final name = nameController.text.trim();
-    final description = descriptionController.text.trim();
-    final address = addressController.text.trim();
-    final category = categoryController.text.trim();
-    final bannerImageUrl = bannerImageUrlController.text.trim();
-    final logoUrl = logoUrlController.text.trim();
-    var websiteUrl = websiteUrlController.text.trim();
-    if (websiteUrl.isNotEmpty && !websiteUrl.startsWith('http')) websiteUrl='https://'+websiteUrl;
-
-    if (name.isEmpty ||
-        description.isEmpty ||
-        address.isEmpty ||
-        category.isEmpty) {
-      _showMessage('Please complete all fields.');
-      return;
-    }
-
-    if (!_validateOpeningHours()) return;
+    _normaliseOpeningHourControllers();
 
     setState(() => isLoading = true);
 
@@ -274,43 +257,19 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
         return;
       }
 
-      await FirebaseFirestore.instance.collection('venues').add({
-        'ownerId': user.uid,
-        'name': name,
-        'description': description,
-        'address': address,
-        'category': category,
-        'crowdLevel': crowdLevel,
-      'currentCrowdLevel': crowdLevel,
-      'currentCrowdScore': VenueProfileConstants.crowdScoreForLevel(crowdLevel),
-        'bannerImageUrl': bannerImageUrl,
-        'logoUrl': logoUrl,
-        'websiteUrl': websiteUrl,
-        'openingHours': _buildOpeningHoursMap(),
-        'hasDeals': false,
-        'isDeleted': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'searchTerms': DiscoveryVenueSearchTermBuilder.buildMinimalVenueTerms(
-          name: name,
-          description: description,
-          address: address,
-          category: category,
-          crowdLevel: crowdLevel,
-        ),
-        'location': selectedLocation != null
-            ? GeoPoint(
-                selectedLocation!.latitude,
-                selectedLocation!.longitude,
-              )
-            : null,
-        'presenceRadiusMeters': 75,
-        'activePresenceCount': 0,
-        'crowdSource': 'owner',
-      });
+      final result = await OwnerVenueService.createVenue(
+        ownerId: user.uid,
+        draft: _buildDraft(),
+      );
 
-      if (!mounted) return;
-      _showMessage('Venue added successfully.');
-      Navigator.pop(context);
+      switch (result) {
+        case DataSuccess():
+          if (!mounted) return;
+          _showMessage('Venue added successfully.');
+          Navigator.pop(context);
+        case DataFailure(:final error):
+          _showMessage(error.message);
+      }
     } catch (e) {
       _showMessage('Failed to save venue: $e');
     } finally {

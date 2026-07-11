@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-
-import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
-import 'package:vex_engines/venue/domain/venue_profile_constants.dart';
+import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/venue/application/venue_owner_profile_service.dart';
 import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../home/models/venue_model.dart';
 import '../../../core/widgets/home_icon_button.dart';
+import '../../owner/services/owner_venue_service.dart';
 import '../../venues/screens/pick_location_screen.dart';
 
 class _TimeTextInputFormatter extends TextInputFormatter {
@@ -149,24 +149,6 @@ class _EditVenueScreenState extends State<EditVenueScreen> {
     });
   }
 
-  List<String> _buildSearchTerms({
-    required String name,
-    required String description,
-    required String address,
-    required String category,
-    required String crowdLevel,
-  }) {
-    return DiscoveryVenueSearchTermBuilder.buildVenueFormTerms(
-      name: name,
-      description: description,
-      address: address,
-      category: category,
-      crowdLevel: crowdLevel,
-    );
-  }
-
-
-
   String _normaliseTimeInput(String value) =>
       VenueProfileFieldCodec.normaliseTimeInput(value);
 
@@ -213,11 +195,6 @@ class _EditVenueScreenState extends State<EditVenueScreen> {
     }
   }
 
-  bool _isValidTime(String value) => VenueProfileFieldCodec.isValidTime(value);
-
-  Map<String, Map<String, dynamic>> _buildOpeningHoursMap() =>
-      VenueProfileFieldCodec.buildOpeningHoursMap(_openingHoursDraft());
-
   Map<String, Map<String, dynamic>> _openingHoursDraft() {
     final result = <String, Map<String, dynamic>>{};
 
@@ -230,16 +207,6 @@ class _EditVenueScreenState extends State<EditVenueScreen> {
     }
 
     return result;
-  }
-
-  bool _validateOpeningHours() {
-    _normaliseOpeningHourControllers();
-    final error = VenueProfileFieldCodec.validateOpeningHours(_openingHoursDraft());
-    if (error != null) {
-      _showMessage(error);
-      return false;
-    }
-    return true;
   }
 
   Widget _buildOpeningHoursSection() {
@@ -319,66 +286,41 @@ class _EditVenueScreenState extends State<EditVenueScreen> {
     );
   }
 
+  VenueOwnerProfileDraft _buildDraft() {
+    return VenueOwnerProfileDraft(
+      name: nameController.text,
+      description: descriptionController.text,
+      address: addressController.text,
+      category: categoryController.text,
+      crowdLevel: crowdLevel,
+      bannerImageUrl: bannerImageUrlController.text,
+      logoUrl: logoUrlController.text,
+      websiteUrl: websiteUrlController.text,
+      openingHours: _openingHoursDraft(),
+      latitude: selectedLocation?.latitude,
+      longitude: selectedLocation?.longitude,
+    );
+  }
+
   Future<void> _updateVenue() async {
-    final name = nameController.text.trim();
-    final description = descriptionController.text.trim();
-    final address = addressController.text.trim();
-    final category = categoryController.text.trim();
-    final bannerImageUrl = bannerImageUrlController.text.trim();
-    final logoUrl = logoUrlController.text.trim();
-    var websiteUrl = websiteUrlController.text.trim();
-    if (websiteUrl.isNotEmpty && !websiteUrl.startsWith('http')) websiteUrl='https://'+websiteUrl;
-
-    if (name.isEmpty ||
-        description.isEmpty ||
-        address.isEmpty ||
-        category.isEmpty) {
-      _showMessage('Please complete all fields.');
-      return;
-    }
-
-    if (!_validateOpeningHours()) return;
+    _normaliseOpeningHourControllers();
 
     setState(() => isLoading = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('venues')
-          .doc(widget.venue.id)
-          .update({
-        'name': name,
-        'description': description,
-        'address': address,
-        'category': category,
-        'bannerImageUrl': bannerImageUrl,
-        'logoUrl': logoUrl,
-        'websiteUrl': websiteUrl,
-        'crowdLevel': crowdLevel,
-      'currentCrowdLevel': crowdLevel,
-      'currentCrowdScore': VenueProfileConstants.crowdScoreForLevel(crowdLevel),
-      'crowdSource': 'owner',
-      'crowdUpdatedAt': FieldValue.serverTimestamp(),
-        'openingHours': _buildOpeningHoursMap(),
-        'searchTerms': _buildSearchTerms(
-          name: name,
-          description: description,
-          address: address,
-          category: category,
-          crowdLevel: crowdLevel,
-        ),
-        'location': selectedLocation != null
-            ? GeoPoint(
-                selectedLocation!.latitude,
-                selectedLocation!.longitude,
-              )
-            : null,
-        'presenceRadiusMeters': 75,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      final result = await OwnerVenueService.updateVenue(
+        venueId: widget.venue.id,
+        draft: _buildDraft(),
+      );
 
-      if (!mounted) return;
-      _showMessage('Venue updated successfully.');
-      Navigator.pop(context);
+      switch (result) {
+        case DataSuccess():
+          if (!mounted) return;
+          _showMessage('Venue updated successfully.');
+          Navigator.pop(context);
+        case DataFailure(:final error):
+          _showMessage(error.message);
+      }
     } catch (e) {
       _showMessage('Failed to update venue: $e');
     } finally {
