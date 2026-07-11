@@ -7,6 +7,8 @@ void main() {
     WebVexCore.authenticationOverride = null;
     WebVexCore.identityOverride = null;
     WebVexCore.eventBusOverride = null;
+    WebVexCore.storageOverride = null;
+    WebVexCore.documentStorageOverride = null;
   });
 
   test('WebVexCore exposes shared singleton platform services', () {
@@ -18,11 +20,14 @@ void main() {
     final busB = WebVexCore.eventBus;
     final loggerA = WebVexCore.logger;
     final loggerB = WebVexCore.logger;
+    final storageA = WebVexCore.storage;
+    final storageB = WebVexCore.storage;
 
     expect(identical(authA, authB), isTrue);
     expect(identical(identityA, identityB), isTrue);
     expect(identical(busA, busB), isTrue);
     expect(identical(loggerA, loggerB), isTrue);
+    expect(identical(storageA, storageB), isTrue);
   });
 
   test('event bus publishes venue profile updates without Firebase', () async {
