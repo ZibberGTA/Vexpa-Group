@@ -37,7 +37,9 @@ final class VenueDrinkDataService {
   }
 
   List<VenueDrink> _publicDrinks(List<VenueDrink> drinks) {
-    final visible = drinks.where((drink) => !drink.isDeleted).toList()
+    final visible = drinks
+        .where((drink) => !drink.isDeleted && drink.available)
+        .toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return visible;
   }

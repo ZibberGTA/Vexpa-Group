@@ -123,13 +123,14 @@ void main() {
       expect((result as DataFailure).error.code, 'permission-denied');
     });
 
-    test('filters deleted drinks and sorts case-insensitively', () async {
+    test('filters deleted and unavailable drinks and sorts case-insensitively', () async {
       final service = VenueDrinkDataService(
         repository: MockVenueDrinkRepository(
           publicDrinks: [
             _drink(id: '1', name: 'bravo'),
             _drink(id: '2', name: 'Alpha', isDeleted: true),
             _drink(id: '3', name: 'alpha'),
+            _drink(id: '4', name: 'Hidden', available: false),
           ],
         ),
       );
