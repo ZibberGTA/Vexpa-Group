@@ -66,15 +66,17 @@ passes. Engine work composes adapter results in memory on existing query paths.
 | 2 — Aggregation services | Complete | Top entities, weekly growth, engagement |
 | 3 — Web runtime slice | Complete | `VenueAnalyticsService` dashboard snapshot |
 | 4 — Mobile runtime slice | Complete | `AnalyticsService` summary and growth |
-| 5 — VexCore read contracts | Planned | Optional `VenueAnalyticsDataService` |
+| 5 — Dashboard calculations | Complete | Date ranges, stats, highlights, activity aggregation |
+| 6 — VexCore read contracts | Planned | Optional `VenueAnalyticsDataService` |
 
 ## Runtime flow (Version 1)
 
 ```text
-VenueDashboardRepository
+VenueDashboardRepository (web facade)
   → VenueAnalyticsService (Firebase count/get — unchanged)
-  → Analytics Engine (compose metrics, chart series, top entities)
-  → dashboard UI
+  → Analytics Engine (period boundaries, stats, highlights, activity sort)
+  → Venue Engine (whats-next, setup highlights, activity labels)
+  → VenueDashboardEngineMapper → dashboard UI
 ```
 
 Network calls unchanged: same count/get queries per dashboard load.

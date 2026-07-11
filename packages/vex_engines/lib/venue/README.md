@@ -83,7 +83,21 @@ the Master Blueprint is created.
 | 1 — Shared helpers | Complete | Contact utils, opening hours, image position, profile completion |
 | 2 — Domain rules | Complete | Profile field codec/constants, image field parser |
 | 3 — Profile update orchestration | Complete | `VenueProfileUpdateService` prepares writes; Firebase adapter persists |
-| 4 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
+| 4 — Dashboard orchestration | Partial | Active venue selection, whats-next, setup highlights, activity interpretation |
+| 5 — Profile repository writes | Planned | Broader management orchestration beyond profile fields |
 
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.
+
+## Dashboard orchestration (web — partial)
+
+Venue-specific dashboard rules now live in the Venue Engine:
+
+- `VenueActiveVenueSelector` — preferred venue and role-venue fallback
+- `VenueWhatsNextComposer` — ordered setup guidance actions
+- `VenueDashboardSetupHighlights` / `VenueDashboardHighlightComposer` — setup highlights and merge with analytics highlights
+- `VenueActivityInterpreter` — venue-specific activity labels
+
+Firebase queries, auth, permissions, and Flutter widgets remain in
+`apps/nightlife_web`. Analytics metric math remains in the Analytics Engine.
+Web maps engine DTOs through `VenueDashboardEngineMapper`.

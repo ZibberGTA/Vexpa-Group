@@ -170,9 +170,9 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Tenant-scoped venue profile, management workflows, validation |
 | Version | 1 |
-| Status | ~75% — phases 0–3 complete; broader orchestration planned |
+| Status | ~82% — phases 0–3 complete; dashboard orchestration partial |
 | VexCore | Auth, identity, permissions, `VenueDataService`, storage |
-| Owns | Profile field rules, opening hours, media semantics, profile updates |
+| Owns | Profile field rules, opening hours, media semantics, profile updates, dashboard guidance |
 | Consumes | VexCore public venue reads; Experience Engine owns drinks/deals/events content |
 
 #### Discovery Engine — [discovery.md](./engines/discovery.md)
@@ -214,9 +214,9 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Venue metrics, charts, engagement, growth comparisons |
 | Version | 1 |
-| Status | ~75% — web dashboard + mobile summary wired |
+| Status | ~90% — dashboard calculations + web/mobile aggregation wired |
 | VexCore | Permissions (`viewAnalytics`); future analytics read service |
-| Owns | Aggregation rules, chart bucketing, top entities, weekly growth |
+| Owns | Aggregation rules, chart bucketing, dashboard date ranges, activity ordering |
 | Consumes | Count/get results from app adapters — no extra queries on migration |
 
 ### Discovery-adjacent (Version 1 product)

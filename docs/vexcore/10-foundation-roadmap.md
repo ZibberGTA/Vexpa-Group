@@ -116,7 +116,8 @@ See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pil
 | Phase 1 shared helpers | Complete | Contact, opening hours, image position, profile completion |
 | Phase 2 domain rules | Complete | Profile field codec/constants, image field parser |
 | Phase 3 profile updates | Complete | `VenueProfileUpdateService` + Firebase write adapter |
-| Phase 4 orchestration | Planned | Dashboard aggregation and broader management workflows |
+| Phase 4 dashboard orchestration | Partial | Active venue, whats-next, highlights, activity interpretation |
+| Phase 5 management orchestration | Planned | Broader dashboard aggregation and management workflows |
 
 Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
 See [docs/master-blueprint.md](../master-blueprint.md) and [ADR-0005](../decisions/0005-engine-acceptance-rule.md).
@@ -174,6 +175,7 @@ See `packages/vex_engines/lib/claim/MIGRATION_PLAN.md`.
 | Aggregation services | Complete | Top entities, weekly growth, engagement |
 | Web runtime slice | Complete | `VenueAnalyticsService` dashboard snapshot |
 | Mobile runtime slice | Complete | `AnalyticsService` summary and growth |
+| Dashboard calculations | Complete | Date ranges, stats, highlights, activity aggregation |
 | VexCore read contracts | Planned | Optional analytics data service pilot |
 
 The Analytics Engine owns venue metrics and aggregation rules for Version 1.

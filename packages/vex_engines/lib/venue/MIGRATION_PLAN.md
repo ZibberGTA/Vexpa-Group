@@ -89,11 +89,12 @@ Engine README until the Master Blueprint is created.
 | --- | --- | --- |
 | `data/venue_profile_repository.dart` | **VE/data** | Profile write orchestration |
 | `data/venue_profile_field_codec.dart` | **VE/domain** | **Migrated Phase 2** |
-| `data/venue_dashboard_repository.dart` | **VE/application** | Dashboard aggregation |
+| `data/venue_dashboard_repository.dart` | **VE/application** | **Partial — wired** | Firebase reads stay; Venue + Analytics engines compose |
 | `data/venue_images_repository.dart` | **VE/data** | Gallery metadata |
 | `data/venue_media_*` | **VE/data** | Upload orchestration (uses VexCore storage adapter) |
 | `data/venue_analytics_service.dart` | **OTHER** | Analytics Engine |
-| `data/venue_activity_service.dart` | **VE/application** | Activity feed for dashboard |
+| `data/venue_activity_service.dart` | **VE/ANALYTICS** | **Partial — wired** | Firebase reads stay; engines aggregate and interpret |
+| `services/venue_dashboard_engine_mapper.dart` | **WEB** | Added | Maps engine DTOs to Flutter dashboard models |
 | `data/*_write_payload.dart` | **OTHER** | Content writes → content modules / future content engines |
 | `services/venue_profile_completion_calculator.dart` | **VE/domain** | Pure rules |
 | `services/subscription_service.dart` | **OTHER** | Growth/monetisation engine |

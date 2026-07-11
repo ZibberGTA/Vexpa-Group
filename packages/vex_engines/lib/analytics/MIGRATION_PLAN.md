@@ -20,11 +20,13 @@ Status: **Phase 4 complete — web and mobile aggregation wired**
 | Path | Tag | Batch | Notes |
 | --- | --- | --- | --- |
 | `venue_management/data/venue_analytics_service.dart` | WEB/ANALYTICS | Wired | Firebase reads stay; engine composes results |
-| `venue_management/data/venue_dashboard_repository.dart` | WEB | — | Consumes analytics snapshot |
-| `venue_management/models/venue_dashboard_date_range.dart` | WEB | — | Date window; maps to `AnalyticsChartPeriod` |
+| `venue_management/data/venue_dashboard_repository.dart` | WEB/VE | Wired | Firebase reads stay; Venue + Analytics engines compose home data |
+| `venue_management/data/venue_activity_service.dart` | WEB/ANALYTICS/VE | Wired | Firebase reads stay; engines aggregate and interpret |
+| `venue_management/models/venue_dashboard_date_range.dart` | WEB/ANALYTICS | Wired | Delegates period boundaries to `AnalyticsDashboardPeriodCalculator` |
 | `venue_management/models/venue_profile_views_chart_data.dart` | WEB | — | Chart point DTO + mock data |
 | `test/venue_dashboard_main_content_test.dart` | WEB | — | Empty analytics parity |
 | `test/analytics_engine_delegation_test.dart` | WEB | Added | Engine delegation |
+| `test/venue_dashboard_engine_delegation_test.dart` | WEB | Added | Dashboard + activity delegation |
 
 ## Mobile audit (`apps/nightlife_app`)
 
