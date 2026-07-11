@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/application/experience_event_visibility.dart';
 
 class EventModel {
   const EventModel({
@@ -35,8 +36,12 @@ class EventModel {
 
   DateTime get dateTime => startDateTime;
 
-  bool get isLiveOrUpcoming =>
-      !isDeleted && isActive && endDateTime.isAfter(DateTime.now());
+  bool get isLiveOrUpcoming => ExperienceEventVisibility.isPublicVisible(
+        isDeleted: isDeleted,
+        isActive: isActive,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+      );
 
   String get formattedDate {
     final day = startDateTime.day.toString().padLeft(2, '0');

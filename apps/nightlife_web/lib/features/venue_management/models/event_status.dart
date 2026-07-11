@@ -1,11 +1,8 @@
+import 'package:vex_engines/experience/application/experience_event_status.dart';
+
 import '../../venue/data/models/event_model.dart';
 
-enum EventStatus {
-  draft,
-  upcoming,
-  live,
-  ended,
-}
+typedef EventStatus = ExperienceEventManagementStatus;
 
 extension EventStatusX on EventStatus {
   String get label => switch (this) {
@@ -17,12 +14,10 @@ extension EventStatusX on EventStatus {
 }
 
 /// Derives management status for an event row badge.
-EventStatus computeEventStatus(EventModel event, {DateTime? now}) {
-  final clock = now ?? DateTime.now();
-
-  if (!event.isActive) return EventStatus.draft;
-  if (!event.endDateTime.isAfter(clock)) return EventStatus.ended;
-  if (event.startDateTime.isAfter(clock)) return EventStatus.upcoming;
-
-  return EventStatus.live;
-}
+EventStatus computeEventStatus(EventModel event, {DateTime? now}) =>
+    ExperienceEventStatusRules.compute(
+      isActive: event.isActive,
+      startDateTime: event.startDateTime,
+      endDateTime: event.endDateTime,
+      now: now,
+    );
