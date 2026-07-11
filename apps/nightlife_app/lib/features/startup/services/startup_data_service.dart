@@ -1,15 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:vex_core/vex_core.dart';
 import 'package:vex_engines/discovery/application/discovery_nearby_sorter.dart';
 
+import '../../../core/vexcore/mobile_venue_document_mapper.dart';
+import '../../../core/vexcore/mobile_vexcore.dart';
 import '../../home/models/venue_model.dart';
 import '../models/startup_data.dart';
 import 'startup_cache.dart';
 
 class StartupDataService {
   StartupDataService._();
-
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static Future<StartupData> load({
     void Function(String message)? onStatus,
@@ -88,15 +88,12 @@ class StartupDataService {
   }
 
   static Future<List<VenueModel>> _loadVenues() async {
-    final snapshot = await _db
-        .collection('venues')
-        .where('isDeleted', isEqualTo: false)
-        .limit(100)
-        .get();
-
-    return snapshot.docs
-        .map((doc) => VenueModel.fromMap(doc.id, doc.data()))
-        .toList();
+    final result = await MobileVexCore.venueRepository.loadPublicVenues();
+    return switch (result) {
+      DataSuccess(:final value) =>
+        value.map(MobileVenueDocumentMapper.homeVenueFromVexVenue).toList(),
+      DataFailure() => <VenueModel>[],
+    };
   }
 
   static List<VenueModel> _sortNearby({

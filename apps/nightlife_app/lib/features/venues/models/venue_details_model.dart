@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../core/utils/venue_branding_parser.dart';
+import '../../../core/vexcore/mobile_venue_document_mapper.dart';
 
 class VenueDetailsModel {
   final String id;
@@ -80,63 +80,7 @@ class VenueDetailsModel {
   factory VenueDetailsModel.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = doc.data() ?? {};
-
-    final rawAddress = data['address'];
-    final address = rawAddress is Map<String, dynamic> ? rawAddress : <String, dynamic>{};
-    final flatAddress = rawAddress is String ? rawAddress : '';
-
-    final rawLocation = data['location'];
-
-    double lat = 0;
-    double lng = 0;
-
-    if (rawLocation is GeoPoint) {
-      lat = rawLocation.latitude;
-      lng = rawLocation.longitude;
-    } else if (rawLocation is Map<String, dynamic>) {
-      lat = (rawLocation['lat'] ?? 0).toDouble();
-      lng = (rawLocation['lng'] ?? 0).toDouble();
-    }
-
-    return VenueDetailsModel(
-      id: doc.id,
-      name: data['name'] ?? '',
-      description: data['description'] ?? data['Description'] ?? '',
-      venueType: data['venueType'] ?? data['category'] ?? '',
-      category: data['category'] ?? data['venueType'] ?? '',
-      categories: List<String>.from(data['categories'] ?? []),
-      addressLine1: address['line1'] ?? flatAddress,
-      addressLine2: address['line2'] ?? '',
-      city: address['city'] ?? '',
-      postcode: address['postcode'] ?? '',
-      country: address['country'] ?? 'UK',
-      lat: lat,
-      lng: lng,
-      phone: data['phone'] ?? '',
-      website: (data['website'] ?? data['websiteUrl'] ?? '').toString(),
-      instagram: data['instagram'] ?? '',
-      logoUrl: VenueBrandingParser.resolveLogoUrl(data),
-      coverImageUrl: VenueBrandingParser.resolveBannerImageUrl(data),
-      galleryImageUrls: List<String>.from(data['galleryImageUrls'] ?? []),
-      features: List<String>.from(data['features'] ?? []),
-      priceRange: data['priceRange'] ?? '',
-      averageRating: (data['averageRating'] ?? 0).toDouble(),
-      reviewCount: data['reviewCount'] ?? 0,
-      currentCrowdLevel:
-          data['currentCrowdLevel'] ?? data['crowdLevel'] ?? 'quiet',
-      currentCrowdScore: data['currentCrowdScore'] ?? 1,
-      ownerId: data['ownerId'] ?? '',
-      managerIds: List<String>.from(data['managerIds'] ?? []),
-      subscriptionPlan: data['subscriptionPlan'] ?? 'free',
-      isVerified: data['isVerified'] ?? false,
-      isPublished: data['isPublished'] ?? false,
-      isFeatured: data['isFeatured'] ?? false,
-      isDeleted: data['isDeleted'] ?? false,
-      createdAt: data['createdAt'],
-      updatedAt: data['updatedAt'],
-      crowdUpdatedAt: data['crowdUpdatedAt'] is Timestamp ? data['crowdUpdatedAt'] as Timestamp : null,
-    );
+    return MobileVenueDocumentMapper.parseVenueDetails(doc.id, doc.data())!;
   }
 
   Map<String, dynamic> toFirestore() {
