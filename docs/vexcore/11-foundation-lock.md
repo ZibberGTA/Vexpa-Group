@@ -52,15 +52,20 @@ Do not add new business rules to deprecated modules.
 
 ## Adoption backlog (post-lock)
 
-- Firebase document-storage adapters (`VexDocumentStorageService`)
-- Venue media storage adapter (`VexStorageService`)
-- Claim Engine evidence upload adapter
+**In progress (2026-07-11):** Web Firebase storage adapters wired through `WebVexCore.storage` and `WebVexCore.documentStorage`. Venue logo/banner upload and gallery delete delegate to `VexStorageService`. Claim evidence upload path uses `VexDocumentStorageService` + Claim Engine document policy.
+
+**Blocked pending Firebase Rules ADR:** Live claim evidence uploads to `claims/{uid}/evidence/*` — current `storage.rules` default-deny all non-venue media paths. Do not weaken rules in adoption work.
+
+**Remaining:**
+
+- Mobile `VexStorageService` adapter (no active mobile upload path yet)
 - Cloud Functions integration adapters
 - Remaining direct Firestore paths (admin, claims, map, search, mobile legacy screens)
 - Broader entitlement adoption in billing/subscription UI
 - Duplicate mobile admin permission service cleanup
 - Phase 9 automated architecture enforcement (import/Firebase boundary checks)
 - Web UI reduction of parallel `UserRoleService` subscriptions where `WebVexCore.identity` suffices
+- Gallery bulk upload orchestration fully on composition root (logo/banner pilot complete)
 
 ## Rollback
 

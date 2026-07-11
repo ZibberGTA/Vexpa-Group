@@ -46,7 +46,7 @@ Status: **Phase 3 complete — web submission and review validation wired**
 | Path | Tag | Notes |
 | --- | --- | --- |
 | `StaffPermission.venueClaimApprove` etc. | VC | Permission evaluation stays in VexCore |
-| Storage uploads for evidence documents | VC/WEB | Upload adapter stays in web shell |
+| Storage uploads for evidence documents | VC/WEB | **In progress** — `ClaimEvidenceUploadService` + `WebVexCore.documentStorage`; live Firebase blocked until rules ADR |
 
 ---
 

@@ -91,7 +91,7 @@ Engine README until the Master Blueprint is created.
 | `data/venue_profile_field_codec.dart` | **VE/domain** | **Migrated Phase 2** |
 | `data/venue_dashboard_repository.dart` | **VE/application** | **Partial — wired** | Firebase reads stay; Venue + Analytics engines compose |
 | `data/venue_images_repository.dart` | **VE/data** | Gallery metadata |
-| `data/venue_media_*` | **VE/data** | Upload orchestration (uses VexCore storage adapter) |
+| `data/venue_media_*` | **VE/data** | **Pilot complete (web)** — branding upload + gallery delete via `WebVexCore.storage`; bulk gallery upload orchestration remains |
 | `data/venue_analytics_service.dart` | **OTHER** | Analytics Engine |
 | `data/venue_activity_service.dart` | **VE/ANALYTICS** | **Partial — wired** | Firebase reads stay; engines aggregate and interpret |
 | `services/venue_dashboard_engine_mapper.dart` | **WEB** | Added | Maps engine DTOs to Flutter dashboard models |

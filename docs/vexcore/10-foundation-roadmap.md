@@ -231,3 +231,15 @@ Completion criteria:
 - No new Firebase reads, Auth calls, or listeners added during lock work.
 
 Post-lock work (adapters, repository migration, Phase 9 enforcement) continues on separate tracks.
+
+## Phase 11 — Storage Adapter Adoption (post-lock)
+
+**Status: In progress (2026-07-11).** Web Firebase adapters implement locked `VexStorageService` and `VexDocumentStorageService` contracts.
+
+Completion criteria:
+
+- `WebVexCore.storage` and `WebVexCore.documentStorage` expose stable singleton adapters.
+- Venue logo/banner upload and gallery delete delegate to `VexStorageService` without duplicate SDK calls.
+- Claim evidence upload orchestration uses `VexDocumentStorageService` + Claim Engine document policy.
+- No VexCore contract breaking changes; Firebase Rules unchanged in this phase.
+- Claim evidence live uploads blocked until rules ADR adds `claims/{uid}/evidence/*` — document explicitly.

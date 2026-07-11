@@ -54,13 +54,15 @@ Own the claim **workflow business rules** separately from VexCore auth/permissio
 
 ## Current Status
 
-**~70% complete**
+**~78% complete**
 
 | Phase | Status |
 | --- | --- |
 | Shared rules | Complete |
 | Submission + review services | Complete |
 | Web runtime slice | Complete |
+| Evidence document policy + path conventions | Complete |
+| Web evidence upload via VexCore document adapter | Complete (code path; **Firebase Rules block live `claims/` uploads**) |
 | Mobile claim flow | Planned |
 | Admin presentation view models | Planned |
 
@@ -78,10 +80,11 @@ Own the claim **workflow business rules** separately from VexCore auth/permissio
 ## Known Risks
 
 - Mobile has no claim flow yet — web-only increases onboarding friction for some owners.
-- Evidence storage paths must remain venue-scoped and permission-checked in adapters.
+- **`storage.rules` has no `claims/{uid}/evidence/*` match** — live evidence uploads require a rules ADR before production use. VexCore adapter and UI path are wired; Firebase default-deny remains authoritative.
 
 ## Outstanding Work
 
+- Firebase Storage rules ADR for claim evidence paths
 - Mobile adoption
 - Admin UI view model extraction
 - Write repository contracts

@@ -54,7 +54,7 @@ Give venues one authoritative place for **profile and management business rules*
 
 ## Current Status
 
-**~75% complete** (Engine Acceptance Rule partially met)
+**~80% complete** (Engine Acceptance Rule partially met)
 
 | Phase | Status |
 | --- | --- |
@@ -62,6 +62,7 @@ Give venues one authoritative place for **profile and management business rules*
 | Shared helpers | Complete |
 | Domain rules | Complete |
 | Profile update orchestration | Complete |
+| Web venue media storage via VexCore (`uploadBrandingImage`, gallery delete) | Complete (pilot) |
 | Broader management orchestration | Planned |
 
 ## Future Features
