@@ -106,6 +106,58 @@ final class FirebaseVenueRepository implements VenueRepository {
   }
 
   @override
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId) {
+    final trimmedOwnerId = ownerId.trim();
+    if (trimmedOwnerId.isEmpty) {
+      return Stream.value(const DataSuccess([]));
+    }
+
+    final firestore = _resolveFirestore();
+    if (firestore == null) {
+      return Stream.value(
+        DataFailure(
+          const VexException(
+            'Firebase is not initialized.',
+            code: 'firebase-unavailable',
+          ),
+        ),
+      );
+    }
+
+    return firestore
+        .collection('venues')
+        .where('ownerId', isEqualTo: trimmedOwnerId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map<DataResult<List<Venue>>>((snapshot) {
+          return DataSuccess(mapVenueDocuments(snapshot.docs));
+        })
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleError: (Object error, StackTrace stackTrace, EventSink sink) {
+              if (kDebugMode) {
+                debugPrint(
+                  '[FirebaseVenueRepository] watchVenuesForOwner failed: $error',
+                );
+                debugPrint('$stackTrace');
+              }
+              sink.add(
+                DataFailure(
+                  VexException(
+                    'Failed to watch owner venues.',
+                    code: error is FirebaseException
+                        ? error.code
+                        : 'venue-watch-failed',
+                    cause: error,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+  }
+
+  @override
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   }) async {

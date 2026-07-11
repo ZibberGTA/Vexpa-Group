@@ -26,6 +26,20 @@ final class VenueDataService {
     });
   }
 
+  Stream<DataResult<VenueCatalog>> watchOwnerVenues(String ownerId) {
+    final trimmedOwnerId = ownerId.trim();
+    if (trimmedOwnerId.isEmpty) {
+      return Stream.value(const DataSuccess(VenueCatalog(venues: [])));
+    }
+
+    return _repository.watchVenuesForOwner(trimmedOwnerId).map((result) {
+      return switch (result) {
+        DataSuccess(:final value) => DataSuccess(_sortedCatalog(value)),
+        DataFailure(:final error) => DataFailure(error),
+      };
+    });
+  }
+
   Future<DataResult<VenueSearchMatch>> searchDiscoveryVenues({
     required List<String> terms,
   }) async {

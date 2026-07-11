@@ -7,6 +7,8 @@ abstract interface class VenueRepository {
 
   Stream<DataResult<List<Venue>>> watchPublicVenues();
 
+  Stream<DataResult<List<Venue>>> watchVenuesForOwner(String ownerId);
+
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   });
