@@ -7,5 +7,6 @@ void main() {
     expect(discoveryEngineLibraryExists, isTrue);
     expect(experienceEngineLibraryExists, isTrue);
     expect(claimEngineLibraryExists, isTrue);
+    expect(analyticsEngineLibraryExists, isTrue);
   });
 }
