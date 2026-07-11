@@ -28,7 +28,9 @@ Classification tags:
 | `data/search_repository.dart` | WEB | Wired | Facade → Discovery Engine |
 | `data/search_venue_repository.dart` | WEB/VC | Wired | VexCore catalog load |
 | `data/sources/venue_search_data_source.dart` | WEB | Wired | Delegates merge to engine |
-| `data/unified_search_service.dart` | WEB | Wired | Firestore entity queries stay; composition in engine |
+| `data/unified_search_service.dart` | WEB | Migrated | Thin facade; engine owns composition |
+| `data/sources/unified_search_firestore_adapter.dart` | WEB | Migrated | Firestore queries + doc mapping only |
+| `data/web_search_venue_match_factory.dart` | WEB | Migrated | Web match factory for engine merger |
 | `data/search_preview_data.dart` | WEB | — | Dev fixtures |
 | `data/search_autocomplete_data.dart` | WEB | — | UI autocomplete |
 | `data/search_map_coordinates.dart` | WEB | — | Google Maps |
@@ -143,12 +145,53 @@ Web adoption:
 
 No extra listeners, catalog reloads, or ranking passes were introduced.
 
+## Migrated in Batch 4 (unified search orchestration)
+
+**VexCore**
+
+- `SearchableDrinkRecord`, `SearchableDealRecord`, `SearchableEventRecord`, `SearchableTrailRecord`
+- `UnifiedSearchCandidateBatch` — adapter-loaded candidate batch DTO
+
+**Discovery Engine**
+
+- `DiscoveryUnifiedSearchQuery` — query normalisation, category gates, empty/short-query rules
+- `DiscoveryUnifiedSearchCandidateMatcher` — text match + visibility (drinks via `ExperienceDrinkVisibility`; deals/events/trails parity with legacy web rules)
+- `DiscoveryUnifiedSearchMerger` — venue-grouped deduplication
+- `DiscoveryUnifiedSearchOrchestrator` — combines venues, drinks, deals, events, trails; delegates ranking to `DiscoveryUnifiedSearchComposer`
+
+**Web**
+
+- `UnifiedSearchService` — compatibility facade; `Future.wait` for parallel venue index + candidate load
+- `UnifiedSearchFirestoreAdapter` — Firestore queries and document mapping (unchanged query shapes)
+- `WebSearchVenueMatchFactory` — builds `SearchVenueMatch` from engine merger callbacks
+
+Experience Engine remains the source of truth for drink visibility; deal/event active flags come from Firestore filters and record fields — not duplicated in Discovery.
+
+## Network calls (Batch 4 — unified search)
+
+| Step | Before | After |
+| --- | --- | --- |
+| Venue index search (non-empty, venues category) | 1 × `VenueDataService.searchDiscoveryVenues` | Same |
+| Drinks query | 1 × Firestore `drinks` (limit 80) | Same |
+| Deals query | 1 × Firestore `deals` (limit 80) | Same |
+| Events query | 1 × Firestore `events` (limit 80) | Same |
+| Trails query | 1 × Firestore `trails` (limit 80) | Same |
+| Adapter execution | Sequential venue then entity loads | Parallel via `Future.wait` (same read count) |
+
+No extra listeners, catalog reloads, or ranking passes were introduced.
+
 ## Next batch (recommended)
 
-1. VexCore cross-entity discovery read contracts; remove direct Firestore from `UnifiedSearchService`
-2. Converge mobile `VenueSearchService` Firestore path with web index flow where product allows
+1. Converge mobile `VenueSearchService` Firestore path with web index flow where product allows
+2. Optional VexCore repository interfaces for cross-entity adapter injection (Firestore stays in apps)
 3. Presentation phase: search pages/widgets under `presentation/web/` and `presentation/mobile/`
 4. Recommendation/trending input DTOs fed from VexCore analytics contracts
+
+## Rollback (Batch 4)
+
+Revert `UnifiedSearchService` to inline composition and remove orchestrator wiring.
+`UnifiedSearchFirestoreAdapter` can remain — it only moves Firestore code out of the service.
+Engine modules can remain unused without affecting Firebase Rules or network behaviour.
 
 ## Rollback (Batch 3)
 

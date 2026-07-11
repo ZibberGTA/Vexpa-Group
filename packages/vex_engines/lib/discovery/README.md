@@ -79,9 +79,22 @@ An engine is not considered complete until:
 | 3 — Web runtime slice | Complete | `VenueSearchDataSource` + `UnifiedSearchService` composition |
 | 4 — Shared web/mobile logic | Complete | Related venues, trending/recommendation scorers, mobile search rules |
 | 5 — Venue search consolidation (Batch C) | Complete | Shared query normalisation, mobile client matcher, search-term builder, nearby sorter, filter state, map geometry |
-| 6 — Presentation + cross-entity | Planned | Pages/widgets and VexCore discovery repos |
+| 6 — Unified search orchestration (Batch D) | Complete | Cross-entity merge, ranking, grouping; Firestore stays in web adapter |
+| 7 — Presentation + cross-entity repos | Planned | Pages/widgets; optional VexCore repository interfaces for adapter injection |
 
 See `MIGRATION_PLAN.md` for the file inventory and next batch.
+
+## Runtime flow (web unified search)
+
+```text
+Search page
+  → SearchRepository (web compatibility facade)
+  → UnifiedSearchService (web facade — parallel adapter fan-out)
+  → DiscoveryUnifiedSearchOrchestrator (query rules, merge, rank, group)
+  → UnifiedSearchFirestoreAdapter + VenueSearchDataSource (parallel Firestore/index reads)
+  → VexCore Searchable* records + VenueDataService catalog
+  → Firestore
+```
 
 ## Runtime flow (web venue discovery)
 

@@ -104,6 +104,7 @@ Completion criteria:
 | Public venue drinks menu | Complete | Web `VenueDrinksRepository.watchDrinks` through `VenueDrinkDataService`. |
 | Public venue deals menu | Complete | Web `VenueDealsRepository.watchDeals` through `VenueDealDataService`. |
 | Public venue events menu | Complete | Web `VenueEventsRepository.watchEvents` through `VenueEventDataService`. |
+| Unified search content DTOs | Complete | VexCore `Searchable*Record` + `UnifiedSearchCandidateBatch` for adapter-fed candidates. |
 | Admin route guard | Complete | Web `/admin` guard uses VexCore auth/identity/permissions. |
 
 See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pilot.md`, and `16-venue-events-pilot.md` for rollback paths.
@@ -116,7 +117,7 @@ See `13-venue-details-pilot.md`, `14-venue-drinks-pilot.md`, `15-venue-deals-pil
 | Phase 1 shared helpers | Complete | Contact, opening hours, image position, profile completion |
 | Phase 2 domain rules | Complete | Profile field codec/constants, image field parser |
 | Phase 3 profile updates | Complete | `VenueProfileUpdateService` + Firebase write adapter |
-| Phase 4 dashboard orchestration | Partial | Active venue, whats-next, highlights, activity interpretation |
+| Phase 4 dashboard orchestration | Complete | Active venue, whats-next, highlights, activity interpretation |
 | Phase 5 management orchestration | Planned | Broader dashboard aggregation and management workflows |
 
 Engine Acceptance Rule documented in `packages/vex_engines/lib/venue/README.md`.
@@ -132,9 +133,10 @@ See [docs/master-blueprint.md](../master-blueprint.md) and [ADR-0005](../decisio
 | Web runtime slice | Complete | `VenueSearchDataSource` + `UnifiedSearchService` wired |
 | Shared web/mobile logic | Complete | Related venues, trending/recommendation scorers, mobile search rules |
 | Venue search consolidation (Batch C) | Complete | Shared matcher, search-term builder, nearby sorter, filter state, map geometry |
-| Presentation + cross-entity | Planned | Pages/widgets and VexCore discovery repos |
+| Unified search orchestration (Batch D) | Complete | Cross-entity merge/rank/group; web Firestore adapter retained |
+| Presentation + optional VexCore repos | Planned | Pages/widgets; repository interfaces for adapter injection |
 
-Network calls unchanged on venue search path (1 catalog + 1 index lookup per search).
+Network calls unchanged on unified search path (1 index + up to 4 entity queries per search, parallelised).
 See `packages/vex_engines/lib/discovery/MIGRATION_PLAN.md`.
 
 ### Experience Engine structure (Version 1 launch engine)

@@ -170,7 +170,7 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Tenant-scoped venue profile, management workflows, validation |
 | Version | 1 |
-| Status | ~82% — phases 0–3 complete; dashboard orchestration partial |
+| Status | ~86% — phases 0–4 complete; management orchestration planned |
 | VexCore | Auth, identity, permissions, `VenueDataService`, storage |
 | Owns | Profile field rules, opening hours, media semantics, profile updates, dashboard guidance |
 | Consumes | VexCore public venue reads; Experience Engine owns drinks/deals/events content |
@@ -181,8 +181,8 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Cross-venue search, ranking, filters, trending, recommendations |
 | Version | 1 |
-| Status | ~88% — web/mobile shared matching; presentation phase planned |
-| VexCore | `VenueDataService`, future cross-entity discovery repos |
+| Status | ~92% — unified search orchestration complete; presentation phase planned |
+| VexCore | `VenueDataService`, searchable content DTOs (`Searchable*Record`) |
 | Owns | Query normalisation, matching, relevance, search-term indexing rules |
 | Consumes | Venue snapshots from VexCore — does not duplicate venue master data |
 
@@ -270,7 +270,7 @@ See [ADR-0002](./decisions/0002-version-1-scope.md).
 - **Growth Engine** extraction from app-level subscription/boost services
 - Trail Engine migration (composition, publishing, discovery rules)
 - VexCore analytics read contracts
-- Discovery cross-entity VexCore repos; reduced direct Firestore in unified search
+- Discovery presentation layer; optional VexCore repository interfaces for adapter injection
 - Automated architecture enforcement (Foundation Phase 9)
 
 ### Version 2 — Intelligence and scale
@@ -454,7 +454,7 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 ### Version 1 engines
 
 - **Venue:** Phase 4 orchestration, broader management workflows
-- **Discovery:** Presentation layer; VexCore cross-entity repos; unified search Firestore reduction
+- **Discovery:** Presentation layer; mobile/web search path convergence; optional VexCore adapter contracts
 - **Experience:** Remaining mobile write adoption; presentation helpers
 - **Claim:** Mobile claim flow; admin presentation view models
 - **Analytics:** VexCore analytics read service pilot
