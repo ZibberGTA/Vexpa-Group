@@ -2,13 +2,16 @@ import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_core/vex_core.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 
 /// Uploads venue media bytes to Firebase Storage under venue-scoped paths.
 class VenueMediaStorageService {
   VenueMediaStorageService({
     FirebaseStorage? storage,
+    VexStorageService? vexStorage,
     Future<({String downloadUrl, String storagePath})> Function({
       required String storagePath,
       required Uint8List bytes,
@@ -17,17 +20,22 @@ class VenueMediaStorageService {
     uploadOverride,
     Future<void> Function(String storagePath)? deleteOverride,
   }) : _storageOverride = storage,
+       _vexStorage = vexStorage,
        _uploadOverride = uploadOverride,
        _deleteOverride = deleteOverride;
 
   final FirebaseStorage? _storageOverride;
+  final VexStorageService? _vexStorage;
   final Future<({String downloadUrl, String storagePath})> Function({
     required String storagePath,
     required Uint8List bytes,
     required String contentType,
   })?
   _uploadOverride;
-  final Future<void> Function(String storagePath)? _deleteOverride;
+  final Future<void> Function(String storagePath)?   _deleteOverride;
+
+  VexStorageService get _resolvedVexStorage =>
+      _vexStorage ?? WebVexCore.storage;
 
   FirebaseStorage? _resolveStorage() {
     if (_storageOverride != null) return _storageOverride;
@@ -48,15 +56,13 @@ class VenueMediaStorageService {
       );
     }
 
-    final storage = _resolveStorage();
-    if (storage == null) {
-      throw StateError('Firebase Storage is not available.');
-    }
-
     try {
-      final ref = storage.ref(storagePath);
-      await ref.putData(bytes, SettableMetadata(contentType: contentType));
-      final downloadUrl = await ref.getDownloadURL();
+      final result = await _resolvedVexStorage.putBytes(
+        path: storagePath,
+        bytes: bytes,
+        contentType: contentType,
+      );
+      final downloadUrl = result.downloadUrl?.toString() ?? '';
       if (downloadUrl.trim().isEmpty) {
         throw StateError('Storage upload returned an empty download URL.');
       }
@@ -89,15 +95,7 @@ class VenueMediaStorageService {
       return;
     }
 
-    final storage = _resolveStorage();
-    if (storage == null) return;
-
-    try {
-      await storage.ref(storagePath).delete();
-    } on FirebaseException catch (error) {
-      if (error.code == 'object-not-found') return;
-      rethrow;
-    }
+    await _resolvedVexStorage.delete(storagePath);
   }
 
   Future<bool> objectExistsAtPath(String storagePath) async {
@@ -128,12 +126,9 @@ class VenueMediaStorageService {
     final path = storagePath.trim();
     if (path.isEmpty) return null;
 
-    final storage = _resolveStorage();
-    if (storage == null) return null;
-
     try {
-      final downloadUrl = await storage.ref(path).getDownloadURL();
-      return downloadUrl.trim().isEmpty ? null : downloadUrl;
+      final url = await _resolvedVexStorage.downloadUrl(path);
+      return url.toString();
     } on FirebaseException catch (error, stackTrace) {
       if (kDebugMode) {
         debugPrint(

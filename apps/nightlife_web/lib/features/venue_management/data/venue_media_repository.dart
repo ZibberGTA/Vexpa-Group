@@ -172,6 +172,24 @@ class VenueMediaRepository {
     if (ids.isEmpty) return;
 
     final items = itemsForStorage.toList();
+    final storage = storageService ??
+        (items.any((item) => (item.storagePath?.trim().isNotEmpty ?? false))
+            ? VenueMediaStorageService()
+            : null);
+
+    if (storage != null) {
+      for (final item in items) {
+        final path = item.storagePath?.trim();
+        if (path != null && path.isNotEmpty) {
+          try {
+            await storage.deleteAtPath(path);
+          } catch (_) {
+            // Metadata delete proceeds even when the storage object is already gone.
+          }
+        }
+      }
+    }
+
     final deletesGallery = items.any(
       (item) => item.mediaType == VenueMediaType.gallery,
     );
@@ -188,14 +206,7 @@ class VenueMediaRepository {
       final venueStore = _inMemoryStore[venueId];
       if (venueStore != null) {
         for (final id in ids) {
-          final existing = venueStore[id];
-          if (existing == null) continue;
-          venueStore[id] = {
-            ...existing,
-            'visible': false,
-            'status': 'deleted',
-            'updatedAt': Timestamp.now(),
-          };
+          venueStore.remove(id);
         }
       }
       if (deletesGallery) {
