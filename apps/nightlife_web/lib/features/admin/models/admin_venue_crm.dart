@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_core/entitlements/entitlements.dart';
 
 import '../../venue_management/models/media_library_tab.dart';
 import '../../venue_management/models/media_subscription_limits.dart';
@@ -454,31 +455,6 @@ class AdminVenueHealth {
   bool get isComplete => missingItems.isEmpty && totalCount > 0;
 }
 
-/// Normalizes subscription tier ids from Firestore into display labels.
-String formatAdminVenueSubscriptionTier(String? raw) {
-  if (raw == null) return '—';
-  final trimmed = raw.trim();
-  if (trimmed.isEmpty || trimmed == '—') return '—';
-
-  final normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
-  return switch (normalized) {
-    'venue_pro' || 'pro' || 'venuepro' => 'Venue Pro',
-    'professional' => 'Professional',
-    'starter' => 'Starter',
-    'premium' => 'Premium',
-    'corporate' => 'Corporate',
-    _ =>
-      trimmed
-          .split(RegExp(r'[_\s]+'))
-          .where((part) => part.isNotEmpty)
-          .map(
-            (part) =>
-                '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
-          )
-          .join(' '),
-  };
-}
-
 String formatAdminVenueSubscriptionStatus(String? raw) {
   if (raw == null) return '—';
   final trimmed = raw.trim();
@@ -491,28 +467,6 @@ String formatAdminVenueSubscriptionStatus(String? raw) {
         (part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
       )
       .join(' ');
-}
-
-bool isPremiumVenueSubscriptionTier(String? displayTier) {
-  final value = displayTier?.toLowerCase() ?? '';
-  return value.contains('pro') || value == 'premium' || value == 'corporate';
-}
-
-/// Admin table pill label for venue subscription plans.
-String adminVenueSubscriptionPlanLabel(String? raw) {
-  if (raw == null) return 'Unknown';
-  final trimmed = raw.trim();
-  if (trimmed.isEmpty || trimmed == '—') return 'Unknown';
-
-  final normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
-  return switch (normalized) {
-    'starter' => 'Starter',
-    'professional' || 'pro' || 'venue_pro' || 'venuepro' => 'Professional',
-    'premium' => 'Premium',
-    'corporate' => 'Corporate',
-    'free' => 'Free',
-    _ => 'Unknown',
-  };
 }
 
 class AdminVenueContentSummary {

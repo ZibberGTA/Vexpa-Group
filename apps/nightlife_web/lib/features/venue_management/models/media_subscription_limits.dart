@@ -1,13 +1,17 @@
+import 'package:vex_core/entitlements/entitlements.dart';
+
 import 'media_library_tab.dart';
 
 /// Subscription-based upload limits for each media library.
 class MediaSubscriptionLimits {
   MediaSubscriptionLimits._();
 
+  static const _entitlements = EntitlementService();
+
   static const starterPlanId = 'starter';
 
   static bool hasMediaCentreAccess(String planId) {
-    return planId.trim().toLowerCase() != starterPlanId;
+    return _entitlements.hasMediaCentreAccess(planId);
   }
 
   static int limitFor({
@@ -15,35 +19,11 @@ class MediaSubscriptionLimits {
     required MediaLibraryTab tab,
     Map<String, int> customLimits = const {},
   }) {
-    final normalized = planId.trim().toLowerCase();
-
-    if (normalized == 'corporate') {
-      final custom = customLimits[tab.customLimitKey];
-      if (custom != null && custom > 0) return custom;
-      return 50;
-    }
-
-    return switch (normalized) {
-      'starter' => 0,
-      'professional' => switch (tab) {
-          MediaLibraryTab.brandAssets => 0,
-          MediaLibraryTab.venueGallery => 20,
-          MediaLibraryTab.dealImages => 15,
-          MediaLibraryTab.eventImages => 15,
-        },
-      'premium' => switch (tab) {
-          MediaLibraryTab.brandAssets => 0,
-          MediaLibraryTab.venueGallery => 30,
-          MediaLibraryTab.dealImages => 25,
-          MediaLibraryTab.eventImages => 25,
-        },
-      _ => switch (tab) {
-          MediaLibraryTab.brandAssets => 0,
-          MediaLibraryTab.venueGallery => 20,
-          MediaLibraryTab.dealImages => 15,
-          MediaLibraryTab.eventImages => 15,
-        },
-    };
+    return _entitlements.mediaUploadLimit(
+      planId: planId,
+      mediaLibraryKey: tab.customLimitKey,
+      customLimits: customLimits,
+    );
   }
 
   static String? validateUpload({

@@ -7,6 +7,7 @@ import '../../../core/firebase/vexda_firebase.dart';
 import '../models/admin_dashboard_models.dart';
 import '../models/admin_user_crm.dart';
 import '../models/admin_venue_crm.dart';
+import 'package:vex_core/entitlements/entitlements.dart';
 
 enum StaffInviteUpsertResult { created, updated, alreadyStaffMember }
 
