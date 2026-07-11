@@ -1,4 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/analytics/application/analytics_engagement_calculator.dart';
+import 'package:vex_engines/analytics/application/analytics_metrics_composer.dart';
+import 'package:vex_engines/analytics/application/analytics_top_entity_aggregator.dart';
+import 'package:vex_engines/analytics/application/analytics_weekly_growth_calculator.dart';
+import 'package:vex_engines/analytics/domain/analytics_event_record.dart';
+import 'package:vex_engines/analytics/domain/analytics_venue_metrics.dart';
 
 class AnalyticsRange {
   final String label;
@@ -90,16 +96,30 @@ class AnalyticsSummary {
   });
 
   double get favouriteConversionRate {
-    if (venueViews == 0) return 0;
-    return (favouriteTaps / venueViews) * 100;
+    const calculator = AnalyticsEngagementCalculator();
+    final metrics = AnalyticsVenueMetrics(
+      profileViews: venueViews,
+      saves: favouriteTaps,
+      crowdUpdates: crowdUpdates,
+      drinkViews: drinkViews,
+      dealViews: dealViews,
+      eventViews: eventViews,
+    );
+    return calculator.compute(metrics).favouriteConversionRate;
   }
 
-  String get formattedConversionRate =>
-      '${favouriteConversionRate.toStringAsFixed(1)}%';
+  String get formattedConversionRate {
+    const calculator = AnalyticsEngagementCalculator();
+    return calculator.formatConversionRate(favouriteConversionRate);
+  }
 }
 
 class AnalyticsService {
   AnalyticsService._();
+
+  static const _metricsComposer = AnalyticsMetricsComposer();
+  static const _topEntityAggregator = AnalyticsTopEntityAggregator();
+  static const _weeklyGrowthCalculator = AnalyticsWeeklyGrowthCalculator();
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -296,13 +316,22 @@ class AnalyticsService {
       since: since,
     );
 
-    return AnalyticsSummary(
+    final metrics = _metricsComposer.fromSummaryCounts(
       venueViews: results[0],
       favouriteTaps: results[1],
       crowdUpdates: results[2],
       drinkViews: results[3],
       dealViews: results[4],
       eventViews: results[5],
+    );
+
+    return AnalyticsSummary(
+      venueViews: metrics.profileViews,
+      favouriteTaps: metrics.saves,
+      crowdUpdates: metrics.crowdUpdates,
+      drinkViews: metrics.drinkViews,
+      dealViews: metrics.dealViews,
+      eventViews: metrics.eventViews,
       topDrinks: topDrinks,
       topDeals: topDeals,
       crowdTrends: crowdTrends,
@@ -324,13 +353,22 @@ class AnalyticsService {
       countEventsForVenues(venueIds: venueIds, type: 'event_view', since: since),
     ]);
 
-    return AnalyticsSummary(
+    final metrics = _metricsComposer.fromSummaryCounts(
       venueViews: results[0],
       favouriteTaps: results[1],
       crowdUpdates: results[2],
       drinkViews: results[3],
       dealViews: results[4],
       eventViews: results[5],
+    );
+
+    return AnalyticsSummary(
+      venueViews: metrics.profileViews,
+      favouriteTaps: metrics.saves,
+      crowdUpdates: metrics.crowdUpdates,
+      drinkViews: metrics.drinkViews,
+      dealViews: metrics.dealViews,
+      eventViews: metrics.eventViews,
       topDrinks: const [],
       topDeals: const [],
       crowdTrends: const [],
@@ -351,34 +389,33 @@ class AnalyticsService {
       since: since,
     ).get();
 
-    final counts = <String, int>{};
-    final names = <String, String>{};
+    final records = snapshot.docs.map((doc) {
+      final data = doc.data();
+      final payload = data['data'];
+      return AnalyticsEventRecord(
+        type: data['type']?.toString() ?? type,
+        payload: payload is Map
+            ? Map<String, dynamic>.from(payload)
+            : const {},
+      );
+    });
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data()['data'];
-      if (data is! Map) continue;
+    final items = _topEntityAggregator.topItems(
+      events: records,
+      idKey: idKey,
+      nameKey: nameKey,
+      limit: limit,
+    );
 
-      final id = data[idKey]?.toString() ?? '';
-      if (id.isEmpty) continue;
-
-      counts[id] = (counts[id] ?? 0) + 1;
-
-      final name = data[nameKey]?.toString() ?? '';
-      if (name.isNotEmpty) names[id] = name;
-    }
-
-    final items = counts.entries
+    return items
         .map(
-          (entry) => TopAnalyticsItem(
-            id: entry.key,
-            name: names[entry.key] ?? entry.key,
-            count: entry.value,
+          (item) => TopAnalyticsItem(
+            id: item.id,
+            name: item.name,
+            count: item.count,
           ),
         )
-        .toList()
-      ..sort((a, b) => b.count.compareTo(a.count));
-
-    return items.take(limit).toList();
+        .toList();
   }
 
   static Future<List<CrowdTrendPoint>> crowdTrendForVenue({
@@ -391,24 +428,21 @@ class AnalyticsService {
       since: since,
     ).get();
 
-    final counts = <String, int>{};
+    final records = snapshot.docs.map((doc) {
+      final data = doc.data();
+      final payload = data['data'];
+      return AnalyticsEventRecord(
+        type: data['type']?.toString() ?? 'crowd_update',
+        payload: payload is Map
+            ? Map<String, dynamic>.from(payload)
+            : const {},
+      );
+    });
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data()['data'];
-      if (data is! Map) continue;
-
-      final level = data['level']?.toString().trim();
-      if (level == null || level.isEmpty) continue;
-
-      counts[level] = (counts[level] ?? 0) + 1;
-    }
-
-    final items = counts.entries
-        .map((entry) => CrowdTrendPoint(label: entry.key, count: entry.value))
-        .toList()
-      ..sort((a, b) => b.count.compareTo(a.count));
-
-    return items;
+    final points = _topEntityAggregator.crowdTrendPoints(records);
+    return points
+        .map((point) => CrowdTrendPoint(label: point.label, count: point.value.round()))
+        .toList();
   }
 
 
@@ -426,7 +460,6 @@ class AnalyticsService {
     }
 
     final currentNow = now ?? DateTime.now();
-    final thisWeekStart = currentNow.subtract(const Duration(days: 7));
     final lastWeekStart = currentNow.subtract(const Duration(days: 14));
 
     final snapshot = await _analytics
@@ -435,37 +468,23 @@ class AnalyticsService {
         .where('createdAt', isLessThan: Timestamp.fromDate(currentNow))
         .get();
 
-    var thisWeekScore = 0;
-    var lastWeekScore = 0;
-
+    final timestamps = <DateTime>[];
     for (final doc in snapshot.docs) {
       final createdAt = doc.data()['createdAt'];
-      if (createdAt is! Timestamp) continue;
-
-      final createdDate = createdAt.toDate();
-
-      if (!createdDate.isBefore(thisWeekStart)) {
-        thisWeekScore++;
-      } else {
-        lastWeekScore++;
+      if (createdAt is Timestamp) {
+        timestamps.add(createdAt.toDate());
       }
     }
 
-    double percentageChange;
-
-    if (lastWeekScore == 0 && thisWeekScore == 0) {
-      percentageChange = 0;
-    } else if (lastWeekScore == 0) {
-      percentageChange = 100;
-    } else {
-      percentageChange =
-          ((thisWeekScore - lastWeekScore) / lastWeekScore) * 100;
-    }
+    final growth = _weeklyGrowthCalculator.compute(
+      eventTimestamps: timestamps,
+      now: currentNow,
+    );
 
     return WeeklyGrowthMetric(
-      thisWeekScore: thisWeekScore,
-      lastWeekScore: lastWeekScore,
-      percentageChange: percentageChange,
+      thisWeekScore: growth.thisWeekScore,
+      lastWeekScore: growth.lastWeekScore,
+      percentageChange: growth.percentageChange,
     );
   }
 
