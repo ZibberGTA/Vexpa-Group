@@ -1,4 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/analytics/application/analytics_chart_series_builder.dart';
+import 'package:vex_engines/analytics/application/analytics_metrics_composer.dart';
+import 'package:vex_engines/analytics/application/analytics_percent_change.dart';
+import 'package:vex_engines/analytics/application/analytics_top_entity_aggregator.dart';
+import 'package:vex_engines/analytics/domain/analytics_chart_period.dart';
+import 'package:vex_engines/analytics/domain/analytics_event_record.dart';
+import 'package:vex_engines/analytics/domain/analytics_venue_metrics.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../models/venue_dashboard_date_range.dart';
@@ -6,10 +13,22 @@ import '../models/venue_profile_views_chart_data.dart';
 
 /// Reads venue analytics events from the shared `analytics` collection.
 class VenueAnalyticsService {
-  VenueAnalyticsService({FirebaseFirestore? firestore})
-      : _firestoreOverride = firestore;
+  VenueAnalyticsService({
+    FirebaseFirestore? firestore,
+    AnalyticsMetricsComposer? metricsComposer,
+    AnalyticsChartSeriesBuilder? chartSeriesBuilder,
+    AnalyticsTopEntityAggregator? topEntityAggregator,
+  })  : _firestoreOverride = firestore,
+        _metricsComposer = metricsComposer ?? const AnalyticsMetricsComposer(),
+        _chartSeriesBuilder =
+            chartSeriesBuilder ?? const AnalyticsChartSeriesBuilder(),
+        _topEntityAggregator =
+            topEntityAggregator ?? const AnalyticsTopEntityAggregator();
 
   final FirebaseFirestore? _firestoreOverride;
+  final AnalyticsMetricsComposer _metricsComposer;
+  final AnalyticsChartSeriesBuilder _chartSeriesBuilder;
+  final AnalyticsTopEntityAggregator _topEntityAggregator;
 
   FirebaseFirestore? get _db {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -76,7 +95,16 @@ class VenueAnalyticsService {
       range: range,
     );
 
-    final hasData = current.total > 0 || chartPoints.isNotEmpty;
+    final hasData = _metricsComposer.snapshotHasData(
+      current: AnalyticsVenueMetrics(
+        profileViews: current.profileViews,
+        saves: current.saves,
+        drinkViews: current.drinkViews,
+        dealViews: current.dealViews,
+        eventViews: current.eventViews,
+      ),
+      chartPoints: chartPoints,
+    );
 
     return VenueAnalyticsSnapshot(
       current: current,
@@ -99,12 +127,13 @@ class VenueAnalyticsService {
       countEvents(venueId: venueId, type: 'event_view', since: since, until: until),
     ]);
 
+    final metrics = _metricsComposer.fromDashboardCounts(results);
     return VenueAnalyticsCounts(
-      profileViews: results[0],
-      saves: results[1],
-      drinkViews: results[2],
-      dealViews: results[3],
-      eventViews: results[4],
+      profileViews: metrics.profileViews,
+      saves: metrics.saves,
+      drinkViews: metrics.drinkViews,
+      dealViews: metrics.dealViews,
+      eventViews: metrics.eventViews,
     );
   }
 
@@ -131,22 +160,24 @@ class VenueAnalyticsService {
       final snapshot = await query.get();
       if (snapshot.docs.isEmpty) return const [];
 
-      final buckets = <String, double>{};
+      final timestamps = <DateTime>[];
       for (final doc in snapshot.docs) {
         final createdAt = doc.data()['createdAt'];
-        if (createdAt is! Timestamp) continue;
-        final label = _bucketLabel(createdAt.toDate(), range);
-        buckets[label] = (buckets[label] ?? 0) + 1;
+        if (createdAt is Timestamp) {
+          timestamps.add(createdAt.toDate());
+        }
       }
 
-      if (buckets.isEmpty) return const [];
+      final series = _chartSeriesBuilder.buildProfileViewsSeries(
+        timestamps: timestamps,
+        period: _chartPeriod(range),
+      );
 
-      final orderedLabels = _orderedBucketLabels(range, buckets.keys.toList());
-      return orderedLabels
+      return series
           .map(
-            (label) => VenueProfileViewsDataPoint(
-              label: label,
-              value: buckets[label] ?? 0,
+            (point) => VenueProfileViewsDataPoint(
+              label: point.label,
+              value: point.value,
             ),
           )
           .toList();
@@ -155,65 +186,8 @@ class VenueAnalyticsService {
     }
   }
 
-  static double? percentChange(int current, int? previous) {
-    if (previous == null) return null;
-    if (previous == 0 && current == 0) return 0;
-    if (previous == 0) return 100;
-    return ((current - previous) / previous) * 100;
-  }
-
-  String _bucketLabel(DateTime date, VenueDashboardDateRange range) {
-    return switch (range) {
-      VenueDashboardDateRange.today =>
-        '${((date.hour + 11) ~/ 12) * 12}${date.hour >= 12 ? 'pm' : 'am'}',
-      VenueDashboardDateRange.last3Days ||
-      VenueDashboardDateRange.last7Days =>
-        _weekdayLabel(date.weekday),
-      VenueDashboardDateRange.lastMonth => 'W${_weekOfMonth(date)}',
-      VenueDashboardDateRange.allTime => _monthLabel(date.month),
-      VenueDashboardDateRange.custom => _weekdayLabel(date.weekday),
-    };
-  }
-
-  List<String> _orderedBucketLabels(
-    VenueDashboardDateRange range,
-    List<String> labels,
-  ) {
-    if (range == VenueDashboardDateRange.last7Days ||
-        range == VenueDashboardDateRange.custom) {
-      const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return order.where(labels.contains).toList();
-    }
-    if (range == VenueDashboardDateRange.last3Days) {
-      return labels;
-    }
-    return labels..sort();
-  }
-
-  String _weekdayLabel(int weekday) {
-    return switch (weekday) {
-      DateTime.monday => 'Mon',
-      DateTime.tuesday => 'Tue',
-      DateTime.wednesday => 'Wed',
-      DateTime.thursday => 'Thu',
-      DateTime.friday => 'Fri',
-      DateTime.saturday => 'Sat',
-      DateTime.sunday => 'Sun',
-      _ => 'Day',
-    };
-  }
-
-  String _monthLabel(int month) {
-    const names = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return names[(month - 1).clamp(0, 11)];
-  }
-
-  int _weekOfMonth(DateTime date) {
-    return ((date.day - 1) ~/ 7) + 1;
-  }
+  static double? percentChange(int current, int? previous) =>
+      AnalyticsPercentChange.calculate(current, previous);
 
   Future<VenueAnalyticsCounts> loadTodayCounts({required String venueId}) async {
     final since = VenueDashboardDateRange.today.since;
@@ -241,49 +215,40 @@ class VenueAnalyticsService {
           .limit(120)
           .get();
 
-      final drinkCounts = <String, int>{};
-      final dealCounts = <String, int>{};
-      final eventCounts = <String, int>{};
-
-      for (final doc in snapshot.docs) {
+      final records = snapshot.docs.map((doc) {
         final data = doc.data();
-        final type = data['type']?.toString() ?? '';
         final payload = data['data'];
-        final payloadMap =
-            payload is Map ? Map<String, dynamic>.from(payload) : null;
+        return AnalyticsEventRecord(
+          type: data['type']?.toString() ?? '',
+          payload: payload is Map
+              ? Map<String, dynamic>.from(payload)
+              : const {},
+          createdAt: data['createdAt'] is Timestamp
+              ? (data['createdAt'] as Timestamp).toDate()
+              : null,
+        );
+      });
 
-        switch (type) {
-          case 'drink_view':
-            final name = payloadMap?['drinkName']?.toString().trim();
-            if (name != null && name.isNotEmpty) {
-              drinkCounts[name] = (drinkCounts[name] ?? 0) + 1;
-            }
-          case 'deal_view':
-            final title = payloadMap?['dealTitle']?.toString().trim();
-            if (title != null && title.isNotEmpty) {
-              dealCounts[title] = (dealCounts[title] ?? 0) + 1;
-            }
-          case 'event_view':
-            final title = payloadMap?['eventTitle']?.toString().trim();
-            if (title != null && title.isNotEmpty) {
-              eventCounts[title] = (eventCounts[title] ?? 0) + 1;
-            }
-        }
-      }
-
+      final top = _topEntityAggregator.aggregateTodayEntities(records);
       return VenueAnalyticsTopEntities(
-        topDrinkName: _topKey(drinkCounts),
-        topDealTitle: _topKey(dealCounts),
-        topEventTitle: _topKey(eventCounts),
+        topDrinkName: top.topDrinkName,
+        topDealTitle: top.topDealTitle,
+        topEventTitle: top.topEventTitle,
       );
     } on FirebaseException {
       return const VenueAnalyticsTopEntities();
     }
   }
 
-  String? _topKey(Map<String, int> counts) {
-    if (counts.isEmpty) return null;
-    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  static AnalyticsChartPeriod _chartPeriod(VenueDashboardDateRange range) {
+    return switch (range) {
+      VenueDashboardDateRange.today => AnalyticsChartPeriod.today,
+      VenueDashboardDateRange.last3Days => AnalyticsChartPeriod.last3Days,
+      VenueDashboardDateRange.last7Days => AnalyticsChartPeriod.last7Days,
+      VenueDashboardDateRange.lastMonth => AnalyticsChartPeriod.lastMonth,
+      VenueDashboardDateRange.allTime => AnalyticsChartPeriod.allTime,
+      VenueDashboardDateRange.custom => AnalyticsChartPeriod.custom,
+    };
   }
 }
 
