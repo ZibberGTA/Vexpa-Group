@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:vex_engines/experience/application/experience_scheduling_utils.dart';
-import 'package:vex_engines/experience/application/experience_update_preparation.dart';
+import 'package:vex_engines/experience/application/experience_write_preparation.dart';
 
 /// Builds Firestore payloads for venue event writes.
 class EventWritePayload {
@@ -20,31 +19,27 @@ class EventWritePayload {
     String category = 'General',
     String imageUrl = '',
   }) {
-    final trimmedTitle = title.trim();
-    final trimmedDescription = description.trim();
+    final fields = ExperienceWritePreparation.eventCreateFields(
+      venueId: venueId,
+      venueName: venueName,
+      title: title,
+      description: description,
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
+      isActive: isActive,
+      featured: featured,
+      createdBy: createdBy,
+      category: category,
+      imageUrl: imageUrl,
+    );
 
     return {
-      'venueId': venueId,
-      'venueName': venueName,
-      'title': trimmedTitle,
-      'description': trimmedDescription,
+      ...fields,
       'startDateTime': Timestamp.fromDate(startDateTime),
       'endDateTime': Timestamp.fromDate(endDateTime),
       'dateTime': Timestamp.fromDate(startDateTime),
-      'category': category,
-      'imageUrl': imageUrl,
-      'isDeleted': false,
-      'isActive': isActive,
-      'featured': featured,
-      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
-        trimmedTitle,
-        trimmedDescription,
-        venueName,
-        category,
-      ]),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-      'createdBy': createdBy,
     };
   }
 
@@ -56,22 +51,27 @@ class EventWritePayload {
     bool? isActive,
     bool? featured,
   }) {
-    final payload = <String, dynamic>{
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
-    };
+    final fields = ExperienceWritePreparation.eventPatchFields(
+      updatedBy: updatedBy,
+      title: title,
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
+      isActive: isActive,
+      featured: featured,
+    );
 
-    if (title != null) payload['title'] = title.trim();
     if (startDateTime != null) {
-      payload['startDateTime'] = Timestamp.fromDate(startDateTime);
+      fields['startDateTime'] = Timestamp.fromDate(startDateTime);
+      fields['dateTime'] = Timestamp.fromDate(startDateTime);
     }
     if (endDateTime != null) {
-      payload['endDateTime'] = Timestamp.fromDate(endDateTime);
+      fields['endDateTime'] = Timestamp.fromDate(endDateTime);
     }
-    if (isActive != null) payload['isActive'] = isActive;
-    if (featured != null) payload['featured'] = featured;
 
-    return payload;
+    return {
+      ...fields,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 }
 

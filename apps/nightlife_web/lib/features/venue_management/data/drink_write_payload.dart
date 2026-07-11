@@ -1,8 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-import 'package:vex_engines/experience/application/experience_update_preparation.dart';
-
-import '../models/drink_categories.dart';
+import 'package:vex_engines/experience/application/experience_write_preparation.dart';
 
 /// Builds Firestore payloads for venue drink writes.
 class DrinkWritePayload {
@@ -19,28 +16,20 @@ class DrinkWritePayload {
     required String createdBy,
     double? price,
   }) {
-    final normalizedCategory = DrinkCategories.normalize(category);
-    final trimmedName = name.trim();
-    final trimmedDescription = description.trim();
-
     return {
-      'venueId': venueId,
-      'venueName': venueName,
-      'name': trimmedName,
-      'category': normalizedCategory,
-      'price': price,
-      'description': trimmedDescription,
-      'available': available,
-      'featured': featured,
-      'isDeleted': false,
-      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
-        trimmedName,
-        DrinkCategories.displayName(normalizedCategory),
-        venueName,
-      ]),
+      ...ExperienceWritePreparation.drinkCreateFields(
+        venueId: venueId,
+        venueName: venueName,
+        name: name,
+        category: category,
+        description: description,
+        available: available,
+        featured: featured,
+        createdBy: createdBy,
+        price: price,
+      ),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-      'createdBy': createdBy,
     };
   }
 
@@ -54,24 +43,18 @@ class DrinkWritePayload {
     required String updatedBy,
     double? price,
   }) {
-    final normalizedCategory = DrinkCategories.normalize(category);
-    final trimmedName = name.trim();
-    final trimmedDescription = description.trim();
-
     return {
-      'name': trimmedName,
-      'category': normalizedCategory,
-      'price': price,
-      'description': trimmedDescription,
-      'available': available,
-      'featured': featured,
-      'searchTerms': ExperienceUpdatePreparation.searchTermsForValues([
-        trimmedName,
-        DrinkCategories.displayName(normalizedCategory),
-        venueName,
-      ]),
+      ...ExperienceWritePreparation.drinkUpdateFields(
+        venueName: venueName,
+        name: name,
+        category: category,
+        description: description,
+        available: available,
+        featured: featured,
+        updatedBy: updatedBy,
+        price: price,
+      ),
       'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
     };
   }
 
@@ -86,31 +69,19 @@ class DrinkWritePayload {
     bool? available,
     bool? featured,
   }) {
-    final payload = <String, dynamic>{
+    return {
+      ...ExperienceWritePreparation.drinkPatchFields(
+        venueName: venueName,
+        drinkName: drinkName,
+        category: category,
+        updatedBy: updatedBy,
+        name: name,
+        categoryPatch: categoryPatch,
+        price: price,
+        available: available,
+        featured: featured,
+      ),
       'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
     };
-
-    final effectiveName = name?.trim() ?? drinkName.trim();
-    final effectiveCategory =
-        categoryPatch == null ? category : DrinkCategories.normalize(categoryPatch);
-
-    if (name != null) payload['name'] = effectiveName;
-    if (categoryPatch != null) {
-      payload['category'] = effectiveCategory;
-    }
-    if (price != null) payload['price'] = price;
-    if (available != null) payload['available'] = available;
-    if (featured != null) payload['featured'] = featured;
-
-    if (name != null || categoryPatch != null) {
-      payload['searchTerms'] = ExperienceUpdatePreparation.searchTermsForValues([
-        effectiveName,
-        DrinkCategories.displayName(effectiveCategory),
-        venueName,
-      ]);
-    }
-
-    return payload;
   }
 }
