@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vex_engines/experience/application/experience_drink_grouper.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/premium_scaffold.dart';
@@ -309,88 +310,16 @@ class _DrinksTabState extends State<_DrinksTab> {
     super.dispose();
   }
 
-  String _normaliseCategory(String rawCategory) {
-    final category = rawCategory.trim();
-    if (category.isEmpty) return 'Other Drinks';
-    final lower = category.toLowerCase();
-    return switch (lower) {
-      'beer' || 'beers' => 'Beers',
-      'lager' || 'lagers' => 'Lagers',
-      'ale' || 'ales' => 'Ales',
-      'wine' || 'wines' => 'Wine',
-      'red wine' => 'Red Wine',
-      'white wine' => 'White Wine',
-      'rose' || 'rosé' || 'rose wine' || 'rosé wine' => 'Rosé Wine',
-      'cocktail' || 'cocktails' => 'Cocktails',
-      'mocktail' || 'mocktails' => 'Mocktails',
-      'spirit' || 'spirits' => 'Spirits',
-      'whisky' || 'whiskey' => 'Whisky',
-      'vodka' => 'Vodka',
-      'gin' => 'Gin',
-      'rum' => 'Rum',
-      'tequila' => 'Tequila',
-      'shots' || 'shot' => 'Shots',
-      'champagne' || 'prosecco' || 'sparkling wine' => 'Sparkling',
-      'soft drink' || 'soft drinks' || 'softs' => 'Soft Drinks',
-      'cider' || 'ciders' => 'Cider',
-      _ => category
-          .split(' ')
-          .where((part) => part.trim().isNotEmpty)
-          .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
-          .join(' '),
-    };
-  }
+  String _normaliseCategory(String rawCategory) =>
+      ExperienceDrinkGrouper.normaliseCategory(rawCategory);
 
-  int _categorySortWeight(String category) {
-    const order = <String, int>{
-      'Cocktails': 0,
-      'Mocktails': 1,
-      'Beers': 2,
-      'Lagers': 3,
-      'Ales': 4,
-      'Cider': 5,
-      'Wine': 6,
-      'Red Wine': 7,
-      'White Wine': 8,
-      'Rosé Wine': 9,
-      'Sparkling': 10,
-      'Spirits': 12,
-      'Whisky': 13,
-      'Vodka': 14,
-      'Gin': 15,
-      'Rum': 16,
-      'Tequila': 17,
-      'Shots': 18,
-      'Soft Drinks': 19,
-      'Other Drinks': 999,
-    };
-
-    return order[category] ?? 500;
-  }
-
-  Map<String, List<DrinkModel>> _groupDrinks(List<DrinkModel> drinks) {
-    final grouped = <String, List<DrinkModel>>{};
-    for (final drink in drinks) {
-      final category = _normaliseCategory(drink.category);
-      grouped.putIfAbsent(category, () => []).add(drink);
-    }
-
-    for (final entries in grouped.values) {
-      entries.sort((a, b) {
-        if (a.available != b.available) return a.available ? -1 : 1;
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      });
-    }
-
-    return Map.fromEntries(
-      grouped.entries.toList()
-        ..sort((a, b) {
-          final weightCompare = _categorySortWeight(a.key).compareTo(_categorySortWeight(b.key));
-          if (weightCompare != 0) return weightCompare;
-          return a.key.compareTo(b.key);
-        }),
-    );
-  }
+  Map<String, List<DrinkModel>> _groupDrinks(List<DrinkModel> drinks) =>
+      ExperienceDrinkGrouper.groupByCategory(
+        drinks,
+        category: (drink) => drink.category,
+        name: (drink) => drink.name,
+        available: (drink) => drink.available,
+      );
 
   IconData _categoryIcon(String category) {
     final lower = category.toLowerCase();
@@ -402,18 +331,15 @@ class _DrinksTabState extends State<_DrinksTab> {
     return Icons.local_bar;
   }
 
-  List<DrinkModel> _filterDrinks(List<DrinkModel> drinks) {
-    final query = _query.trim().toLowerCase();
-    return drinks.where((drink) {
-      final category = _normaliseCategory(drink.category);
-      final categoryMatches = _focusedCategory == null || category == _focusedCategory;
-      if (!categoryMatches) return false;
-      if (query.isEmpty) return true;
-      return drink.name.toLowerCase().contains(query) ||
-          drink.description.toLowerCase().contains(query) ||
-          category.toLowerCase().contains(query);
-    }).toList();
-  }
+  List<DrinkModel> _filterDrinks(List<DrinkModel> drinks) =>
+      ExperienceDrinkGrouper.filterDrinks(
+        drinks: drinks,
+        query: _query,
+        category: (drink) => drink.category,
+        name: (drink) => drink.name,
+        description: (drink) => drink.description,
+        focusedCategory: _focusedCategory,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +361,10 @@ class _DrinksTabState extends State<_DrinksTab> {
         final allGroupedDrinks = _groupDrinks(drinks);
         final filteredDrinks = _filterDrinks(drinks);
         final groupedDrinks = _groupDrinks(filteredDrinks);
-        final trendingDrinks = drinks.where((drink) => drink.available).take(4).toList();
+        final trendingDrinks = ExperienceDrinkGrouper.trendingDrinks(
+          drinks,
+          available: (drink) => drink.available,
+        );
 
         return CustomScrollView(
           slivers: [

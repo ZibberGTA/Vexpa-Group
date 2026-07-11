@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/shared/experience_search_term_builder.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../home/models/venue_model.dart';
@@ -171,30 +172,8 @@ void initState() {
     return count;
   }
 
-  List<String> _buildSearchTerms(List<String> values) {
-    final terms = <String>{};
-
-    for (final value in values) {
-      final cleanValue = value.trim().toLowerCase();
-
-      if (cleanValue.isEmpty) continue;
-
-      terms.add(cleanValue);
-
-      final words = cleanValue.split(RegExp(r'[^a-z0-9]+'));
-
-      for (final word in words) {
-        if (word.isEmpty) continue;
-        terms.add(word);
-
-        for (int i = 1; i <= word.length; i++) {
-          terms.add(word.substring(0, i));
-        }
-      }
-    }
-
-    return terms.take(100).toList();
-  }
+  List<String> _buildSearchTerms(List<String> values) =>
+      ExperienceSearchTermBuilder.buildFromValues(values);
 
   String _categoryForDrink(String drinkName) {
     for (final entry in drinkLibrary.entries) {

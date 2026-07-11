@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/shared/experience_search_term_builder.dart';
 
 import '../models/deal_model.dart';
 
@@ -83,20 +84,12 @@ class DealService {
     String? startTime,
     String? endTime,
   }) {
-    final rawTerms = <String>[
+    return ExperienceSearchTermBuilder.buildFromValues([
       title,
       description,
       if (startTime != null) startTime,
       if (endTime != null) endTime,
-      ...title.split(' '),
-      ...description.split(' '),
-    ];
-
-    return rawTerms
-        .map((term) => term.trim().toLowerCase())
-        .where((term) => term.isNotEmpty)
-        .toSet()
-        .toList();
+    ]);
   }
 
   static Future<void> addDealSearchTermsToVenue({
