@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/home_icon_button.dart';
 import '../../analytics/widgets/venue_analytics_card.dart';
 import '../../monetisation/screens/owner_upgrade_screen.dart';
+import '../../monetisation/services/subscription_entitlements.dart';
 import '../../monetisation/services/subscription_service.dart';
 import '../../home/models/venue_model.dart';
 
@@ -21,7 +22,9 @@ class OwnerAnalyticsDashboardScreen extends StatelessWidget {
       body: FutureBuilder<bool>(
         future: SubscriptionService.isOwnerVenueProActive(),
         builder: (context, subscriptionSnapshot) {
-          final isPro = subscriptionSnapshot.data == true;
+          final isPro = SubscriptionEntitlements.ownerAnalyticsBreakdownAllowed(
+            subscriptionActive: subscriptionSnapshot.data == true,
+          );
 
           return ListView(
             padding: const EdgeInsets.all(18),

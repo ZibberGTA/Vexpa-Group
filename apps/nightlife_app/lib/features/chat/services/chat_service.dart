@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../home/models/artist_application_model.dart';
 import '../../monetisation/services/subscription_service.dart';
+import '../../monetisation/services/subscription_entitlements.dart';
 
 class ChatService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -54,7 +55,9 @@ class ChatService {
 
     if (uid == artistId) {
       final artistActive = await SubscriptionService.isArtistSubscriptionActive();
-      if (!artistActive) {
+      if (!SubscriptionEntitlements.artistChatAllowed(
+        subscriptionActive: artistActive,
+      )) {
         throw Exception('Artist subscription is required to use chat.');
       }
       return;
@@ -64,7 +67,9 @@ class ChatService {
       venueId,
     );
 
-    if (!venueActive) {
+    if (!SubscriptionEntitlements.venueMessagingAllowed(
+      subscriptionActive: venueActive,
+    )) {
       throw Exception('Venue Pro is required to message accepted artists.');
     }
   }
