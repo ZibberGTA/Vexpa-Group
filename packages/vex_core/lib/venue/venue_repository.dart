@@ -5,6 +5,8 @@ import 'venue.dart';
 abstract interface class VenueRepository {
   Future<DataResult<List<Venue>>> loadPublicVenues();
 
+  Stream<DataResult<List<Venue>>> watchPublicVenues();
+
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   });

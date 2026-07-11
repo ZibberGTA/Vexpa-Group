@@ -59,6 +59,53 @@ final class FirebaseVenueRepository implements VenueRepository {
   }
 
   @override
+  Stream<DataResult<List<Venue>>> watchPublicVenues() {
+    final firestore = _resolveFirestore();
+    if (firestore == null) {
+      return Stream.value(
+        DataFailure(
+          const VexException(
+            'Firebase is not initialized.',
+            code: 'firebase-unavailable',
+          ),
+        ),
+      );
+    }
+
+    return firestore
+        .collection('venues')
+        .where('isDeleted', isEqualTo: false)
+        .where('searchablePublic', isNotEqualTo: false)
+        .snapshots()
+        .map<DataResult<List<Venue>>>((snapshot) {
+          return DataSuccess(mapVenueDocuments(snapshot.docs));
+        })
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleError: (Object error, StackTrace stackTrace, EventSink sink) {
+              if (kDebugMode) {
+                debugPrint(
+                  '[FirebaseVenueRepository] watchPublicVenues failed: $error',
+                );
+                debugPrint('$stackTrace');
+              }
+              sink.add(
+                DataFailure(
+                  VexException(
+                    'Failed to watch public venues.',
+                    code: error is FirebaseException
+                        ? error.code
+                        : 'venue-watch-failed',
+                    cause: error,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+  }
+
+  @override
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   }) async {

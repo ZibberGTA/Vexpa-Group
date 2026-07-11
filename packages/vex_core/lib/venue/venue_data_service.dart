@@ -17,6 +17,15 @@ final class VenueDataService {
     };
   }
 
+  Stream<DataResult<VenueCatalog>> watchDiscoveryCatalog() {
+    return _repository.watchPublicVenues().map((result) {
+      return switch (result) {
+        DataSuccess(:final value) => DataSuccess(_sortedCatalog(value)),
+        DataFailure(:final error) => DataFailure(error),
+      };
+    });
+  }
+
   Future<DataResult<VenueSearchMatch>> searchDiscoveryVenues({
     required List<String> terms,
   }) async {

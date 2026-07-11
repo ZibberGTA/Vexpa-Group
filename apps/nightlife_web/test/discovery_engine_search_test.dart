@@ -112,6 +112,11 @@ class _CountingVenueRepository implements VenueRepository {
   }
 
   @override
+  Stream<DataResult<List<Venue>>> watchPublicVenues() {
+    return Stream.value(const DataSuccess([]));
+  }
+
+  @override
   Future<DataResult<VenueSearchMatch>> searchPublicVenuesByTerms({
     required List<String> terms,
   }) async {
@@ -134,6 +139,11 @@ class _EmptyIndexVenueRepository implements VenueRepository {
   @override
   Future<DataResult<List<Venue>>> loadPublicVenues() async {
     return const DataSuccess([]);
+  }
+
+  @override
+  Stream<DataResult<List<Venue>>> watchPublicVenues() {
+    return Stream.value(const DataSuccess([]));
   }
 
   @override
