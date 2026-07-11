@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/shared/experience_featured_sort.dart';
 
 import '../../../venue/data/models/drink_model.dart';
 import '../../models/drink_categories.dart';
@@ -54,29 +55,12 @@ class DrinkTableSort {
 
 /// Applies search/filter sort within featured and non-featured groups.
 /// Featured drinks always appear before non-featured drinks.
-List<DrinkModel> sortDrinks(List<DrinkModel> drinks, DrinkTableSort sort) {
-  final featured = <DrinkModel>[];
-  final nonFeatured = <DrinkModel>[];
-
-  for (final drink in drinks) {
-    if (drink.featured) {
-      featured.add(drink);
-    } else {
-      nonFeatured.add(drink);
-    }
-  }
-
-  return [
-    ..._sortDrinkGroup(featured, sort),
-    ..._sortDrinkGroup(nonFeatured, sort),
-  ];
-}
-
-List<DrinkModel> _sortDrinkGroup(List<DrinkModel> drinks, DrinkTableSort sort) {
-  final sorted = List<DrinkModel>.from(drinks);
-  sorted.sort((a, b) => _compareDrinks(a, b, sort));
-  return sorted;
-}
+List<DrinkModel> sortDrinks(List<DrinkModel> drinks, DrinkTableSort sort) =>
+    sortExperienceFeaturedFirst(
+      drinks,
+      (drink) => drink.featured,
+      (a, b) => _compareDrinks(a, b, sort),
+    );
 
 int _compareDrinks(DrinkModel a, DrinkModel b, DrinkTableSort sort) {
   final comparison = switch (sort.column) {
