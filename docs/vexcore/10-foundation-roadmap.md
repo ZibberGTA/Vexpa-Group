@@ -174,7 +174,9 @@ See `packages/vex_engines/lib/experience/MIGRATION_PLAN.md`.
 | Shared rules batch | Complete | Status, evidence, search support, confidence scoring |
 | Submission + review services | Complete | Validation and callable payload preparation |
 | Web runtime slice | Complete | `VenueClaimRepository` submission/review/scoring wired |
-| Mobile + admin presentation | Planned | No mobile claim flow yet; admin map stays in shell |
+| Search + summary batch | Complete | Search orchestration, admin metrics, evidence interpretation |
+| Mobile + admin map | Planned | No mobile claim flow yet; admin map stays in shell |
+| Storage rules deploy | Blocked | Rules committed; emulator validation requires Java |
 
 The Claim Engine owns venue-claim lifecycle rules. VexCore continues to own auth,
 identity, permissions, and storage contracts. Firebase adapters remain in app shells.
@@ -241,5 +243,5 @@ Completion criteria:
 - `WebVexCore.storage` and `WebVexCore.documentStorage` expose stable singleton adapters.
 - Venue logo/banner upload and gallery delete delegate to `VexStorageService` without duplicate SDK calls.
 - Claim evidence upload orchestration uses `VexDocumentStorageService` + Claim Engine document policy.
-- No VexCore contract breaking changes; Firebase Rules unchanged in this phase.
-- Claim evidence live uploads blocked until rules ADR adds `claims/{uid}/evidence/*` — document explicitly.
+- Claim evidence Storage rules committed (`claims/{uid}/evidence/*`) but **not emulator-validated or deployed** (Java unavailable).
+- No VexCore contract breaking changes; Firebase Rules unchanged in Claim Engine completion batch.

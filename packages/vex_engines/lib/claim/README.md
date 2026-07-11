@@ -6,10 +6,11 @@ Version 1 launch engine for venue ownership claims:
 
 - claim submission validation and preparation
 - claim status model and allowed transitions
-- evidence validation and confidence scoring
-- admin review decision validation
+- evidence validation, interpretation, and confidence scoring
+- admin review decision validation and summaries
 - ownership transfer and audit event preparation
-- claim search eligibility and matching helpers
+- claim search interpretation, ranking, dedupe, and ordering
+- claim list ordering and malformed record handling
 
 ## May depend on
 
@@ -71,10 +72,20 @@ An engine is not considered complete until:
 | 1 — Shared rules batch | Complete | Status, evidence, search support, scoring |
 | 2 — Submission + review services | Complete | Validation and payload preparation |
 | 3 — Web runtime slice | Complete | `VenueClaimRepository` submission/review/scoring |
-| 4 — Mobile + admin UI | Planned | Mobile claim flow; admin page view models |
-| 5 — Write contracts | Planned | Engine-owned repository interfaces |
+| 4 — Search + summary batch | Complete | Search orchestration, summaries, evidence interpretation |
+| 5 — Mobile + admin UI | Planned | Mobile claim flow; admin map repository |
+| 6 — Write contracts | Planned | Engine-owned repository interfaces |
 
 ## Runtime flow (Version 1)
+
+**Claim search**
+
+```text
+ClaimVenuePage
+  → VenueClaimRepository.searchVenues
+  → ClaimSearchService (query, dedupe, rank, order)
+  → Firestore adapter (directory → indexed → fallback)
+```
 
 **Claim submission**
 
@@ -96,4 +107,14 @@ AdminVenueClaimsPage
   → Firestore
 ```
 
-Network calls unchanged: one callable per submission/review action.
+**Evidence review**
+
+```text
+AdminVenueClaimsPage
+  → ClaimEvidenceInterpretation (field labels, completeness, reference scope)
+  → VexCore private document reference (ClaimEvidencePaths)
+  → WebVexCore.documentStorage adapter (no download when access denied)
+```
+
+Network calls unchanged: one callable per submission/review action; search query counts unchanged.
+Claim evidence Storage rules remain **committed but undeployed** pending Java/emulator validation.

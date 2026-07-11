@@ -203,9 +203,9 @@ Each engine document follows the same structure. Technical READMEs and migration
 
 | Field | Summary |
 | --- | --- |
-| Purpose | Venue ownership claims — submission, evidence, review, scoring |
+| Purpose | Venue ownership claims — submission, evidence, review, scoring, search orchestration |
 | Version | 1 |
-| Status | ~70% — web wired; mobile claim UI planned |
+| Status | ~92% — web search/review wired; mobile claim UI planned |
 | VexCore | Auth, identity, permissions, storage, events |
 | Owns | Claim status model, evidence validation, confidence scoring |
 | Consumes | Identity context; does not own global permissions |
@@ -459,7 +459,7 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 - **Venue:** Phase 4 orchestration, broader management workflows
 - **Discovery:** Presentation layer; mobile/web search path convergence; optional VexCore adapter contracts
 - **Experience:** Remaining mobile write adoption; presentation helpers
-- **Claim:** Mobile claim flow; admin presentation view models
+- **Claim:** Mobile claim flow; engine write repository contracts; Storage rules emulator validation + deploy
 - **Analytics:** VexCore analytics read service pilot
 - **Trail:** Engine migration from app logic
 
