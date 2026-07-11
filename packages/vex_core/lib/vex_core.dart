@@ -1,6 +1,7 @@
 export 'authentication/authentication.dart';
 export 'configuration/configuration.dart';
 export 'data/data.dart';
+export 'discovery/discovery.dart';
 export 'entitlements/entitlements.dart';
 export 'events/events.dart';
 export 'identity/identity.dart';
