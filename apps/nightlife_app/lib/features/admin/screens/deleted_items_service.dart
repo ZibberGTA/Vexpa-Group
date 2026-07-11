@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
 
 class DeletedItemsService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -7,7 +8,7 @@ class DeletedItemsService {
       _firestore.collection('deleted_items');
 
   static List<String> _buildSearchTerms(Map<String, dynamic> data) {
-    final values = <String>[
+    return DiscoveryVenueSearchTermBuilder.buildFromFieldValues([
       data['venueName']?.toString() ?? '',
       data['name']?.toString() ?? '',
       data['title']?.toString() ?? '',
@@ -18,13 +19,7 @@ class DeletedItemsService {
       data['endTime']?.toString() ?? '',
       data['price']?.toString() ?? '',
       data['deletedByEmail']?.toString() ?? '',
-    ];
-
-    return values
-        .map((e) => e.trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
+    ]);
   }
 
   static Future<void> _syncVenueHasDeals(String venueId) async {

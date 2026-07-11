@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
+
 import '../../auth/services/auth_service.dart';
 import '../../venues/screens/pick_location_screen.dart';
 
@@ -327,13 +329,13 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
         'hasDeals': false,
         'isDeleted': false,
         'createdAt': FieldValue.serverTimestamp(),
-        'searchTerms': [
-          name.toLowerCase(),
-          description.toLowerCase(),
-          address.toLowerCase(),
-          category.toLowerCase(),
-          crowdLevel.toLowerCase(),
-        ],
+        'searchTerms': DiscoveryVenueSearchTermBuilder.buildMinimalVenueTerms(
+          name: name,
+          description: description,
+          address: address,
+          category: category,
+          crowdLevel: crowdLevel,
+        ),
         'location': selectedLocation != null
             ? GeoPoint(
                 selectedLocation!.latitude,

@@ -1,7 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:vex_engines/discovery/application/discovery_nearby_sorter.dart';
 
 import '../../home/models/venue_model.dart';
 import '../models/startup_data.dart';
@@ -106,52 +105,19 @@ class StartupDataService {
   }) {
     final sorted = [...venues];
 
-    if (position == null) {
-      sorted.sort((a, b) {
-        final aScore = _fallbackVenueScore(a);
-        final bScore = _fallbackVenueScore(b);
-        return bScore.compareTo(aScore);
-      });
-      return sorted;
-    }
-
-    sorted.sort((a, b) {
-      final aDistance = _distanceMiles(position, a);
-      final bDistance = _distanceMiles(position, b);
-      return aDistance.compareTo(bDistance);
-    });
+    DiscoveryNearbySorter.sortByNearby(
+      items: sorted,
+      userLatitude: position?.latitude,
+      userLongitude: position?.longitude,
+      readVenueLatitude: (venue) => venue.location?.latitude,
+      readVenueLongitude: (venue) => venue.location?.longitude,
+      readFallbackScore: (venue) => DiscoveryNearbySorter.fallbackPopularityScore(
+        hasDeals: venue.hasDeals,
+        crowdLevel: venue.crowdLevel,
+        hasBannerImage: venue.bannerImageUrl.isNotEmpty,
+      ),
+    );
 
     return sorted;
   }
-
-  static int _fallbackVenueScore(VenueModel venue) {
-    var score = 0;
-    if (venue.hasDeals) score += 5;
-    if (venue.crowdLevel.toLowerCase().contains('busy')) score += 3;
-    if (venue.crowdLevel.toLowerCase().contains('packed')) score += 4;
-    if (venue.bannerImageUrl.isNotEmpty) score += 1;
-    return score;
-  }
-
-  static double _distanceMiles(Position position, VenueModel venue) {
-    final location = venue.location;
-    if (location == null) return double.maxFinite;
-
-    const earthRadiusMiles = 3958.8;
-    final lat1 = _degToRad(position.latitude);
-    final lon1 = _degToRad(position.longitude);
-    final lat2 = _degToRad(location.latitude);
-    final lon2 = _degToRad(location.longitude);
-
-    final dLat = lat2 - lat1;
-    final dLon = lon2 - lon1;
-
-    final a = math.pow(math.sin(dLat / 2), 2) +
-        math.cos(lat1) * math.cos(lat2) * math.pow(math.sin(dLon / 2), 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-
-    return earthRadiusMiles * c;
-  }
-
-  static double _degToRad(double value) => value * math.pi / 180;
 }

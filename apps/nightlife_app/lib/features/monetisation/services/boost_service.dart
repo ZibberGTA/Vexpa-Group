@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vex_engines/discovery/application/discovery_trending_scorer.dart';
 
 class BoostPlan {
   final String id;
@@ -62,7 +63,11 @@ class BoostService {
       final data = doc.data();
       if (data == null || data['active'] != true) return null;
       final endsAt = data['endsAt'];
-      if (endsAt is Timestamp && endsAt.toDate().isBefore(DateTime.now())) {
+      final endsAtDate = endsAt is Timestamp ? endsAt.toDate() : null;
+      if (!DiscoveryBoostEvaluator.isBoostActive(
+        active: true,
+        endsAt: endsAtDate,
+      )) {
         return null;
       }
       return data;

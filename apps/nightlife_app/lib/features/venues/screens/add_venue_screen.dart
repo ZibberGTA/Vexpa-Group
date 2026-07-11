@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
+
 import '../../auth/services/auth_service.dart';
 import 'pick_location_screen.dart';
 
@@ -59,21 +61,13 @@ class _AddVenueScreenState extends State<AddVenueScreen> {
     required String category,
     required String crowdLevel,
   }) {
-    return <String>[
-      name,
-      description,
-      address,
-      category,
-      crowdLevel,
-      ...name.split(RegExp(r'\s+')),
-      ...description.split(RegExp(r'\s+')),
-      ...address.split(RegExp(r'\s+')),
-      ...category.split(RegExp(r'\s+')),
-    ]
-        .map((term) => term.trim().toLowerCase())
-        .where((term) => term.isNotEmpty)
-        .toSet()
-        .toList();
+    return DiscoveryVenueSearchTermBuilder.buildVenueFormTerms(
+      name: name,
+      description: description,
+      address: address,
+      category: category,
+      crowdLevel: crowdLevel,
+    );
   }
 
   Future<void> _saveVenue() async {

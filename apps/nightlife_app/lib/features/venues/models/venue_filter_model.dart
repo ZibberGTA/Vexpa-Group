@@ -1,3 +1,5 @@
+import 'package:vex_engines/discovery/domain/discovery_venue_filter_state.dart';
+
 class VenueFilterModel {
   final String searchText;
   final String? category;
@@ -27,9 +29,14 @@ class VenueFilterModel {
     );
   }
 
-  bool get hasActiveFilters =>
-      searchText.trim().isNotEmpty ||
-      category != null ||
-      crowdLevel != null ||
-      dealsOnly;
+  bool get hasActiveFilters => toDiscoveryFilterState().hasActiveFilters;
+
+  DiscoveryVenueFilterState toDiscoveryFilterState() {
+    return DiscoveryVenueFilterState(
+      searchText: searchText,
+      category: category,
+      crowdLevel: crowdLevel,
+      dealsOnly: dealsOnly,
+    );
+  }
 }

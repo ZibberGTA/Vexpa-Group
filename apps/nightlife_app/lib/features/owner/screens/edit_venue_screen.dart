@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'package:vex_engines/discovery/shared/discovery_venue_search_term_builder.dart';
+
 import '../../home/models/venue_model.dart';
 import '../../../core/widgets/home_icon_button.dart';
 import '../../venues/screens/pick_location_screen.dart';
@@ -170,21 +172,13 @@ class _EditVenueScreenState extends State<EditVenueScreen> {
     required String category,
     required String crowdLevel,
   }) {
-    return [
-      name,
-      description,
-      address,
-      category,
-      crowdLevel,
-      ...name.split(' '),
-      ...description.split(' '),
-      ...address.split(' '),
-      ...category.split(' '),
-    ]
-        .map((term) => term.trim().toLowerCase())
-        .where((term) => term.isNotEmpty)
-        .toSet()
-        .toList();
+    return DiscoveryVenueSearchTermBuilder.buildVenueFormTerms(
+      name: name,
+      description: description,
+      address: address,
+      category: category,
+      crowdLevel: crowdLevel,
+    );
   }
 
 
