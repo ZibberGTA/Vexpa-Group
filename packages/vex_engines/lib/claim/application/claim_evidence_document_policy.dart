@@ -10,6 +10,14 @@ final class ClaimEvidenceDocumentPolicy {
   static const maxDocumentCount = 12;
   static const allowedExtensions = {'jpg', 'jpeg', 'png', 'webp', 'pdf'};
 
+  /// MIME types enforced by Firebase Storage rules (`storage.rules`).
+  static const allowedContentTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+  ];
+
   ClaimResult<({String extension, String contentType})> validateFile({
     required List<int> bytes,
     required String fileName,

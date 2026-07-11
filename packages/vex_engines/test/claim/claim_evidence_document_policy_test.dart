@@ -31,4 +31,17 @@ void main() {
 
     expect(result, isA<ClaimFailure<({String extension, String contentType})>>());
   });
+
+  test('storage rules parity documents shared MIME types and size limit', () {
+    expect(ClaimEvidenceDocumentPolicy.maxFileSizeBytes, 10 * 1024 * 1024);
+    expect(
+      ClaimEvidenceDocumentPolicy.allowedContentTypes,
+      [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/pdf',
+      ],
+    );
+  });
 }
