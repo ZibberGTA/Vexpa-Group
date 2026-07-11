@@ -13,8 +13,7 @@ import 'support/mock_venue_write_repository.dart';
 void main() {
   group('OwnerVenueService', () {
     tearDown(() {
-      MobileVexCore.overrideVenueRepository(null);
-      MobileVexCore.overrideVenueWriteRepository(null);
+      MobileVexCore.resetTestOverrides();
     });
 
     test('owner venue list delegates to repository once', () async {
