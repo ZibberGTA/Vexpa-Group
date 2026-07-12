@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
 
 enum VenueMediaType { logo, banner, gallery, deal, event }
 
@@ -135,11 +136,14 @@ class VenueMediaBundle {
   }
 
   static int _gallerySort(VenueMediaModel a, VenueMediaModel b) {
-    if (a.featured != b.featured) return a.featured ? -1 : 1;
-    final order = a.sortOrder.compareTo(b.sortOrder);
-    if (order != 0) return order;
-    final aTime = a.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final bTime = b.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    return aTime.compareTo(bTime);
+    const ordering = VenueContentOrderingService();
+    return ordering.compareGalleryMedia(
+      aFeatured: a.featured,
+      bFeatured: b.featured,
+      aSortOrder: a.sortOrder,
+      bSortOrder: b.sortOrder,
+      aUploadedAt: a.uploadedAt,
+      bUploadedAt: b.uploadedAt,
+    );
   }
 }

@@ -28,6 +28,7 @@ import '../../analytics/services/analytics_service.dart';
 import '../../favourites/services/favourites_service.dart';
 import '../../home/models/venue_model.dart';
 import '../../home/models/deal_model.dart';
+import '../../home/services/experience_content_support.dart';
 import '../../venues/screens/venue_details_screen.dart';
 import '../../trails/screens/tonights_trail_screen.dart';
 import '../../trails/models/trail_model.dart';
@@ -635,76 +636,14 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
     }
   }
 
-  String _formatVenueTagLabel(String tag) {
-    final cleaned = tag.trim();
-    if (cleaned.isEmpty) return '';
+  String _formatVenueTagLabel(String tag) =>
+      MobileExperienceContentSupport.presentation.formatVenueTagLabel(tag);
 
-    final normalized = cleaned
-        .replaceAll('-', '')
-        .replaceAll('_', '')
-        .replaceAll(' ', '')
-        .toLowerCase();
-
-    switch (normalized) {
-      case '18+':
-      case '18plus':
-      case 'age18':
-      case 'age18plus':
-        return '18+';
-      case '21+':
-      case '21plus':
-      case 'age21':
-      case 'age21plus':
-        return '21+';
-      case 'livemusic':
-        return 'Live Music';
-      case 'dj':
-        return 'DJ';
-      case 'sports':
-        return 'Sports';
-      case 'karaoke':
-        return 'Karaoke';
-      case 'quiz':
-      case 'quiznight':
-        return 'Quiz Night';
-      case 'dancefloor':
-        return 'Dance Floor';
-      case 'foodserved':
-        return 'Food Served';
-      case 'outdoor':
-      case 'outdoorseating':
-        return 'Outdoor Seating';
-      default:
-        final withSpaces = cleaned
-            .replaceAllMapped(RegExp(r'(?<=[a-z])(?=[A-Z])'), (_) => ' ')
-            .replaceAll('_', ' ')
-            .replaceAll('-', ' ')
-            .trim();
-        return withSpaces
-            .split(RegExp(r'\s+'))
-            .where((part) => part.isNotEmpty)
-            .map(
-              (part) => part.length == 1
-                  ? part.toUpperCase()
-                  : part[0].toUpperCase() + part.substring(1).toLowerCase(),
-            )
-            .join(' ');
-    }
-  }
-
-  List<String> _venuePreviewTags(VenueModel venue) {
-    final selected = venue.featureTags
-        .map(_formatVenueTagLabel)
-        .where((tag) => tag.isNotEmpty)
-        .take(3)
-        .toList();
-
-    if (selected.isNotEmpty) {
-      return selected;
-    }
-
-    return const ['Live Music', '18+'];
-  }
+  List<String> _venuePreviewTags(VenueModel venue) =>
+      MobileExperienceContentSupport.publicPresentation.venuePreviewTags(
+        featureTags: venue.featureTags,
+        formatTagLabel: MobileExperienceContentSupport.presentation.formatVenueTagLabel,
+      );
 
   void _showVenuePreview({
     required VenueModel venue,

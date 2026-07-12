@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_engines/experience/application/experience_deal_scheduling.dart';
 import 'package:vex_engines/experience/application/experience_deal_visibility.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
+
+const _presentation = VenuePresentationSupport();
 
 class DealModel {
   final String id;
@@ -80,5 +83,16 @@ class DealModel {
         startDateTime: startDateTime,
         endDateTime: endDateTime,
         effectiveEndDateTime: effectiveEndDateTime,
+      );
+
+  bool get isFutureDeal => ExperienceDealScheduling.isFutureStart(
+        startDateTime: startDateTime,
+      );
+
+  String get expiryLabel => _presentation.dealExpiryLabel(
+        endDateTime: endDateTime,
+        endTime: endTime,
+        effectiveEndDateTime: effectiveEndDateTime,
+        isFutureStart: isFutureDeal,
       );
 }

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/experience_content_support.dart';
+
 import '../../../core/utils/venue_branding_parser.dart';
 
 class VenueModel {
@@ -64,46 +66,13 @@ class VenueModel {
       crowdUpdatedAt: map['crowdUpdatedAt'] is Timestamp ? map['crowdUpdatedAt'] as Timestamp : null,
       updatedAt: map['updatedAt'] is Timestamp ? map['updatedAt'] as Timestamp : null,
       openingHours: map['openingHours'] is Map ? Map<String, dynamic>.from(map['openingHours'] as Map) : const {},
-      featureTags: _parseFeatureTags(map['featureTags'], map['venueFeatures']),
+      featureTags: MobileExperienceContentSupport.publicPresentation
+          .parseFeatureTags(
+        featureTags: map['featureTags'],
+        venueFeatures: map['venueFeatures'],
+      ),
       presenceRadiusMeters: (map['presenceRadiusMeters'] as num?)?.toInt() ?? 75,
     );
-  }
-
-  static List<String> _parseFeatureTags(dynamic featureTags, dynamic venueFeatures) {
-    final tags = <String>[];
-
-    void addTag(String tag) {
-      final cleaned = tag.trim();
-      if (cleaned.isEmpty) return;
-      if (!tags.contains(cleaned)) tags.add(cleaned);
-    }
-
-    if (featureTags is List) {
-      for (final tag in featureTags) {
-        addTag(tag.toString());
-      }
-    }
-
-    if (venueFeatures is Map) {
-      final map = Map<String, dynamic>.from(venueFeatures as Map);
-      const labels = <String, String>{
-        'age18': '18+',
-        'age21': '21+',
-        'liveMusic': 'Live Music',
-        'dj': 'DJ',
-        'sports': 'Sports',
-        'karaoke': 'Karaoke',
-        'quizNight': 'Quiz Night',
-        'danceFloor': 'Dance Floor',
-        'foodServed': 'Food Served',
-        'outdoorSeating': 'Outdoor',
-      };
-      labels.forEach((key, label) {
-        if (map[key] == true) addTag(label);
-      });
-    }
-
-    return tags.take(3).toList();
   }
 
   static List<String> _parseSearchTerms(dynamic value) {

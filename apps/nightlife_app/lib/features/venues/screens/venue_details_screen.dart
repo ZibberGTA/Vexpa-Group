@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vex_engines/experience/application/experience_drink_grouper.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/premium_scaffold.dart';
@@ -593,6 +595,7 @@ class _DrinksTabState extends State<_DrinksTab> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   String? _focusedCategory;
+  static const _presentation = VenuePresentationSupport();
 
   @override
   void dispose() {
@@ -600,108 +603,20 @@ class _DrinksTabState extends State<_DrinksTab> {
     super.dispose();
   }
 
-  String _formatPrice(dynamic rawPrice) {
-    if (rawPrice == null) return '';
-    if (rawPrice is num) return rawPrice.toStringAsFixed(2);
-    return rawPrice.toString();
-  }
+  String _formatPrice(dynamic rawPrice) =>
+      _presentation.formatPricePlainFromRaw(rawPrice);
 
-  String _normaliseCategory(dynamic rawCategory) {
-    final category = rawCategory?.toString().trim() ?? '';
-    if (category.isEmpty) return 'Other Drinks';
-
-    final lower = category.toLowerCase();
-    return switch (lower) {
-      'beer' || 'beers' => 'Beers',
-      'lager' || 'lagers' => 'Lagers',
-      'ale' || 'ales' => 'Ales',
-      'wine' || 'wines' => 'Wine',
-      'red wine' => 'Red Wine',
-      'white wine' => 'White Wine',
-      'rose' || 'rosé' || 'rose wine' || 'rosé wine' => 'Rosé Wine',
-      'cocktail' || 'cocktails' => 'Cocktails',
-      'mocktail' || 'mocktails' => 'Mocktails',
-      'spirit' || 'spirits' => 'Spirits',
-      'whisky' || 'whiskey' => 'Whisky',
-      'vodka' => 'Vodka',
-      'gin' => 'Gin',
-      'rum' => 'Rum',
-      'tequila' => 'Tequila',
-      'shots' || 'shot' => 'Shots',
-      'champagne' || 'prosecco' || 'sparkling wine' => 'Sparkling',
-      'soft drink' || 'soft drinks' || 'softs' => 'Soft Drinks',
-      'cider' || 'ciders' => 'Cider',
-      _ => category
-          .split(' ')
-          .where((part) => part.trim().isNotEmpty)
-          .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
-          .join(' '),
-    };
-  }
-
-  int _categorySortWeight(String category) {
-    const order = <String, int>{
-      'Cocktails': 0,
-      'Mocktails': 1,
-      'Beers': 2,
-      'Lagers': 3,
-      'Ales': 4,
-      'Cider': 5,
-      'Wine': 6,
-      'Red Wine': 7,
-      'White Wine': 8,
-      'Rosé Wine': 9,
-      'Sparkling': 10,
-      'Champagne': 11,
-      'Spirits': 12,
-      'Whisky': 13,
-      'Vodka': 14,
-      'Gin': 15,
-      'Rum': 16,
-      'Tequila': 17,
-      'Shots': 18,
-      'Soft Drinks': 19,
-      'Other Drinks': 999,
-    };
-
-    return order[category] ?? 500;
-  }
+  String _normaliseCategory(dynamic rawCategory) =>
+      ExperienceDrinkGrouper.normaliseCategory(rawCategory?.toString());
 
   Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> _groupDrinks(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> drinks,
   ) {
-    final grouped = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-
-    for (final drink in drinks) {
-      final data = drink.data();
-      final category = _normaliseCategory(data['category']);
-      grouped.putIfAbsent(category, () => []).add(drink);
-    }
-
-    for (final entries in grouped.values) {
-      entries.sort((a, b) {
-        final aData = a.data();
-        final bData = b.data();
-        final aAvailable = aData['available'] == true;
-        final bAvailable = bData['available'] == true;
-
-        if (aAvailable != bAvailable) {
-          return aAvailable ? -1 : 1;
-        }
-
-        final aName = aData['name']?.toString().toLowerCase() ?? '';
-        final bName = bData['name']?.toString().toLowerCase() ?? '';
-        return aName.compareTo(bName);
-      });
-    }
-
-    return Map.fromEntries(
-      grouped.entries.toList()
-        ..sort((a, b) {
-          final weightCompare = _categorySortWeight(a.key).compareTo(_categorySortWeight(b.key));
-          if (weightCompare != 0) return weightCompare;
-          return a.key.compareTo(b.key);
-        }),
+    return ExperienceDrinkGrouper.groupByCategory(
+      drinks,
+      category: (drink) => drink.data()['category']?.toString() ?? '',
+      name: (drink) => drink.data()['name']?.toString() ?? '',
+      available: (drink) => drink.data()['available'] == true,
     );
   }
 

@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_engines/experience/application/experience_event_visibility.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
+
+const _presentation = VenuePresentationSupport();
 
 class EventModel {
   final String id;
@@ -38,6 +41,13 @@ class EventModel {
         endDateTime: endDateTime,
       );
 
+  String get formattedDate => _presentation.formatDateOnly(startDateTime);
+
+  String get formattedTime => _presentation.formatTimeOnly(startDateTime);
+
+  String get formattedDateTimeLabel =>
+      _presentation.formatEventDateTimeLabel(startDateTime);
+
   factory EventModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
@@ -46,7 +56,7 @@ class EventModel {
         DateTime.now();
 
     final end = (data['endDateTime'] as Timestamp?)?.toDate() ??
-        start.add(const Duration(hours: 24));
+        _presentation.defaultEventEndDateTime(start);
 
     return EventModel(
       id: doc.id,
