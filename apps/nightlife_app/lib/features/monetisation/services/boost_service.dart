@@ -1,62 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:vex_engines/discovery/application/discovery_trending_scorer.dart';
+import 'package:vex_engines/growth/growth_engine.dart';
 
-class BoostPlan {
-  final String id;
-  final String name;
-  final String description;
-  final int days;
-  final int boostScore;
-  final String priceLabel;
-  final int pricePence;
-
-  const BoostPlan({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.days,
-    required this.boostScore,
-    required this.priceLabel,
-    required this.pricePence,
-  });
-}
+export 'package:vex_engines/growth/domain/boost_plan.dart' show BoostPlan;
 
 class BoostService {
   BoostService._();
 
+  static const _growthBoost = GrowthBoostService();
+
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static const plans = <BoostPlan>[
-    BoostPlan(
-      id: 'boost_24h',
-      name: '24 Hour Boost',
-      description: 'Push one venue higher in Trending for a full day.',
-      days: 1,
-      boostScore: 35,
-      priceLabel: '£4.99',
-      pricePence: 499,
-    ),
-    BoostPlan(
-      id: 'boost_7d',
-      name: '7 Day Boost',
-      description: 'Keep one venue promoted during the week.',
-      days: 7,
-      boostScore: 45,
-      priceLabel: '£19.99',
-      pricePence: 1999,
-    ),
-    BoostPlan(
-      id: 'boost_30d',
-      name: '30 Day Boost',
-      description: 'Monthly visibility for your highest-priority venue.',
-      days: 30,
-      boostScore: 55,
-      priceLabel: '£59.99',
-      pricePence: 5999,
-    ),
-  ];
+  static List<BoostPlan> get plans => GrowthProductCatalog.boostPlans;
 
   static Stream<Map<String, dynamic>?> activeBoostStream(String venueId) {
     return _db.collection('venue_boosts').doc(venueId).snapshots().map((doc) {
@@ -64,10 +20,7 @@ class BoostService {
       if (data == null || data['active'] != true) return null;
       final endsAt = data['endsAt'];
       final endsAtDate = endsAt is Timestamp ? endsAt.toDate() : null;
-      if (!DiscoveryBoostEvaluator.isBoostActive(
-        active: true,
-        endsAt: endsAtDate,
-      )) {
+      if (!_growthBoost.isBoostActive(active: true, endsAt: endsAtDate)) {
         return null;
       }
       return data;
@@ -82,35 +35,50 @@ class BoostService {
     String paymentStatus = 'manual',
     String? checkoutSessionPath,
   }) async {
-    final now = DateTime.now();
-    final endsAt = now.add(Duration(days: plan.days));
+    final preparation = _growthBoost.prepareActivation(
+      venueId: venueId,
+      venueName: venueName,
+      ownerId: ownerId,
+      planId: plan.id,
+      startedAt: DateTime.now(),
+      paymentStatus: paymentStatus,
+      checkoutSessionPath: checkoutSessionPath,
+    );
+    if (preparation is GrowthFailure<GrowthBoostActivationPayload>) {
+      throw Exception(preparation.message);
+    }
+    final payload =
+        (preparation as GrowthSuccess<GrowthBoostActivationPayload>).value;
+    final endsAt = payload.endsAt;
 
     await _db.collection('venue_boosts').doc(venueId).set({
-      'venueId': venueId,
-      'venueName': venueName,
-      'ownerId': ownerId,
-      'planId': plan.id,
-      'planName': plan.name,
-      'priceLabel': plan.priceLabel,
-      'pricePence': plan.pricePence,
-      'boostScore': plan.boostScore,
+      'venueId': payload.venueId,
+      'venueName': payload.venueName,
+      'ownerId': payload.ownerId,
+      'planId': payload.plan.id,
+      'planName': payload.plan.name,
+      'priceLabel': payload.plan.priceLabel,
+      'pricePence': payload.plan.pricePence,
+      'boostScore': payload.plan.boostScore,
       'active': true,
-      'paymentStatus': paymentStatus,
-      if (checkoutSessionPath != null) 'checkoutSessionPath': checkoutSessionPath,
+      'paymentStatus': payload.paymentStatus,
+      if (payload.checkoutSessionPath != null)
+        'checkoutSessionPath': payload.checkoutSessionPath,
       'startedAt': FieldValue.serverTimestamp(),
       'endsAt': Timestamp.fromDate(endsAt),
     }, SetOptions(merge: true));
 
     await _db.collection('monetisation_events').add({
-      'venueId': venueId,
-      'venueName': venueName,
-      'ownerId': ownerId,
+      'venueId': payload.venueId,
+      'venueName': payload.venueName,
+      'ownerId': payload.ownerId,
       'type': 'boost_activated',
-      'planId': plan.id,
-      'priceLabel': plan.priceLabel,
-      'pricePence': plan.pricePence,
-      'paymentStatus': paymentStatus,
-      if (checkoutSessionPath != null) 'checkoutSessionPath': checkoutSessionPath,
+      'planId': payload.plan.id,
+      'priceLabel': payload.plan.priceLabel,
+      'pricePence': payload.plan.pricePence,
+      'paymentStatus': payload.paymentStatus,
+      if (payload.checkoutSessionPath != null)
+        'checkoutSessionPath': payload.checkoutSessionPath,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -126,12 +94,12 @@ class BoostService {
 
     final checkout = await checkoutRef.get();
     final data = checkout.data();
-    final paymentStatus = data?['payment_status']?.toString().toLowerCase();
-    final status = data?['status']?.toString().toLowerCase();
-    final paid = paymentStatus == 'paid' || status == 'complete' || status == 'paid';
-
-    if (!paid) {
-      throw Exception('Stripe checkout has not been paid yet.');
+    final validation = _growthBoost.validatePaidCheckout(
+      paymentStatus: data?['payment_status']?.toString(),
+      sessionStatus: data?['status']?.toString(),
+    );
+    if (validation is GrowthFailure<void>) {
+      throw Exception(validation.message);
     }
 
     await activateBoost(
@@ -167,10 +135,7 @@ class BoostService {
       }
     }
 
-    return {
-      'paidBoosts': paidBoosts,
-      'totalPence': totalPence,
-    };
+    return {'paidBoosts': paidBoosts, 'totalPence': totalPence};
   }
 
   static Future<void> cancelBoost(String venueId) async {

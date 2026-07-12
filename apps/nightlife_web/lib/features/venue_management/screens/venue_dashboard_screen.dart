@@ -74,7 +74,9 @@ class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
 
       if (!mounted) return;
       setState(() {
-        _contextData = contextData;
+        _contextData = contextData.copyWith(
+          subscriptionPlanId: venue.subscriptionPlanId,
+        );
         _activeVenue = venue;
         _loadingContext = false;
       });

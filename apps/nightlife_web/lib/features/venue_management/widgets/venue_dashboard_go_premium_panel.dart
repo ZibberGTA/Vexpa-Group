@@ -7,6 +7,7 @@ import '../../../shared/components/drinkspot_button.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/widgets/light_sweep_overlay.dart';
 import '../../../shared/widgets/premium_effects.dart';
+import '../data/growth_commercial_view_support.dart';
 import '../models/venue_dashboard_tab.dart';
 import 'venue_dashboard_controller.dart';
 
@@ -16,7 +17,9 @@ class VenueDashboardGoPremiumPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectTab = VenueDashboardController.maybeOf(context)?.selectTab;
+    final controller = VenueDashboardController.maybeOf(context);
+    final selectTab = controller?.selectTab;
+    final snapshot = GrowthCommercialViewSupport.fromDashboard(controller);
 
     return PremiumGradientBorder(
       glow: true,
@@ -37,7 +40,7 @@ class VenueDashboardGoPremiumPanel extends StatelessWidget {
                     shaderCallback: (bounds) =>
                         AppColors.brandGradient.createShader(bounds),
                     child: Text(
-                      AppStrings.venueDashboardGoPremiumTitle,
+                      snapshot.goPremiumTitle,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppColors.white,
                             fontWeight: FontWeight.w800,
@@ -46,7 +49,7 @@ class VenueDashboardGoPremiumPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    AppStrings.venueDashboardGoPremiumBody,
+                    snapshot.goPremiumBody,
                     style: TextStyle(
                       color: AppColors.textSecondary.withValues(alpha: 0.95),
                       fontSize: 13.5,

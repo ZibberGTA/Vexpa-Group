@@ -2,10 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/subscription_plans.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../data/growth_commercial_view_support.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_profile_completion.dart';
+import '../venue_dashboard_controller.dart';
 import '../venue_dashboard_profile_completion_card.dart';
 import 'venue_dashboard_page_widgets.dart';
 
@@ -2018,38 +2021,21 @@ class _MarketingInsightsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = GrowthCommercialViewSupport.fromDashboard(
+      VenueDashboardController.maybeOf(context),
+    );
+
     return VenuePageSection(
       title: 'Marketing Insights',
       child: _AnalyticsResponsiveGrid(
         minCardWidth: 240,
-        children: const [
-          _RecommendationCard(
-            icon: Icons.auto_awesome_outlined,
-            title: 'Friday uplift',
-            body:
-                'Your venue performs 34% better on Fridays. Promote weekend events earlier.',
-          ),
-          _RecommendationCard(
-            icon: Icons.schedule_outlined,
-            title: 'Cocktail intent peaks after 7PM',
-            body:
-                'Customers search cocktails after 7PM. Push drink specials late afternoon.',
-          ),
-          _RecommendationCard(
-            icon: Icons.local_offer_outlined,
-            title: 'Thursday deal opportunity',
-            body: 'Posting a deal on Thursdays could increase visibility.',
-          ),
-          _RecommendationCard(
-            icon: Icons.event_busy_outlined,
-            title: 'Next weekend gap',
-            body: 'You have not created an event for next weekend.',
-          ),
-          _RecommendationCard(
-            icon: Icons.photo_library_outlined,
-            title: 'Gallery freshness',
-            body: 'Your gallery has not been updated for 42 days.',
-          ),
+        children: [
+          for (final card in snapshot.recommendationCards)
+            _RecommendationCard(
+              icon: card.icon,
+              title: card.title,
+              body: card.body,
+            ),
         ],
       ),
     );
@@ -2061,31 +2047,21 @@ class _GoalsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = GrowthCommercialViewSupport.fromDashboard(
+      VenueDashboardController.maybeOf(context),
+    );
+
     return VenuePageSection(
       title: 'Goals',
       child: _AnalyticsResponsiveGrid(
         minCardWidth: 180,
-        children: const [
-          _GoalCard(
-            label: 'Monthly Views Goal',
-            value: '18.4k / 25k',
-            progress: 0.74,
-          ),
-          _GoalCard(
-            label: 'Venue Saves Goal',
-            value: '3.2k / 4k',
-            progress: 0.80,
-          ),
-          _GoalCard(
-            label: 'Followers Goal',
-            value: '1.8k / 3k',
-            progress: 0.60,
-          ),
-          _GoalCard(
-            label: 'Event Attendance Goal',
-            value: '684 / 1k',
-            progress: 0.68,
-          ),
+        children: [
+          for (final goal in snapshot.goalCards)
+            _GoalCard(
+              label: goal.label,
+              value: goal.value,
+              progress: goal.progress,
+            ),
         ],
       ),
     );
@@ -4007,84 +3983,75 @@ class _SubscriptionPageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = GrowthCommercialViewSupport.fromDashboard(
+      VenueDashboardController.maybeOf(context),
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final stack = constraints.maxWidth < 920;
-        const cards = [
-          _SubscriptionPlanCard(
-            plan: _SubscriptionPlan(
-              name: 'Starter',
-              description: 'For small venues getting started.',
-              price: '£49',
-              priceSuffix: '/ month',
-              ctaLabel: 'Current Plan',
-              state: _SubscriptionPlanState.current,
-              features: [
-                _PlanFeature('1 venue'),
-                _PlanFeature('Basic venue profile'),
-                _PlanFeature('Drinks'),
-                _PlanFeature('Deals'),
-                _PlanFeature('Events'),
-                _PlanFeature('Basic support'),
-                _PlanFeature('Photo gallery', included: false),
-                _PlanFeature('Advanced analytics', included: false),
-                _PlanFeature('Vexda Intelligence', included: false),
-              ],
+        final cards = [
+          for (final plan in snapshot.planCards)
+            _SubscriptionPlanCard(
+              plan: _SubscriptionPlan(
+                name: plan.name,
+                description: plan.description,
+                price: plan.price,
+                priceSuffix: plan.priceSuffix,
+                ctaLabel: plan.ctaLabel,
+                state: _mapPlanState(plan.state),
+                badgeLabel: plan.badgeLabel,
+                features: [
+                  for (final feature in plan.features)
+                    _PlanFeature(feature.label, included: feature.included),
+                ],
+              ),
             ),
-          ),
-          _SubscriptionPlanCard(
-            plan: _SubscriptionPlan(
-              name: 'Professional',
-              description: 'For active venues growing visibility.',
-              price: '£99',
-              priceSuffix: '/ month',
-              ctaLabel: 'Upgrade to Professional',
-              badgeLabel: 'Most Popular',
-              state: _SubscriptionPlanState.recommended,
-              features: [
-                _PlanFeature('Up to 3 venues'),
-                _PlanFeature('Everything in Starter'),
-                _PlanFeature('Photo gallery'),
-                _PlanFeature('Team management'),
-                _PlanFeature('Trails eligibility'),
-                _PlanFeature('Basic analytics'),
-                _PlanFeature('Deal and event promotion tools'),
-                _PlanFeature('Vexda Intelligence', included: false),
-                _PlanFeature(
-                  'Dedicated Venue Success Manager',
-                  included: false,
-                ),
-              ],
-            ),
-          ),
-          _SubscriptionPlanCard(
-            plan: _SubscriptionPlan(
-              name: 'Premium',
-              description: 'For venues that want maximum growth.',
-              price: '£199',
-              priceSuffix: '/ month',
-              ctaLabel: 'Upgrade to Premium',
-              badgeLabel: 'Maximum Growth',
-              state: _SubscriptionPlanState.premium,
-              features: [
-                _PlanFeature('Up to 6 venues'),
-                _PlanFeature('Everything in Professional'),
-                _PlanFeature('Advanced analytics'),
-                _PlanFeature('Vexda Intelligence'),
-                _PlanFeature('Search trend data'),
-                _PlanFeature('Drink trend insights'),
-                _PlanFeature('Event/deal performance'),
-                _PlanFeature('Priority placement'),
-                _PlanFeature('Dedicated Venue Success Manager'),
-              ],
-            ),
-          ),
         ];
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (snapshot.renewalPrompt != null) ...[
+              VenuePageSection(
+                title: 'Renewal',
+                child: VenuePageSummaryTile(
+                  label: 'Subscription renewal',
+                  value: snapshot.renewalPrompt!,
+                  icon: Icons.event_repeat_outlined,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            if (snapshot.subscriptionRecommendations.isNotEmpty) ...[
+              VenuePageSection(
+                title: 'Recommendations',
+                child: Column(
+                  children: [
+                    for (final recommendation
+                        in snapshot.subscriptionRecommendations.take(2)) ...[
+                      VenuePageSummaryTile(
+                        label: recommendation.title,
+                        value: recommendation.message,
+                        icon: Icons.workspace_premium_outlined,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            Text(
+              SubscriptionPlans.launchDiscountLabel,
+              style: TextStyle(
+                color: AppColors.primaryPink.withValues(alpha: 0.92),
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (stack)
               for (var i = 0; i < cards.length; i++) ...[
                 cards[i],
@@ -4094,17 +4061,28 @@ class _SubscriptionPageContent extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: cards[0]),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(child: cards[1]),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(child: cards[2]),
+                  for (var i = 0; i < cards.length; i++) ...[
+                    Expanded(child: cards[i]),
+                    if (i < cards.length - 1) const SizedBox(width: AppSpacing.lg),
+                  ],
                 ],
               ),
           ],
         );
       },
     );
+  }
+
+  _SubscriptionPlanState _mapPlanState(GrowthSubscriptionPlanCardState state) {
+    return switch (state) {
+      GrowthSubscriptionPlanCardState.current =>
+        _SubscriptionPlanState.current,
+      GrowthSubscriptionPlanCardState.recommended =>
+        _SubscriptionPlanState.recommended,
+      GrowthSubscriptionPlanCardState.premium => _SubscriptionPlanState.premium,
+      GrowthSubscriptionPlanCardState.standard =>
+        _SubscriptionPlanState.recommended,
+    };
   }
 }
 
@@ -4428,31 +4406,21 @@ class _MarketingPageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = GrowthCommercialViewSupport.fromDashboard(
+      VenueDashboardController.maybeOf(context),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         VenuePageMetricRow(
-          metrics: const [
-            VenuePageMetricCard(
-              label: 'Active campaigns',
-              value: '3',
-              icon: Icons.campaign_outlined,
-            ),
-            VenuePageMetricCard(
-              label: 'Notifications sent',
-              value: '1,240',
-              icon: Icons.notifications_active_outlined,
-            ),
-            VenuePageMetricCard(
-              label: 'QR downloads',
-              value: '86',
-              icon: Icons.qr_code_2_outlined,
-            ),
-            VenuePageMetricCard(
-              label: 'Boost performance',
-              value: '+18%',
-              icon: Icons.trending_up_rounded,
-            ),
+          metrics: [
+            for (final metric in snapshot.marketingMetrics)
+              VenuePageMetricCard(
+                label: metric.label,
+                value: metric.value,
+                icon: metric.icon,
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -4462,36 +4430,30 @@ class _MarketingPageContent extends StatelessWidget {
             final campaigns = VenuePageSection(
               title: 'Campaign Overview',
               child: Column(
-                children: const [
-                  VenuePageSummaryTile(
-                    label: 'Weekend Spotlight',
-                    value: 'Live · 842 impressions · ends Sunday',
-                    icon: Icons.campaign_outlined,
-                  ),
-                  SizedBox(height: AppSpacing.sm),
-                  VenuePageSummaryTile(
-                    label: 'Happy Hour Push',
-                    value: 'Scheduled · notification draft ready',
-                    icon: Icons.notifications_active_outlined,
-                  ),
+                children: [
+                  for (var i = 0; i < snapshot.campaignTiles.length; i++) ...[
+                    if (i > 0) const SizedBox(height: AppSpacing.sm),
+                    VenuePageSummaryTile(
+                      label: snapshot.campaignTiles[i].label,
+                      value: snapshot.campaignTiles[i].value,
+                      icon: snapshot.campaignTiles[i].icon,
+                    ),
+                  ],
                 ],
               ),
             );
             final tools = VenuePageSection(
               title: 'Promotional Tools',
               child: Column(
-                children: const [
-                  VenuePageSummaryTile(
-                    label: 'Boosted venue placement',
-                    value: 'Active until Sunday in city search',
-                    icon: Icons.rocket_launch_outlined,
-                  ),
-                  SizedBox(height: AppSpacing.sm),
-                  VenuePageSummaryTile(
-                    label: 'Venue QR code',
-                    value: '86 downloads this month',
-                    icon: Icons.qr_code_2_outlined,
-                  ),
+                children: [
+                  for (var i = 0; i < snapshot.promotionalTools.length; i++) ...[
+                    if (i > 0) const SizedBox(height: AppSpacing.sm),
+                    VenuePageSummaryTile(
+                      label: snapshot.promotionalTools[i].label,
+                      value: snapshot.promotionalTools[i].value,
+                      icon: snapshot.promotionalTools[i].icon,
+                    ),
+                  ],
                 ],
               ),
             );
@@ -4518,13 +4480,21 @@ class _MarketingPageContent extends StatelessWidget {
         VenuePageSection(
           title: 'Marketing Performance',
           child: Column(
-            children: const [
-              VenuePageChartPlaceholder(title: 'Campaign impressions & clicks'),
-              SizedBox(height: AppSpacing.md),
+            children: [
+              const VenuePageChartPlaceholder(
+                title: 'Campaign impressions & clicks',
+              ),
+              const SizedBox(height: AppSpacing.md),
               VenuePageSummaryTile(
-                label: 'Best campaign this month',
-                value: 'Weekend Spotlight · +18% profile views',
+                label: snapshot.performanceHeadline,
+                value: snapshot.performanceInsight,
                 icon: Icons.insights_outlined,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              VenuePageSummaryTile(
+                label: 'Revenue forecast',
+                value: snapshot.forecastRevenueLabel,
+                icon: Icons.payments_outlined,
               ),
             ],
           ),

@@ -12,6 +12,8 @@ class VenueDashboardContext {
     this.bannerImageUrl,
     this.unreadNotifications = 0,
     this.availableVenueIds = const [],
+    this.subscriptionPlanId = 'starter',
+    this.daysUntilSubscriptionRenewal = -1,
   });
 
   final String ownerName;
@@ -22,6 +24,8 @@ class VenueDashboardContext {
   final String? bannerImageUrl;
   final int unreadNotifications;
   final List<String> availableVenueIds;
+  final String subscriptionPlanId;
+  final int daysUntilSubscriptionRenewal;
 
   String get initials {
     final words = venueName.trim().split(RegExp(r'\s+'));
@@ -61,6 +65,8 @@ class VenueDashboardContext {
     bool clearBannerImageUrl = false,
     int? unreadNotifications,
     List<String>? availableVenueIds,
+    String? subscriptionPlanId,
+    int? daysUntilSubscriptionRenewal,
   }) {
     return VenueDashboardContext(
       ownerName: ownerName ?? this.ownerName,
@@ -73,6 +79,9 @@ class VenueDashboardContext {
           : (bannerImageUrl ?? this.bannerImageUrl),
       unreadNotifications: unreadNotifications ?? this.unreadNotifications,
       availableVenueIds: availableVenueIds ?? this.availableVenueIds,
+      subscriptionPlanId: subscriptionPlanId ?? this.subscriptionPlanId,
+      daysUntilSubscriptionRenewal:
+          daysUntilSubscriptionRenewal ?? this.daysUntilSubscriptionRenewal,
     );
   }
 
@@ -103,7 +112,9 @@ class VenueDashboardContext {
         other.logoUrl == logoUrl &&
         other.bannerImageUrl == bannerImageUrl &&
         other.unreadNotifications == unreadNotifications &&
-        _listEquals(other.availableVenueIds, availableVenueIds);
+        _listEquals(other.availableVenueIds, availableVenueIds) &&
+        other.subscriptionPlanId == subscriptionPlanId &&
+        other.daysUntilSubscriptionRenewal == daysUntilSubscriptionRenewal;
   }
 
   @override
@@ -115,6 +126,8 @@ class VenueDashboardContext {
     logoUrl,
     bannerImageUrl,
     unreadNotifications,
+    subscriptionPlanId,
+    daysUntilSubscriptionRenewal,
     Object.hashAll(availableVenueIds),
   );
 }

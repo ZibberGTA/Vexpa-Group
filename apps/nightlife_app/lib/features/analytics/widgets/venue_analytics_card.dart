@@ -1,36 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/growth/growth_engine.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../monetisation/services/growth_commercial_support.dart';
 
 import '../services/analytics_service.dart';
 
+GrowthPerformanceInput _performanceInput(AnalyticsSummary summary) {
+  return GrowthPerformanceInput(
+    venueViews: summary.venueViews,
+    favouriteTaps: summary.favouriteTaps,
+    dealViews: summary.dealViews,
+    eventViews: summary.eventViews,
+    crowdUpdates: summary.crowdUpdates,
+    conversionRatePercent: summary.favouriteConversionRate,
+  );
+}
 
 int _estimatedVisits(AnalyticsSummary summary) {
-  final intentSignals = summary.favouriteTaps + summary.dealViews + summary.eventViews;
-  return ((summary.venueViews * 0.08) + (intentSignals * 0.35)).round();
+  return MobileGrowthCommercialSupport.estimatedVisits(
+    _performanceInput(summary),
+  );
 }
 
 int _estimatedRevenue(AnalyticsSummary summary) {
-  // Conservative placeholder until real POS/redemption tracking is connected.
-  return _estimatedVisits(summary) * 18;
+  return MobileGrowthCommercialSupport.estimatedRevenueGbp(
+    _performanceInput(summary),
+  );
 }
 
 String _roiSignal(AnalyticsSummary summary) {
-  final intentSignals = summary.favouriteTaps + summary.dealViews + summary.eventViews;
-  if (summary.venueViews == 0) return 'New';
-  final rate = intentSignals / summary.venueViews;
-  if (rate >= 0.35) return 'Strong';
-  if (rate >= 0.15) return 'Good';
-  return 'Build';
+  return MobileGrowthCommercialSupport.roiSignalLabel(
+    _performanceInput(summary),
+  );
 }
 
 class VenueAnalyticsCard extends StatefulWidget {
   final String venueId;
 
-  const VenueAnalyticsCard({
-    super.key,
-    required this.venueId,
-  });
+  const VenueAnalyticsCard({super.key, required this.venueId});
 
   @override
   State<VenueAnalyticsCard> createState() => _VenueAnalyticsCardState();
@@ -38,7 +46,6 @@ class VenueAnalyticsCard extends StatefulWidget {
 
 class _VenueAnalyticsCardState extends State<VenueAnalyticsCard> {
   AnalyticsRange _range = AnalyticsRange.sevenDays;
-
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +61,7 @@ class _VenueAnalyticsCardState extends State<VenueAnalyticsCard> {
                 SizedBox(width: 8),
                 Text(
                   'Analytics Dashboard',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -163,13 +167,11 @@ class _VenueAnalyticsCardState extends State<VenueAnalyticsCard> {
 class OwnerAnalyticsSummaryCard extends StatefulWidget {
   final List<String> venueIds;
 
-  const OwnerAnalyticsSummaryCard({
-    super.key,
-    required this.venueIds,
-  });
+  const OwnerAnalyticsSummaryCard({super.key, required this.venueIds});
 
   @override
-  State<OwnerAnalyticsSummaryCard> createState() => _OwnerAnalyticsSummaryCardState();
+  State<OwnerAnalyticsSummaryCard> createState() =>
+      _OwnerAnalyticsSummaryCardState();
 }
 
 class _OwnerAnalyticsSummaryCardState extends State<OwnerAnalyticsSummaryCard> {
@@ -303,10 +305,7 @@ class _RangeSelector extends StatelessWidget {
   final AnalyticsRange selected;
   final ValueChanged<AnalyticsRange> onChanged;
 
-  const _RangeSelector({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _RangeSelector({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +314,7 @@ class _RangeSelector extends StatelessWidget {
       runSpacing: 8,
       children: AnalyticsRange.values.map((range) {
         return ChoiceChip(
-        side: const BorderSide(color: Color(0xFF9D28FF), width: 1),
+          side: const BorderSide(color: Color(0xFF9D28FF), width: 1),
           label: Text(range.label),
           selected: selected.label == range.label,
           onSelected: (_) => onChanged(range),
@@ -346,9 +345,7 @@ class _MetricPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primaryPurple.withOpacity(0.65),
-        ),
+        border: Border.all(color: AppColors.primaryPurple.withOpacity(0.65)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,10 +354,7 @@ class _MetricPill extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           Text(
             label,
@@ -393,20 +387,14 @@ class _TopList extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         if (items.isEmpty)
           Text(emptyText)
         else
           ...items.map(
-            (item) => _AnalyticsRow(
-              label: item.name,
-              value: item.count,
-            ),
+            (item) => _AnalyticsRow(label: item.name, value: item.count),
           ),
       ],
     );
@@ -425,20 +413,14 @@ class _CrowdTrendList extends StatelessWidget {
       children: [
         const Text(
           'Crowd trends',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         if (items.isEmpty)
           const Text('No crowd trend data yet.')
         else
           ...items.map(
-            (item) => _AnalyticsRow(
-              label: item.label,
-              value: item.count,
-            ),
+            (item) => _AnalyticsRow(label: item.label, value: item.count),
           ),
       ],
     );
@@ -452,19 +434,16 @@ class _InsightBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final message = summary.venueViews == 0
-        ? 'Views will appear here once users start opening this venue.'
-        : summary.favouriteConversionRate < 5
-            ? 'People are viewing this venue, but favourites are low. Try improving photos, deals or event details.'
-            : 'This venue is converting views into favourites well. Keep deals and crowd levels updated.';
+    final performance = MobileGrowthCommercialSupport.interpret(
+      _performanceInput(summary),
+    );
+    final message = performance.insightMessage;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primaryPurple.withOpacity(0.65),
-        ),
+        border: Border.all(color: AppColors.primaryPurple.withOpacity(0.65)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,10 +461,7 @@ class _AnalyticsRow extends StatelessWidget {
   final String label;
   final int value;
 
-  const _AnalyticsRow({
-    required this.label,
-    required this.value,
-  });
+  const _AnalyticsRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +482,6 @@ class _AnalyticsRow extends StatelessWidget {
   }
 }
 
-
 class _RevenueInsightBox extends StatelessWidget {
   const _RevenueInsightBox({required this.summary});
 
@@ -514,11 +489,12 @@ class _RevenueInsightBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visits = _estimatedVisits(summary);
-    final revenue = _estimatedRevenue(summary);
-    final message = visits == 0
-        ? 'Start driving saves, deal views and event interest to build a revenue signal.'
-        : 'Estimated from views, saves, deal taps and event interest. Connect redemptions or POS later for exact revenue.';
+    final performance = MobileGrowthCommercialSupport.interpret(
+      _performanceInput(summary),
+    );
+    final visits = performance.estimatedVisits;
+    final revenue = performance.estimatedRevenueGbp;
+    final message = performance.revenueInsightMessage;
 
     return Container(
       width: double.infinity,
@@ -562,9 +538,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.primaryPurple.withOpacity(0.65),
-        ),
+        border: Border.all(color: AppColors.primaryPurple.withOpacity(0.65)),
       ),
       child: Column(
         children: [
@@ -572,10 +546,7 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           Text(
             title,
