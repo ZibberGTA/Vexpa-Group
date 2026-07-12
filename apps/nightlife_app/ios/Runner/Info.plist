@@ -68,5 +68,7 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>DrinkSpot uses your location to show nearby venues, drinks, deals, and events.</string>
+	<key>GMSApiKey</key>
+	<string>$(MAPS_API_KEY)</string>
 </dict>
 </plist>
