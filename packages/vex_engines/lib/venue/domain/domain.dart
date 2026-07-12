@@ -1,6 +1,8 @@
 /// Venue-specific entities, invariants, and validation rules.
 library;
 
+export 'venue_admin_health.dart';
+export 'venue_admin_health_input.dart';
 export 'venue_opening_hours_entry.dart';
 export 'venue_dashboard_models.dart';
 export 'venue_profile_completion.dart';

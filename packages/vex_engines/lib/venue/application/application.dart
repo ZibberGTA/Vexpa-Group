@@ -3,6 +3,7 @@ library;
 
 export 'venue_active_venue_selector.dart';
 export 'venue_activity_interpreter.dart';
+export 'venue_admin_health_service.dart';
 export 'venue_dashboard_composer.dart';
 export 'venue_profile_completion_calculator.dart';
 export 'venue_profile_update.dart';

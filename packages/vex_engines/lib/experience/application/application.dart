@@ -3,6 +3,7 @@ library;
 
 export 'experience_content_orchestrator.dart';
 export 'experience_drink_import_validator.dart';
+export 'experience_admin_content_service.dart';
 export 'experience_owner_write_service.dart';
 export 'experience_deal_scheduling.dart';
 export 'experience_deal_status.dart';
