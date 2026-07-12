@@ -94,7 +94,7 @@ if (androidMapsApiKey.isEmpty()) {
 
 android {
 
-    namespace = "com.vexda.app"
+    namespace = "com.drinkspot.app"
 
     compileSdk = flutter.compileSdkVersion
 
