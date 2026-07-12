@@ -16,11 +16,21 @@ import '../../../auth/services/auth_service.dart';
 import '../../../venue_management/widgets/page/venue_dashboard_page_widgets.dart';
 import '../../../venue_management/widgets/venue_dashboard_layout.dart';
 import '../../data/admin_dashboard_repository.dart';
+import '../../data/admin_venue_health_support.dart';
 import '../../models/admin_dashboard_models.dart';
 import '../../models/admin_venue_crm.dart';
 import '../shared/admin_crm_sortable_header.dart';
 import '../../permissions/admin_permission_constants.dart';
 import '../../permissions/permission_service.dart';
+import 'package:vex_engines/venue/domain/venue_admin_health.dart';
+
+Color _healthAccentColor(int scorePercent) {
+  return switch (AdminVenueHealthSupport.accentTier(scorePercent)) {
+    VenueHealthAccentTier.strong => AppColors.trailGold,
+    VenueHealthAccentTier.moderate => AppColors.primaryPurple,
+    VenueHealthAccentTier.weak => AppColors.primaryPink,
+  };
+}
 
 /// Admin Venues CRM — table, filters, profile modal, and venue management actions.
 class AdminVenuesCrmPage extends StatefulWidget {
@@ -1777,7 +1787,8 @@ class _VenuesCrmProfileModalBodyState
     final profile = AdminVenueCrmView(row: widget.venue);
     final supplementary = _supplementary;
     final content = supplementary?.content;
-    final health = profile.calculateHealth(
+    final health = AdminVenueHealthSupport.calculateHealth(
+      profile: profile,
       drinksCount: content?.drinksCount ?? 0,
       dealsCount: content?.dealsCount ?? 0,
       eventsCount: content?.eventsCount ?? 0,
@@ -2370,12 +2381,7 @@ class _VenuesCrmHealthDonut extends StatelessWidget {
 
   final AdminVenueHealth health;
 
-  Color get _accentColor {
-    final score = health.scorePercent;
-    if (score >= 75) return AppColors.trailGold;
-    if (score >= 45) return AppColors.primaryPurple;
-    return AppColors.primaryPink;
-  }
+  Color get _accentColor => _healthAccentColor(health.scorePercent);
 
   @override
   Widget build(BuildContext context) {
@@ -3667,11 +3673,7 @@ class _VenuesCrmHealthChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = health.scorePercent;
-    final color = score >= 75
-        ? AppColors.trailGold
-        : score >= 45
-        ? AppColors.primaryPurple
-        : AppColors.primaryPink;
+    final color = _healthAccentColor(score);
 
     return Container(
       padding: const EdgeInsets.symmetric(

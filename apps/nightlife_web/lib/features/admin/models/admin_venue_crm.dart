@@ -3,6 +3,7 @@ import 'package:vex_core/entitlements/entitlements.dart';
 
 import '../../venue_management/models/media_library_tab.dart';
 import '../../venue_management/models/media_subscription_limits.dart';
+import '../data/admin_venue_health_support.dart';
 import '../permissions/admin_permission_constants.dart';
 import '../permissions/permission_service.dart';
 import '../permissions/staff_permission.dart';
@@ -356,74 +357,6 @@ class AdminVenueCrmView {
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
-  AdminVenueHealth calculateHealth({
-    int drinksCount = 0,
-    int dealsCount = 0,
-    int eventsCount = 0,
-    int galleryImagesCount = 0,
-  }) {
-    final items = <AdminVenueHealthItem>[
-      AdminVenueHealthItem(
-        label: 'Logo uploaded',
-        passed: logoUrl.trim().isNotEmpty && logoUrl != '—',
-      ),
-      AdminVenueHealthItem(
-        label: 'Banner uploaded',
-        passed: bannerUrl.trim().isNotEmpty && bannerUrl != '—',
-      ),
-      AdminVenueHealthItem(
-        label: 'Description added',
-        passed: description.trim().isNotEmpty && description != '—',
-      ),
-      AdminVenueHealthItem(
-        label: 'Address complete',
-        passed:
-            (address.trim().isNotEmpty && address != '—') ||
-            (city.trim().isNotEmpty && city != '—'),
-      ),
-      AdminVenueHealthItem(
-        label: 'Opening hours complete',
-        passed: _hasOpeningHours(),
-      ),
-      AdminVenueHealthItem(label: 'Drinks added', passed: drinksCount > 0),
-      AdminVenueHealthItem(label: 'Deals live', passed: dealsCount > 0),
-      AdminVenueHealthItem(label: 'Events live', passed: eventsCount > 0),
-      AdminVenueHealthItem(
-        label: 'Website added',
-        passed: website.trim().isNotEmpty && website != '—',
-      ),
-      AdminVenueHealthItem(
-        label: 'Gallery images',
-        passed: galleryImagesCount > 0,
-      ),
-      AdminVenueHealthItem(label: 'Verified', passed: isVerified),
-      AdminVenueHealthItem(label: 'Claimed', passed: isClaimed),
-    ];
-
-    final passed = items.where((item) => item.passed).length;
-    final total = items.length;
-    final score = total == 0 ? 0 : ((passed / total) * 100).round();
-
-    return AdminVenueHealth(
-      scorePercent: score,
-      passedCount: passed,
-      totalCount: total,
-      items: items,
-    );
-  }
-
-  bool _hasOpeningHours() {
-    final hours = row.data['openingHours'];
-    if (hours is! Map || hours.isEmpty) return false;
-    return hours.values.any((value) {
-      if (value is Map) {
-        return value.values.any(
-          (entry) => entry?.toString().trim().isNotEmpty ?? false,
-        );
-      }
-      return value?.toString().trim().isNotEmpty ?? false;
-    });
-  }
 }
 
 class AdminVenueHealthItem {
@@ -705,6 +638,5 @@ Set<String> collectVenueSubscriptionPlans(List<AdminDocumentRow> rows) {
 const kAdminVenuesCrmPageSizeOptions = [20, 50, 100];
 
 /// Lightweight health score for table display (venue doc only, no counts).
-AdminVenueHealth estimateTableHealth(AdminVenueCrmView venue) {
-  return venue.calculateHealth();
-}
+AdminVenueHealth estimateTableHealth(AdminVenueCrmView venue) =>
+    AdminVenueHealthSupport.estimateTableHealth(venue);

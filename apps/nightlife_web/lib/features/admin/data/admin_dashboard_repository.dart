@@ -7,6 +7,7 @@ import '../../../core/firebase/vexda_firebase.dart';
 import '../models/admin_dashboard_models.dart';
 import '../models/admin_user_crm.dart';
 import '../models/admin_venue_crm.dart';
+import 'admin_venue_content_support.dart';
 import 'package:vex_core/entitlements/entitlements.dart';
 
 enum StaffInviteUpsertResult { created, updated, alreadyStaffMember }
@@ -1027,12 +1028,14 @@ class AdminDashboardRepository {
       );
       final upcomingEvents = await _countUpcomingEvents(venueId);
 
-      final result = AdminVenueContentSummary(
-        drinksCount: drinksCount,
-        dealsCount: dealsCount,
-        eventsCount: eventsCount,
-        liveDealsCount: liveDeals,
-        upcomingEventsCount: upcomingEvents,
+      final result = AdminVenueContentSupport.mapSummary(
+        AdminVenueContentSupport.buildSummary(
+          drinksCount: drinksCount,
+          dealsCount: dealsCount,
+          eventsCount: eventsCount,
+          liveDealsCount: liveDeals,
+          upcomingEventsCount: upcomingEvents,
+        ),
       );
       _venueContentCache[venueId] = result;
       return result;
@@ -1584,11 +1587,16 @@ class AdminDashboardRepository {
           .limit(100)
           .get();
       final now = DateTime.now();
-      return snapshot.docs.where((doc) {
-        final start = doc.data()['startAt'] ?? doc.data()['startDate'];
-        if (start is Timestamp) return start.toDate().isAfter(now);
-        return true;
-      }).length;
+      final startTimes = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final start = data['startAt'] ?? data['startDate'];
+        if (start is Timestamp) return start.toDate();
+        return null;
+      });
+      return AdminVenueContentSupport.countUpcomingEvents(
+        startDateTimes: startTimes,
+        now: now,
+      );
     } on FirebaseException {
       return null;
     }
