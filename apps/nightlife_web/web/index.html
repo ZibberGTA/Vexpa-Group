@@ -52,18 +52,19 @@
 
     2) Confirm billing is enabled on the same project.
 
-    3) API key restrictions (Credentials → Browser key):
-       - Development: allow http://localhost:* and http://127.0.0.1:*
-       - Production: add your live domain later, e.g. https://vexda.com/*
+    3) Copy web/vexda_maps_config.example.js to web/vexda_maps_config.js and
+       set your browser-restricted Maps JavaScript API key (gitignored).
 
-    4) The key below matches the Vexda mobile Android Maps SDK key.
-       ApiNotActivatedMapError means step (1) is not complete yet — enabling
-       Maps SDK for Android alone is not enough for Flutter Web.
+    4) API key referrer restrictions should include:
+       - http://localhost:* and http://127.0.0.1:* (development)
+       - https://vexda.co.uk/* and https://www.vexda.co.uk/* (production)
+       - Firebase Hosting domains for this project
 
-    5) google_maps_flutter_web is also listed in pubspec.yaml for clarity;
-       it is endorsed by google_maps_flutter on current Flutter versions.
+    5) google_maps_flutter_web is endorsed by google_maps_flutter on current
+       Flutter versions.
 
-    After changing this file, hot restart Chrome (not hot reload).
+    After changing Maps config, hot restart Chrome (not hot reload).
+    See docs/platform/API_KEYS_SETUP.md
   -->
   <script>
     window.vexdaMapsLoadState = {
@@ -93,12 +94,7 @@
       };
     })();
   </script>
-  <script
-    async
-    defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0xi_cVXRDlQ39yULIuv91Zz4hsSsn7qo&loading=async"
-    onerror="window.vexdaMapsLoadState.error='Maps JavaScript API script failed to load'; window.vexdaMapsLoadState.errorDetail='Check network access and web/index.html Maps script URL.';">
-  </script>
+  <script src="vexda_maps_config.js"></script>
   <style>
     html, body {
       margin: 0;
