@@ -1,6 +1,6 @@
 # Experience Engine — Migration Plan
 
-Status: **Phase 7 complete — admin CRM content summaries (~99%)**
+Status: **Phase 8 complete — presentation consolidation (~100% for Version 1 business and presentation rules)**
 
 This plan is derived from the current monorepo (`apps/nightlife_web`, `apps/nightlife_app`,
 `packages/vex_core`, `packages/vex_engines`).

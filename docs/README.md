@@ -6,6 +6,7 @@ Permanent documentation for the Vexda platform. This tree is the **single source
 
 | Document | Audience | Purpose |
 | --- | --- | --- |
+| [Platform Completion Report](./PLATFORM_COMPLETION_REPORT.md) | Leadership, product, engineering | Formal declaration that Version 1 modular platform architecture is complete |
 | [Master Blueprint](./master-blueprint.md) | Leadership, product, engineering | CEO handbook — organises all documentation without duplicating technical detail |
 | [VexCore Foundation](./vexcore/README.md) | Engineers | Infrastructure contracts, dependency rules, migration roadmap |
 | [Engine Catalogue](./engines/README.md) | Engineers, product | One page per business engine |
@@ -44,4 +45,5 @@ See [ADR-0009: Documentation Policy](./decisions/0009-documentation-policy.md).
 
 | Version | Date | Summary |
 | --- | --- | --- |
+| 1.1 | 2026-07-12 | Platform Completion Report; Version 1 architecture formally complete |
 | 1.0 | 2026-07-11 | Initial permanent documentation foundation |

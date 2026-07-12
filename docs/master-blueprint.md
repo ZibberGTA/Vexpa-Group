@@ -3,9 +3,11 @@
 **Document ID:** VEXDA-MASTER-001  
 **Status:** Product and architecture authority  
 **Audience:** Leadership, product, engineering, future hires  
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-12
 
 This document is the **CEO handbook** for Vexda. It organises the platform and points to authoritative technical documentation. It does **not** replace engine READMEs, VexCore foundation docs, or ADRs — it references them.
+
+**Version 1 modular platform architecture** is formally complete as of 2026-07-12. See [Platform Completion Report](./PLATFORM_COMPLETION_REPORT.md).
 
 ---
 
@@ -194,7 +196,7 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Drinks, deals, events — visibility, scheduling, validation, featured rules |
 | Version | 1 (replaces separate Drink/Deal/Event engines) |
-| Status | ~99% — mobile owner writes, import validation, and admin content summaries complete |
+| Status | ~100% — Version 1 business and presentation rules complete; optional write repository interfaces and deprecated compatibility/parity paths remain |
 | VexCore | `VenueDrinkDataService`, `VenueDealDataService`, `VenueEventDataService` |
 | Owns | Publishing lifecycle, visibility, search-term prep for content |
 | Consumes | VexCore read contracts; Firebase writes stay in app adapters |
@@ -476,6 +478,7 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 
 | Version | Date | Author | Changes |
 | --- | --- | --- | --- |
+| 1.1 | 2026-07-12 | Vexda | Experience Engine ~100%; link Platform Completion Report |
 | 1.0 | 2026-07-11 | Vexda | Initial Master Blueprint — documentation foundation |
 
 ---
@@ -485,6 +488,7 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 ```text
 docs/
   master-blueprint.md          ← you are here
+  PLATFORM_COMPLETION_REPORT.md ← Version 1 architecture completion declaration
   README.md                    ← documentation index
   decisions/                   ← ADRs
   engines/                     ← engine catalogue
