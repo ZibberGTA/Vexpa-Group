@@ -87,6 +87,9 @@ the Master Blueprint is created.
 | 5 — Mobile read convergence | Complete | Public catalog, details watch, branding/hours helpers via VexCore adapter |
 | 6 — Mobile owner convergence | Complete | Owner list/create/update via VexCore write contract + engine validation |
 | 7 — Profile repository writes (web) | Planned | Broader management orchestration beyond profile fields |
+| 8 — Admin CRM health | Complete | `VenueAdminHealthService` — health score, completeness, quality tiers |
+
+**Completion: ~85%**
 
 See `MIGRATION_PLAN.md` for the file inventory, classification, and phased
 migration order.

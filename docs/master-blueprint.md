@@ -194,7 +194,7 @@ Each engine document follows the same structure. Technical READMEs and migration
 | --- | --- |
 | Purpose | Drinks, deals, events — visibility, scheduling, validation, featured rules |
 | Version | 1 (replaces separate Drink/Deal/Event engines) |
-| Status | ~78% — Batch A/B migration complete on web and mobile |
+| Status | ~99% — mobile owner writes, import validation, and admin content summaries complete |
 | VexCore | `VenueDrinkDataService`, `VenueDealDataService`, `VenueEventDataService` |
 | Owns | Publishing lifecycle, visibility, search-term prep for content |
 | Consumes | VexCore read contracts; Firebase writes stay in app adapters |
@@ -231,7 +231,7 @@ Trails appear in search and web architecture (`trails` collection). Engine folde
 
 | Engine | Document | Version target | Notes |
 | --- | --- | --- | --- |
-| Growth | [growth.md](./engines/growth.md) | 1.5–2 | Subscriptions, boosts, campaigns — partial logic today in app monetisation services |
+| Growth | [growth.md](./engines/growth.md) | 1.5–2 | ~92% — web commercial UI wired; checkout adapters remain |
 | Intelligence | [intelligence.md](./engines/intelligence.md) | 2 | Recommendations/ranking beyond current scorers; anonymised data only |
 | Messaging | [messaging.md](./engines/messaging.md) | 3 | Not in Version 1 |
 | Membership | [membership.md](./engines/membership.md) | 3 | Not in Version 1 |
@@ -269,7 +269,7 @@ See [ADR-0002](./decisions/0002-version-1-scope.md).
 
 ### Version 1.5 — Growth foundations
 
-- **Growth Engine** extraction from app-level subscription/boost services
+- **Growth Engine** Phase 3 web commercial wiring (~92%); checkout/Firestore adapters remain in apps
 - Trail Engine migration (composition, publishing, discovery rules)
 - VexCore analytics read contracts
 - Discovery presentation layer; optional VexCore repository interfaces for adapter injection
@@ -456,9 +456,9 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 
 ### Version 1 engines
 
-- **Venue:** Phase 4 orchestration, broader management workflows
+- **Venue:** Admin CRM health scoring complete; broader management workflows remain
 - **Discovery:** Presentation layer; mobile/web search path convergence; optional VexCore adapter contracts
-- **Experience:** Remaining mobile write adoption; presentation helpers
+- **Experience:** Optional VexCore visibility parity; engine write repository contracts
 - **Claim:** Mobile claim flow; engine write repository contracts; Storage rules emulator validation + deploy
 - **Analytics:** VexCore analytics read service pilot
 - **Trail:** Engine migration from app logic
@@ -468,7 +468,7 @@ High-level only — detail in [10-foundation-roadmap.md](./vexcore/10-foundation
 - Web route completion per [WEB_ARCHITECTURE.md](../apps/nightlife_web/docs/WEB_ARCHITECTURE.md)
 - Duplication elimination ([07-duplication-audit.md](./vexcore/07-duplication-audit.md))
 - Risk mitigations ([09-risk-register.md](./vexcore/09-risk-register.md))
-- Growth Engine extraction from monetisation services
+- Growth Engine Phase 3: marketing dashboard wiring and checkout adapter consolidation
 
 ---
 

@@ -19,6 +19,7 @@ Replace three would-be engines (Drink, Deal, Event) with **one content engine** 
 - Write field preparation (payloads adapted in app shells with Firebase types)
 - Search-term building for content indexing (Experience layer; venue index uses Discovery builder)
 - In-memory `ExperienceContentOrchestrator` for public content filtering/sorting
+- Admin CRM content count interpretation and upcoming event semantics
 
 ## Version
 
@@ -56,38 +57,41 @@ Future-ready placeholders only (not V1): menus, happy hours, promotions, announc
 
 ## Current Status
 
-**~78% complete**
+**~100% complete** (presentation rules consolidated)
 
 | Phase | Status |
 | --- | --- |
 | Shared rules batch | Complete |
 | Web write facades + orchestrator | Complete |
-| Mobile grouping/search-term adoption (Batch B) | Complete |
+| Mobile grouping/search-term adoption | Complete |
+| Venue content services (ordering, validation, gallery, summaries) | Complete |
+| Mobile owner write flows (drink/deal/event) | Complete |
+| Bulk drink import validation | Complete |
+| Admin CRM content summaries | Complete |
+| Presentation consolidation (tags, highlights, relative time, mobile parity) | Complete |
 | VexCore optional visibility delegation | Planned |
 | Engine-owned write repository interfaces | Planned |
-| Presentation layer | Planned |
 
 ## Future Features
 
 - Engine-owned write contracts in `data/`
-- Presentation view models
+- Optional VexCore parity delegation
 - Extended content kinds when product expands beyond drinks/deals/events
 
 ## Technical Notes
 
 - VexCore **cannot import** `vex_engines` — public visibility filtering on web happens at repository boundary.
 - Package: `packages/vex_engines/lib/experience/`
+- Adapter facades: `WebExperienceContentSupport` (web), `MobileExperienceContentSupport` (mobile), `AdminVenueContentSupport` (admin)
+- Mobile write adapters: `MobileDrinkWritePayload`, `MobileDealWritePayload`, `MobileEventWritePayload`
 
 ## Known Risks
 
-- Residual inline write paths in mobile owner screens not yet delegated.
-- Visibility split between VexCore data services and Experience orchestrator requires clear documentation for new contributors.
+- Mobile deal schema uses legacy `drink_offer` type — preserved intentionally for runtime parity.
 
 ## Outstanding Work
 
-- Remaining mobile write adoption
 - Optional VexCore parity delegation
 - Write repository interfaces
-- Presentation helpers
 
 **Deep dive:** [packages/vex_engines/lib/experience/README.md](../../packages/vex_engines/lib/experience/README.md) · [MIGRATION_PLAN.md](../../packages/vex_engines/lib/experience/MIGRATION_PLAN.md)

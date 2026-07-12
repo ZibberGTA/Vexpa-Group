@@ -160,7 +160,10 @@ See `packages/vex_engines/lib/discovery/MIGRATION_PLAN.md`.
 | Web write facades | Complete | Write payloads and public filters delegate to engine |
 | VexCore parity tests | Complete | Engine visibility matches VexCore deal/event rules |
 | Write contracts + mobile | Complete | Batch B: catalogs, grouping, write prep, orchestrator, mobile adoption |
-| Remaining experience work | Planned | Mobile write adoption, presentation layer |
+| Venue content services | Complete | Ordering, validation, gallery, presentation, summaries |
+| Mobile owner writes + import | Complete | Owner add/edit drink/deal/event; spreadsheet validation (~99%) |
+| Admin CRM delegation | Complete | Venue health + Experience content summaries |
+| Remaining experience work | Planned | VexCore visibility parity; engine write repository contracts |
 
 The Experience Engine replaces separate Drink, Deal, and Event engines for Version 1.
 VexCore read modules (`venue_drinks`, `venue_deals`, `venue_events`) remain generic contracts.
@@ -197,6 +200,18 @@ See `packages/vex_engines/lib/claim/MIGRATION_PLAN.md`.
 The Analytics Engine owns venue metrics and aggregation rules for Version 1.
 VexCore continues to own permissions; Firebase adapters remain in app shells.
 See `packages/vex_engines/lib/analytics/MIGRATION_PLAN.md`.
+
+### Growth Engine structure (Version 1.5–2)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Structure + migration plan | Complete | `packages/vex_engines/lib/growth/` |
+| Pure rules batch | Complete | Catalog, boost lifecycle, ROI interpretation |
+| Commercial services (Phase 2) | Complete | Subscriptions, campaigns, summaries, scoring |
+| Marketing dashboard wiring | Planned | Replace mock marketing UI data |
+| Checkout/Firestore adapters | Planned | Stripe and boost writes stay in apps |
+
+See `packages/vex_engines/lib/growth/MIGRATION_PLAN.md`.
 
 ## Phase 8 — Event Bus Foundation
 

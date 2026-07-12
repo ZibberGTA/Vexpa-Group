@@ -14,6 +14,7 @@ Give venues one authoritative place for **profile and management business rules*
 - Contact and website normalisation
 - Image position and branding field parsing
 - Profile completion scoring
+- Admin CRM venue health, completeness, and quality scoring
 - Profile update orchestration (`VenueProfileUpdateService`)
 - Venue-specific validation and write **preparation** (adapters persist)
 
@@ -40,6 +41,7 @@ Give venues one authoritative place for **profile and management business rules*
 - Venue profile field codec and constants
 - Opening hours domain rules
 - Image field parser and profile completion calculator
+- Admin health scoring (`VenueAdminHealthService`)
 - Profile update preparation payloads
 
 ## Consumes
@@ -54,7 +56,7 @@ Give venues one authoritative place for **profile and management business rules*
 
 ## Current Status
 
-**~80% complete** (Engine Acceptance Rule partially met)
+**~85% complete** (Engine Acceptance Rule partially met)
 
 | Phase | Status |
 | --- | --- |
@@ -62,6 +64,7 @@ Give venues one authoritative place for **profile and management business rules*
 | Shared helpers | Complete |
 | Domain rules | Complete |
 | Profile update orchestration | Complete |
+| Admin CRM health scoring | Complete |
 | Web venue media storage via VexCore (`uploadBrandingImage`, gallery delete) | Complete (pilot) |
 | Broader management orchestration | Planned |
 

@@ -11,7 +11,7 @@ vexda/
 │   └── nightlife_web/     # Flutter web application
 ├── packages/
 │   ├── vex_core/          # Shared infrastructure contracts (VexCore)
-│   └── vex_engines/       # Future business engine placeholders
+│   └── vex_engines/       # Business engines (Experience, Discovery, Claim, Analytics, Growth, …)
 └── docs/
     ├── master-blueprint.md   # CEO handbook — start here for platform overview
     ├── engines/              # Engine catalogue (one page per engine)
@@ -94,6 +94,7 @@ vex_core:
 | Master Blueprint (CEO handbook) | [docs/master-blueprint.md](docs/master-blueprint.md) |
 | Documentation index | [docs/README.md](docs/README.md) |
 | Engine catalogue | [docs/engines/README.md](docs/engines/README.md) |
+| Growth Engine (~75%) | [docs/engines/growth.md](docs/engines/growth.md) |
 | Architecture decisions (ADRs) | [docs/decisions/README.md](docs/decisions/README.md) |
 | VexCore foundation | [docs/vexcore/README.md](docs/vexcore/README.md) |
 | Web product principles | [apps/nightlife_web/docs/VEXDA_PRODUCT_PRINCIPLES.md](apps/nightlife_web/docs/VEXDA_PRODUCT_PRINCIPLES.md) |

@@ -1,6 +1,6 @@
 # Experience Engine — Migration Plan
 
-Status: **Phase 1 complete — shared rules batch migrated from web duplicates**
+Status: **Phase 7 complete — admin CRM content summaries (~99%)**
 
 This plan is derived from the current monorepo (`apps/nightlife_web`, `apps/nightlife_app`,
 `packages/vex_core`, `packages/vex_engines`).
@@ -39,56 +39,88 @@ An engine is not considered complete until:
 
 ---
 
-## VexCore (`packages/vex_core`)
+## Batch 1 — Shared rules (complete)
 
-| Path | Tag | Notes |
-| --- | --- | --- |
-| `lib/venue_drinks/*` | **VC** | Public drink read contracts |
-| `lib/venue_deals/*` | **VC** | Public deal read contracts + visibility (parity tests) |
-| `lib/venue_events/*` | **VC** | Public event read contracts + visibility (parity tests) |
-| `test/venue_*_data_service_test.dart` | **VC** | Contract tests stay with VexCore |
-
-**Do not move** VexCore read repositories into the Experience Engine. Engines consume them.
+Visibility, featured limits, search terms, scheduling, orchestration, drink/deal validators,
+write preparation, drink grouper, deal/event management status.
 
 ---
 
-## Batch 1 — Shared rules (complete)
+## Batch 2 — Web write facades (complete)
+
+Write payloads and public filters delegate to engine. Repository orchestration at boundaries.
+
+---
+
+## Batch 5 — Venue content services (complete)
 
 | Source | Target | Notes |
 | --- | --- | --- |
-| `drink_write_payload.dart` `buildSearchTerms` | **EXP** `ExperienceSearchTermBuilder` | Identical logic consolidated |
-| `deal_write_payload.dart` `buildSearchTerms` | **EXP** | Web payload delegates |
-| `event_write_payload.dart` `buildSearchTerms` | **EXP** | Web payload delegates |
-| `public_venue_content_filters.dart` | **EXP** visibility rules | Web filters delegate |
-| `featured_*_limit.dart` | **EXP** `ExperienceFeaturedLimit` | Presets for drinks/deals/events |
-| `deal_write_payload.dart` `combineDealDateAndTime` | **EXP** `ExperienceSchedulingUtils` | |
-| `event_write_payload.dart` merge helpers | **EXP** | |
-| `event_table_layout.dart` featured sort | **EXP** `sortExperienceFeaturedFirst` | |
-| `AddDrinkFormValidator` | **EXP** `ExperienceDrinkValidator` | Category allow-list stays in web |
+| Deal/drink table sort | **EXP** `VenueContentOrderingService` | Featured-first + column compare |
+| Public deal/event ordering | **EXP** | Current-before-upcoming, start date |
+| Gallery media sort | **EXP** | Featured → sortOrder → uploadedAt |
+| Brand asset sort | **EXP** | isCurrent → logo → upload time |
+| Duplicate deal/event | **EXP** `VenueFeaturedContentService` | Copy title, paused draft defaults |
+| Event form validation | **EXP** `ExperienceEventValidator` | Title, dates, HH:mm range |
+| Drink/deal/event presentation | **EXP** `VenuePresentationSupport` | Prices, labels, upcoming copy |
+| Management metrics/activity | **EXP** `VenueContentSummaryService` | Counts, recent activity heuristics |
+| Pause eligibility | **EXP** `VenueAvailabilityService` | Active/scheduled deals only |
+| Gallery categories/legacy URLs | **EXP** `ExperienceGalleryCategories` | Public cap, legacy mapping |
+| Web/mobile adapters | **WEB/MOB** | `WebExperienceContentSupport`, `MobileExperienceContentSupport` |
 
 Network calls unchanged — all rules are in-memory.
 
 ---
 
-## Batch 2 — Planned
+## Batch 6 — Mobile owner writes + import validation (complete)
 
-| Source | Tag | Notes |
+| Source | Target | Notes |
 | --- | --- | --- |
-| Web drink/deal/event repositories (writes) | **EXP** write preparation service | Engine prepares fields; Firebase stays in app |
-| Mobile drink/deal/event surfaces | **EXP** | Adopt visibility and orchestration helpers |
-| VexCore visibility modules | **DECIDE** | Cannot import engine from VexCore; parity tests only |
+| Mobile add/edit drink | **EXP** `ExperienceOwnerWriteService` | Preset create, edit validation, duplicate detection |
+| Mobile add/edit deal | **EXP** | Legacy `drink_offer` schema, mobile search terms preserved |
+| Mobile add/edit event | **EXP** | Legacy event fields, 4h end fallback |
+| Bulk drink import validation | **EXP** `ExperienceDrinkImportValidator` | Row validation, booleans, price parse, duplicates |
+| Mobile write payloads | **MOB** | `MobileDrinkWritePayload`, `MobileDealWritePayload`, `MobileEventWritePayload` |
+| Web spreadsheet adapter | **WEB** | `DrinkSpreadsheetService` delegates validation to engine |
+
+Network calls and Firestore field shapes unchanged — business rules only.
 
 ---
 
-## Batch 3 — Future content (structure only)
+## Batch 7 — Admin CRM content summaries (complete)
 
-| Kind | Tag | Notes |
+| Source | Target | Notes |
 | --- | --- | --- |
-| Menus | **EXP** | Domain placeholder only |
-| Happy hours | **EXP** | Domain placeholder only |
-| Promotions | **EXP** | Domain placeholder only |
-| Announcements | **EXP** | Domain placeholder only |
-| Seasonal experiences | **EXP** | Domain placeholder only |
+| Admin upcoming event filter | **EXP** `ExperienceAdminContentService` | Legacy startAt/startDate semantics preserved |
+| Admin content summary assembly | **EXP** | Count fields supplied by repository I/O |
+| Admin venue health scoring | **VEN** `VenueAdminHealthService` | 12-item checklist, accent tiers |
+| Admin adapters | **WEB** | `AdminVenueContentSupport`, `AdminVenueHealthSupport` |
+
+Firestore queries unchanged — repositories remain infrastructure only.
+
+---
+
+## Batch 8 — Presentation consolidation (complete)
+
+| Source | Target | Notes |
+| --- | --- | --- |
+| Web deal/event/drink repo relative time | **EXP** `VenuePresentationSupport.managementRelativeTimeLabel` | Long-form owner UI preserved |
+| Web venue highlights/tags | **EXP** `VenuePublicPresentationService` | `VenueHighlightsMapper`, `VenueDetailsMapper` adapters |
+| Mobile map preview tags | **EXP** | Tag label formatting + preview fallbacks |
+| Mobile venues drinks tab | **EXP** `ExperienceDrinkGrouper` + `VenuePresentationSupport` | Removed ~70 lines duplicated logic |
+| Mobile deal/event models | **EXP** | `expiryLabel`, formatted date/time, 4h end fallback |
+| Mobile venue feature tags | **EXP** | `parseFeatureTags` from Firestore maps |
+
+UI strings unchanged — repositories and models are thin adapters only.
+
+---
+
+## Batch 3 — Remaining (optional)
+
+| Source | Tag | Notes |
+| --- | --- | --- |
+| VexCore visibility modules | **DECIDE** | Parity tests only |
+| Engine-owned write contracts | **EXP** | `data/` interfaces |
 
 ---
 
@@ -99,6 +131,6 @@ Network calls unchanged — all rules are in-memory.
 | Venue profile | Venue Engine |
 | Cross-venue search | Discovery Engine |
 | Auth / permissions | VexCore |
-| Analytics / growth | Future engines |
+| Analytics / growth | Growth Engine |
 | Firebase adapters | App shells |
 | UI tables and dialogs | App shells |

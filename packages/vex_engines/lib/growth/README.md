@@ -1,19 +1,65 @@
 # Growth Engine
 
-## Intended Responsibility
+## Intended responsibility
 
-Growth, promotion, subscriptions, boosts, onboarding nudges, and campaign workflows.
+Version 1.5+ commercial and growth decision engine:
 
-## May Depend On
+- boost product catalog and activation lifecycle rules
+- subscription upgrade/downgrade/renewal/trial recommendations
+- campaign readiness, health, completion, scoring, and recommendations
+- commercial performance interpretation (not raw analytics calculation)
+- marketing, ROI, conversion, and commercial summaries
+- growth scoring, opportunity ranking, and owner-facing summaries
+- boost renewal, expiry, duration, plan, and timing suggestions
 
-VexCore contracts for identity, permissions, configuration, integrations, events, data access, and observability.
+## May depend on
 
-## Must Not Contain
+- Adapter-supplied engagement counts and entitlement **flags** (not VexCore imports in engine core)
+- Engine-neutral value objects in `domain/` and `shared/`
 
-Flutter UI, Firebase SDK imports, raw payment provider wiring, raw Firestore paths, or analytics implementation details.
+## Must not contain
 
-## VexCore Contract Rule
+- Flutter UI imports
+- Firebase SDK imports
+- Stripe SDK imports
+- Raw Firestore paths in domain or application layers
+- Entitlement matrix evaluation (VexCore)
+- Analytics aggregation (Analytics Engine)
+- Discovery ranking (Discovery Engine)
 
-The growth engine must consume VexCore contracts and use events only for completed business actions.
+## Application services
 
-Direct Firebase access is forbidden.
+| Service | Responsibility |
+| --- | --- |
+| `GrowthBoostService` | Boost activation, expiry, checkout validation |
+| `GrowthBoostLifecycleService` | Renewal/expiry recommendations, suggested plans and timing |
+| `GrowthSubscriptionService` | Upgrade/downgrade/renewal/trial, product summaries |
+| `GrowthCampaignLifecycleService` | Campaign health, completion, scoring, recommendations |
+| `GrowthMarketingSummaryService` | Marketing, ROI, conversion summaries |
+| `GrowthCommercialService` | Pricing interpretation, forecasting, renewal prompts |
+| `GrowthPerformanceInterpretationService` | Estimated visits/revenue, ROI signals |
+| `GrowthScoringService` | Composite and multi-dimensional venue scores |
+| `GrowthRecommendationService` | Ranked growth opportunities |
+| `GrowthSummaryService` | Owner dashboard commercial summary composition |
+
+## Migration status
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| 0 — Structure | Complete | Folders, README, migration plan |
+| 1 — Pure rules batch | Complete | Catalog, boost lifecycle, ROI interpretation |
+| 2 — Commercial services | Complete | Subscriptions, campaigns, summaries, scoring |
+| 3 — Admin/marketing UI wiring | In progress | Web marketing/subscription/analytics commercial sections wired via `GrowthCommercialViewSupport` |
+
+**Completion: ~92%**
+
+## Runtime flow
+
+```text
+UI / Widget
+  → GrowthCommercialSupport / MobileGrowthCommercialSupport (adapter facade)
+  → Growth Engine service (pure in-memory rules)
+  → Firestore / Stripe adapter (unchanged I/O)
+```
+
+Network calls unchanged — adapters retain all I/O.
