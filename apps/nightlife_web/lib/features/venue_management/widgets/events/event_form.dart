@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/application/experience_event_validator.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -235,42 +236,17 @@ class _DatePickerField extends StatelessWidget {
 class AddEventFormValidator {
   AddEventFormValidator._();
 
-  static String? validateTitle(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Event title is required.';
-    }
-    return null;
-  }
+  static String? validateTitle(String? value) =>
+      ExperienceEventValidator.validateTitle(value);
 
-  static String? validateStartDate(DateTime? value) {
-    if (value == null) return 'Start date is required.';
-    return null;
-  }
+  static String? validateStartDate(DateTime? value) =>
+      ExperienceEventValidator.validateStartDate(value);
 
-  static String? validateStartTime(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Start time is required.';
-    }
-    if (!_isValidTime(value)) return 'Enter a valid start time (HH:mm).';
-    return null;
-  }
+  static String? validateStartTime(String? value) =>
+      ExperienceEventValidator.validateStartTime(value);
 
-  static String? validateEndTime(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'End time is required.';
-    }
-    if (!_isValidTime(value)) return 'Enter a valid end time (HH:mm).';
-    return null;
-  }
-
-  static bool _isValidTime(String value) {
-    final parts = value.trim().split(':');
-    if (parts.length < 2) return false;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), ''));
-    if (hour == null || minute == null) return false;
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
-  }
+  static String? validateEndTime(String? value) =>
+      ExperienceEventValidator.validateEndTime(value);
 }
 
 /// Validates combined start/end date-time after form field validation.
@@ -279,30 +255,13 @@ String? validateEventDateTimeRange({
   required String startTime,
   required DateTime? endDate,
   required String endTime,
-}) {
-  final startDateError = AddEventFormValidator.validateStartDate(startDate);
-  if (startDateError != null) return startDateError;
+}) =>
+    ExperienceEventValidator.validateDateTimeRange(
+      startDate: startDate,
+      startTime: startTime,
+      endDate: endDate,
+      endTime: endTime,
+    );
 
-  final startTimeError = AddEventFormValidator.validateStartTime(startTime);
-  if (startTimeError != null) return startTimeError;
-
-  final endTimeError = AddEventFormValidator.validateEndTime(endTime);
-  if (endTimeError != null) return endTimeError;
-
-  if (endDate == null) return 'End date is required.';
-
-  final start = combineEventDateAndTime(startDate!, startTime);
-  final end = combineEventDateAndTime(endDate, endTime);
-  if (!end.isAfter(start)) {
-    return 'End date/time must be after start date/time.';
-  }
-  return null;
-}
-
-DateTime combineEventDateAndTime(DateTime date, String time) {
-  final parts = time.trim().split(':');
-  final hour = int.tryParse(parts[0]) ?? 0;
-  final minute =
-      int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-  return DateTime(date.year, date.month, date.day, hour, minute);
-}
+DateTime combineEventDateAndTime(DateTime date, String time) =>
+    ExperienceEventValidator.combineEventDateAndTime(date, time);

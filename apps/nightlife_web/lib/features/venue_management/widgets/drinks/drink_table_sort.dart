@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vex_engines/experience/shared/experience_featured_sort.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
 
 import '../../../venue/data/models/drink_model.dart';
 import '../../models/drink_categories.dart';
@@ -43,62 +43,38 @@ class DrinkTableSort {
   }
 
   static DrinkSortDirection _defaultDirection(DrinkSortColumn column) {
-    return switch (column) {
-      DrinkSortColumn.name => DrinkSortDirection.ascending,
-      DrinkSortColumn.category => DrinkSortDirection.ascending,
-      DrinkSortColumn.price => DrinkSortDirection.ascending,
-      DrinkSortColumn.available => DrinkSortDirection.ascending,
-      DrinkSortColumn.featured => DrinkSortDirection.ascending,
-    };
+    return DrinkSortDirection.ascending;
+  }
+
+  ExperienceDrinkTableSort toEngine() {
+    return ExperienceDrinkTableSort(
+      column: switch (column) {
+        DrinkSortColumn.name => ExperienceDrinkSortColumn.name,
+        DrinkSortColumn.category => ExperienceDrinkSortColumn.category,
+        DrinkSortColumn.price => ExperienceDrinkSortColumn.price,
+        DrinkSortColumn.available => ExperienceDrinkSortColumn.available,
+        DrinkSortColumn.featured => ExperienceDrinkSortColumn.featured,
+      },
+      direction: direction == DrinkSortDirection.ascending
+          ? ExperienceSortDirection.ascending
+          : ExperienceSortDirection.descending,
+    );
   }
 }
 
 /// Applies search/filter sort within featured and non-featured groups.
 /// Featured drinks always appear before non-featured drinks.
-List<DrinkModel> sortDrinks(List<DrinkModel> drinks, DrinkTableSort sort) =>
-    sortExperienceFeaturedFirst(
-      drinks,
-      (drink) => drink.featured,
-      (a, b) => _compareDrinks(a, b, sort),
-    );
-
-int _compareDrinks(DrinkModel a, DrinkModel b, DrinkTableSort sort) {
-  final comparison = switch (sort.column) {
-    DrinkSortColumn.name =>
-      a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    DrinkSortColumn.category => DrinkCategories.displayName(a.category)
-        .toLowerCase()
-        .compareTo(DrinkCategories.displayName(b.category).toLowerCase()),
-    DrinkSortColumn.price => a.price.compareTo(b.price),
-    DrinkSortColumn.available => _compareBool(
-        a.available,
-        b.available,
-        trueFirst: true,
-      ),
-    DrinkSortColumn.featured => _compareBool(
-        a.featured,
-        b.featured,
-        trueFirst: true,
-      ),
-  };
-
-  if (comparison == 0) {
-    final nameCompare = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    if (nameCompare == 0) return 0;
-    return sort.direction == DrinkSortDirection.ascending
-        ? nameCompare
-        : -nameCompare;
-  }
-
-  return sort.direction == DrinkSortDirection.ascending
-      ? comparison
-      : -comparison;
-}
-
-int _compareBool(bool a, bool b, {required bool trueFirst}) {
-  if (a == b) return 0;
-  if (trueFirst) return a ? -1 : 1;
-  return a ? 1 : -1;
+List<DrinkModel> sortDrinks(List<DrinkModel> drinks, DrinkTableSort sort) {
+  const ordering = VenueContentOrderingService();
+  return ordering.sortDrinksForTable(
+    drinks: drinks,
+    sort: sort.toEngine(),
+    isFeatured: (drink) => drink.featured,
+    name: (drink) => drink.name,
+    categoryLabel: (drink) => DrinkCategories.displayName(drink.category),
+    price: (drink) => drink.price,
+    available: (drink) => drink.available,
+  );
 }
 
 String drinkSortColumnLabel(DrinkSortColumn column) {

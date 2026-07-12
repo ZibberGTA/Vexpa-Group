@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_engines/experience/application/experience_deal_scheduling.dart';
 import 'package:vex_engines/experience/application/experience_deal_visibility.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../venue_management/models/deal_types.dart';
+
+const _presentation = VenuePresentationSupport();
 
 class DealModel {
   const DealModel({
@@ -106,34 +109,16 @@ class DealModel {
         startDateTime: startDateTime,
       );
 
-  String get displayValue => value.trim().isEmpty ? '—' : value.trim();
+  String get displayValue => _presentation.formatDisplayValue(value);
 
-  String get formattedStartDate => _formatDateOnly(startDateTime);
+  String get formattedStartDate => _presentation.formatDateOnly(startDateTime);
 
-  String get formattedEndDate => _formatDateOnly(endDateTime);
+  String get formattedEndDate => _presentation.formatDateOnly(endDateTime);
 
-  String _formatDateOnly(DateTime? date) {
-    if (date == null) return '—';
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month/${date.year}';
-  }
-
-  String get expiryLabel {
-    final end = effectiveEndDateTime ?? endDateTime;
-    if (end == null) {
-      if (endTime.isNotEmpty) return 'Until $endTime';
-      return 'Active now';
-    }
-    if (isFutureDeal) return 'Starts ${_formatDateTime(end)}';
-    return 'Ends ${_formatDateTime(end)}';
-  }
-
-  String _formatDateTime(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-    return '$day/$month $hour:$minute';
-  }
+  String get expiryLabel => _presentation.dealExpiryLabel(
+        endDateTime: endDateTime,
+        endTime: endTime,
+        effectiveEndDateTime: effectiveEndDateTime,
+        isFutureStart: isFutureDeal,
+      );
 }

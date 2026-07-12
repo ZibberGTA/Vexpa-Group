@@ -13,6 +13,7 @@ import '../../models/venue_dashboard_activity.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_page_quick_action.dart';
 import '../../data/drink_spreadsheet_service.dart';
+import '../../data/experience_content_support.dart';
 import '../page/venue_dashboard_page_scaffold.dart';
 import '../page/venue_dashboard_page_widgets.dart';
 import '../venue_dashboard_controller.dart';
@@ -288,27 +289,22 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
   }
 
   List<VenueDashboardActivity> _buildRecentActivity(List<DrinkModel> drinks) {
-    final sorted = [...drinks]
-      ..sort((a, b) {
-        final aTime = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
-
-    return sorted.take(5).map((drink) {
-      final timestamp = drink.updatedAt ?? drink.createdAt;
-      final isNew = drink.createdAt != null &&
-          drink.updatedAt != null &&
-          drink.updatedAt!.difference(drink.createdAt!).inMinutes <= 2;
-
-      return VenueDashboardActivity(
-        title: isNew ? 'Drink added: ${drink.name}' : 'Drink updated: ${drink.name}',
-        timestampLabel: timestamp == null
-            ? 'Recently'
-            : VenueDrinksRepository.relativeTimeLabel(timestamp),
-        icon: Icons.local_bar_outlined,
-      );
-    }).toList();
+    return WebExperienceContentSupport.summary
+        .recentDrinkActivity(
+          drinks: drinks,
+          name: (drink) => drink.name,
+          createdAt: (drink) => drink.createdAt,
+          updatedAt: (drink) => drink.updatedAt,
+          formatTimestamp: VenueDrinksRepository.relativeTimeLabel,
+        )
+        .map(
+          (activity) => VenueDashboardActivity(
+            title: activity.title,
+            timestampLabel: activity.timestampLabel,
+            icon: Icons.local_bar_outlined,
+          ),
+        )
+        .toList();
   }
 
   void _clearCategoryFilters() {
@@ -364,6 +360,13 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
         _pruneSelection(drinks);
         final displayed = _displayDrinks(drinks);
 
+        final drinkMetrics = WebExperienceContentSupport.summary.drinkMetrics(
+          drinks: drinks,
+          categoryLabel: (drink) => DrinkCategories.displayName(drink.category),
+          available: (drink) => drink.available,
+          featured: (drink) => drink.featured,
+        );
+
         return VenueDashboardPageScaffold(
           tab: VenueDashboardTab.drinks,
           onPrimaryAction: () => _openAddDrinkDialog(drinks),
@@ -376,22 +379,22 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
                 metrics: [
                   VenuePageMetricCard(
                     label: 'Total drinks',
-                    value: '${drinks.length}',
+                    value: '${drinkMetrics.total}',
                     icon: Icons.local_bar_outlined,
                   ),
                   VenuePageMetricCard(
                     label: 'Categories',
-                    value: '${{for (final d in drinks) DrinkCategories.displayName(d.category)}.length}',
+                    value: '${drinkMetrics.categories}',
                     icon: Icons.category_outlined,
                   ),
                   VenuePageMetricCard(
                     label: 'Available',
-                    value: '${drinks.where((d) => d.available).length}',
+                    value: '${drinkMetrics.available}',
                     icon: Icons.check_circle_outline_rounded,
                   ),
                   VenuePageMetricCard(
                     label: 'Featured',
-                    value: '${drinks.where((d) => d.featured).length}',
+                    value: '${drinkMetrics.featured}',
                     icon: Icons.star_outline_rounded,
                   ),
                 ],

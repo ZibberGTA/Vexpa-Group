@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../venues/models/image_position_metadata.dart';
@@ -17,6 +19,9 @@ class VenueMediaRepository {
   }) : _firestoreOverride = firestore;
 
   static const mediaCollection = 'media';
+
+  static const _ordering = VenueContentOrderingService();
+  static const _presentation = VenuePresentationSupport();
 
   final FirebaseFirestore? _firestoreOverride;
   final Map<String, Map<String, Map<String, dynamic>>>? _inMemoryStore;
@@ -360,22 +365,25 @@ class VenueMediaRepository {
   }
 
   static int _compareBrandMediaItems(VenueMediaItem a, VenueMediaItem b) {
-    if (a.isCurrent != b.isCurrent) return a.isCurrent ? -1 : 1;
-    if (a.mediaType != b.mediaType) {
-      return a.mediaType == VenueMediaType.logo ? -1 : 1;
-    }
-    final aTime = a.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final bTime = b.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    return bTime.compareTo(aTime);
+    return _ordering.compareBrandMedia(
+      aIsCurrent: a.isCurrent,
+      bIsCurrent: b.isCurrent,
+      aIsLogo: a.mediaType == VenueMediaType.logo,
+      bIsLogo: b.mediaType == VenueMediaType.logo,
+      aUploadedAt: a.uploadedAt,
+      bUploadedAt: b.uploadedAt,
+    );
   }
 
   static int _compareMediaItems(VenueMediaItem a, VenueMediaItem b) {
-    if (a.featured != b.featured) return a.featured ? -1 : 1;
-    final order = a.sortOrder.compareTo(b.sortOrder);
-    if (order != 0) return order;
-    final aTime = a.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final bTime = b.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    return aTime.compareTo(bTime);
+    return _ordering.compareGalleryMedia(
+      aFeatured: a.featured,
+      bFeatured: b.featured,
+      aSortOrder: a.sortOrder,
+      bSortOrder: b.sortOrder,
+      aUploadedAt: a.uploadedAt,
+      bUploadedAt: b.uploadedAt,
+    );
   }
 
   Future<void> _syncGalleryImageUrls({
@@ -619,14 +627,8 @@ class VenueMediaRepository {
   static String generateId() =>
       DateTime.now().microsecondsSinceEpoch.toString();
 
-  static String relativeTimeLabel(DateTime timestamp) {
-    final diff = DateTime.now().difference(timestamp);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-  }
+  static String relativeTimeLabel(DateTime timestamp) =>
+      _presentation.relativeTimeLabel(timestamp);
 
   static String exportCsv(List<VenueMediaItem> items) {
     final buffer = StringBuffer('Name,URL,Cover,Uploaded\n');

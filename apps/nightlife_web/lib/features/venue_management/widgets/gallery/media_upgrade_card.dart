@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/growth/growth_engine.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -13,13 +14,7 @@ import '../venue_dashboard_controller.dart';
 class MediaUpgradeCard extends StatelessWidget {
   const MediaUpgradeCard({super.key});
 
-  static const benefits = [
-    '20 venue gallery photos',
-    'Deal artwork',
-    'Event banners',
-    'Rich customer experience',
-    'Increased customer engagement',
-  ];
+  static const benefits = GrowthUpgradeService.mediaUpgradeBenefits;
 
   @override
   Widget build(BuildContext context) {
@@ -46,9 +41,9 @@ class MediaUpgradeCard extends StatelessWidget {
                     child: Text(
                       'Professional Feature',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -79,14 +74,18 @@ class MediaUpgradeCard extends StatelessWidget {
                           Icon(
                             Icons.check_circle_rounded,
                             size: 16,
-                            color: AppColors.primaryPink.withValues(alpha: 0.95),
+                            color: AppColors.primaryPink.withValues(
+                              alpha: 0.95,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
                               benefit,
                               style: TextStyle(
-                                color: AppColors.textSecondary.withValues(alpha: 0.98),
+                                color: AppColors.textSecondary.withValues(
+                                  alpha: 0.98,
+                                ),
                                 fontSize: 13.5,
                                 height: 1.45,
                               ),

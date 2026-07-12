@@ -1,3 +1,5 @@
+import 'package:vex_engines/experience/application/venue_public_presentation_service.dart';
+
 import '../../search/data/search_venue_open_status.dart';
 import '../../venues/models/venue_model.dart';
 import '../models/venue_details_view.dart';
@@ -8,6 +10,7 @@ import 'venue_opening_hours_formatter.dart';
 class VenueDetailsMapper {
   VenueDetailsMapper._();
 
+  static const _publicPresentation = VenuePublicPresentationService();
   static const _defaultRating = 4.5;
 
   static VenueDetailsView fromVenueModel(VenueModel venue) {
@@ -24,11 +27,11 @@ class VenueDetailsMapper {
     final phone = venue.phone.trim();
     final website = venue.website.trim();
     final description = venue.description.trim();
-    final tags = venue.featureTags.isNotEmpty
-        ? venue.featureTags
-        : _tagsFromCategory(
-            venue.venueType.isNotEmpty ? venue.venueType : venue.category,
-          );
+    final tags = _publicPresentation.resolvePublicTags(
+      featureTags: venue.featureTags,
+      venueType: venue.venueType,
+      category: venue.category,
+    );
 
     return VenueDetailsView(
       id: venue.id,
@@ -41,7 +44,7 @@ class VenueDetailsMapper {
       venueType: venue.venueType,
       rating: venue.averageRating > 0 ? venue.averageRating : _defaultRating,
       isOpen: openStatus.isOpen,
-      tags: tags.take(3).toList(),
+      tags: tags,
       highlights: VenueHighlightsMapper.fromVenueModel(venue),
       bannerImageUrl:
           galleryCoverUrl ?? (bannerUrl.isNotEmpty ? bannerUrl : null),
@@ -65,12 +68,6 @@ class VenueDetailsMapper {
       latitude: venue.latitude,
       longitude: venue.longitude,
     );
-  }
-
-  static List<String> _tagsFromCategory(String category) {
-    final cleaned = category.trim();
-    if (cleaned.isEmpty) return const ['Venue'];
-    return [cleaned];
   }
 }
 

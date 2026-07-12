@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
+import 'package:vex_engines/experience/shared/experience_gallery_categories.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -7,6 +9,8 @@ import '../../../venues/models/image_position_metadata.dart';
 import '../../../venues/models/venue_model.dart';
 import '../../models/venue_details_view.dart';
 import '../shared/venue_section_primitives.dart';
+
+const _presentation = VenuePresentationSupport();
 
 /// Responsive venue gallery with category filters and full-screen viewing.
 class VenueGallerySection extends StatelessWidget {
@@ -52,10 +56,10 @@ class _InteractiveGalleryGridState extends State<_InteractiveGalleryGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final images = widget.images
-        .where((image) => image.imageUrl.trim().isNotEmpty)
-        .take(12)
-        .toList();
+    final images = _presentation.publicGalleryImages(
+      images: widget.images,
+      imageUrl: (image) => image.imageUrl,
+    );
     if (images.isEmpty) return const SizedBox.shrink();
 
     final categories = <String>{
@@ -402,33 +406,20 @@ class _GalleryLightboxState extends State<_GalleryLightbox> {
 
 List<VenueGalleryImageData> _galleryImagesForVenue(VenueDetailsView venue) {
   if (venue.galleryImages.isNotEmpty) return venue.galleryImages;
-  return venue.galleryImageUrls
-      .where((url) => url.trim().isNotEmpty)
-      .toList()
-      .asMap()
-      .entries
+  return _presentation
+      .legacyGalleryFromUrls(venue.galleryImageUrls)
       .map(
-        (entry) => VenueGalleryImageData(
-          imageId: 'legacy-${entry.key}',
-          imageUrl: entry.value,
-          thumbnailUrl: entry.value,
-          category: entry.key == 0 ? 'cover' : 'other',
-          isCover: entry.key == 0,
-          sortOrder: entry.key,
+        (image) => VenueGalleryImageData(
+          imageId: image.id,
+          imageUrl: image.imageUrl,
+          thumbnailUrl: image.thumbnailUrl,
+          category: image.category,
+          isCover: image.isCover,
+          sortOrder: image.sortOrder,
         ),
       )
       .toList();
 }
 
-String _categoryLabel(String category) {
-  return switch (category) {
-    'cover' => 'Cover',
-    'interior' => 'Interior',
-    'drinks' => 'Drinks',
-    'food' => 'Food',
-    'events' => 'Events',
-    'atmosphere' => 'Atmosphere',
-    'all' => 'All',
-    _ => 'Other',
-  };
-}
+String _categoryLabel(String category) =>
+    ExperienceGalleryCategories.label(category);

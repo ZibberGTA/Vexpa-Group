@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
 import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
+import 'package:vex_engines/experience/application/venue_featured_content_service.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_deal_mapper.dart';
@@ -24,6 +27,8 @@ class VenueDealsRepository {
        _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
 
   static const _defaultOrchestrator = ExperienceContentOrchestrator();
+  static const _ordering = VenueContentOrderingService();
+  static const _featured = VenueFeaturedContentService();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueDealDataService _venueDealDataService;
@@ -51,6 +56,7 @@ class VenueDealsRepository {
 
   List<DealModel> _visibleDeals(List<VenueDeal> deals, {DateTime? now}) {
     final mapped = deals.map(dealModelFromVexVenueDeal).toList();
+    final clock = now ?? DateTime.now();
     final visible = _contentOrchestrator.filterPublicVisibleDeals(
       mapped,
       isDeleted: (deal) => deal.isDeleted,
@@ -58,17 +64,14 @@ class VenueDealsRepository {
       startDateTime: (deal) => deal.startDateTime,
       endDateTime: (deal) => deal.endDateTime,
       effectiveEndDateTime: (deal) => deal.effectiveEndDateTime,
-      now: now,
-    )..sort((a, b) {
-        final clock = now ?? DateTime.now();
-        final aUpcoming = isPublicUpcomingDeal(a, now: clock);
-        final bUpcoming = isPublicUpcomingDeal(b, now: clock);
-        if (aUpcoming != bUpcoming) return aUpcoming ? 1 : -1;
-        return (a.startDateTime ?? DateTime(2100)).compareTo(
-          b.startDateTime ?? DateTime(2100),
-        );
-      });
-    return visible;
+      now: clock,
+    );
+    return _ordering.sortPublicDeals(
+      deals: visible,
+      isUpcoming: (deal) => isPublicUpcomingDeal(deal, now: clock),
+      startDateTime: (deal) => deal.startDateTime,
+      now: clock,
+    );
   }
 
   /// All non-deleted deals for venue management (includes paused/expired).
@@ -157,9 +160,11 @@ class VenueDealsRepository {
     required String createdBy,
   }) async {
     final trimmedTitle = source.title.trim();
-    final copyTitle = trimmedTitle.endsWith(' Copy')
-        ? trimmedTitle
-        : '$trimmedTitle Copy';
+    final copyTitle = _featured.duplicateCopyTitle(trimmedTitle);
+    final defaults = _featured.duplicateDealDefaults(
+      sourceStart: source.startDateTime,
+      sourceEnd: source.endDateTime,
+    );
 
     return addDeal(
       venueId: source.venueId,
@@ -168,17 +173,13 @@ class VenueDealsRepository {
       description: source.description,
       dealType: source.dealType,
       value: source.value,
-      startDateTime: source.startDateTime ?? DateTime.now(),
-      endDateTime:
-          source.endDateTime ??
-          (source.startDateTime ?? DateTime.now()).add(
-            const Duration(days: 30),
-          ),
+      startDateTime: defaults.startDateTime,
+      endDateTime: defaults.endDateTime,
       availableDays: source.availableDays,
       startTime: source.startTime,
       endTime: source.endTime,
-      isActive: false,
-      featured: false,
+      isActive: defaults.isActive,
+      featured: defaults.featured,
       createdBy: createdBy,
     );
   }
@@ -322,13 +323,8 @@ class VenueDealsRepository {
     }
   }
 
-  static String relativeTimeLabel(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutes ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  static const _presentation = VenuePresentationSupport();
+
+  static String relativeTimeLabel(DateTime date) =>
+      _presentation.managementRelativeTimeLabel(date);
 }

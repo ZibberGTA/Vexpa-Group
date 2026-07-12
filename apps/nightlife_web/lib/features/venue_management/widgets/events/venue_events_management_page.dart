@@ -5,6 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../venue/data/models/event_model.dart';
 import '../../../venue/data/venue_events_repository.dart';
+import '../../data/experience_content_support.dart';
+import '../../models/event_status.dart';
 import '../../models/venue_dashboard_activity.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_page_quick_action.dart';
@@ -292,21 +294,22 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
   }
 
   List<VenueDashboardActivity> _buildRecentActivity(List<EventModel> events) {
-    final sorted = [...events]
-      ..sort((a, b) {
-        final aTime = a.updatedAt ?? a.createdAt;
-        final bTime = b.updatedAt ?? b.createdAt;
-        return bTime.compareTo(aTime);
-      });
-
-    return sorted.take(5).map((event) {
-      final timestamp = event.updatedAt ?? event.createdAt;
-      return VenueDashboardActivity(
-        title: 'Event updated: ${event.title}',
-        timestampLabel: VenueEventsRepository.relativeTimeLabel(timestamp),
-        icon: Icons.event_outlined,
-      );
-    }).toList();
+    return WebExperienceContentSupport.summary
+        .recentEventActivity(
+          events: events,
+          title: (event) => event.title,
+          createdAt: (event) => event.createdAt,
+          updatedAt: (event) => event.updatedAt,
+          formatTimestamp: VenueEventsRepository.relativeTimeLabel,
+        )
+        .map(
+          (activity) => VenueDashboardActivity(
+            title: activity.title,
+            timestampLabel: activity.timestampLabel,
+            icon: Icons.event_outlined,
+          ),
+        )
+        .toList();
   }
 
   @override

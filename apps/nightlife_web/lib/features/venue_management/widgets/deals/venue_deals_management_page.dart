@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../venue/data/models/deal_model.dart';
 import '../../../venue/data/venue_deals_repository.dart';
 import '../../data/deal_spreadsheet_service.dart';
+import '../../data/experience_content_support.dart';
 import '../../models/bulk_deal_patch.dart';
 import '../../models/deal_status.dart';
 import '../../models/deal_types.dart';
@@ -268,8 +269,8 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
   Future<void> _handlePauseSelected(List<DealModel> allDeals) async {
     final selected = _selectedDeals(allDeals);
     final pausable = selected.where((deal) {
-      final status = computeDealStatus(deal);
-      return status == DealStatus.active || status == DealStatus.scheduled;
+      return WebExperienceContentSupport.availability
+          .isDealPausable(computeDealStatus(deal));
     }).toList();
 
     if (pausable.isEmpty) {
@@ -411,36 +412,23 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
   }
 
   List<VenueDashboardActivity> _buildRecentActivity(List<DealModel> deals) {
-    final sorted = [...deals]
-      ..sort((a, b) {
-        final aTime = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
-
-    return sorted.take(5).map((deal) {
-      final timestamp = deal.updatedAt ?? deal.createdAt;
-      final status = computeDealStatus(deal);
-      final isNew = deal.createdAt != null &&
-          deal.updatedAt != null &&
-          deal.updatedAt!.difference(deal.createdAt!).inMinutes <= 2;
-
-      final title = isNew
-          ? 'Deal created: ${deal.title}'
-          : status == DealStatus.paused
-              ? 'Deal paused: ${deal.title}'
-              : status == DealStatus.expired
-                  ? 'Deal expired: ${deal.title}'
-                  : 'Deal updated: ${deal.title}';
-
-      return VenueDashboardActivity(
-        title: title,
-        timestampLabel: timestamp == null
-            ? 'Recently'
-            : VenueDealsRepository.relativeTimeLabel(timestamp),
-        icon: Icons.local_offer_outlined,
-      );
-    }).toList();
+    return WebExperienceContentSupport.summary
+        .recentDealActivity(
+          deals: deals,
+          title: (deal) => deal.title,
+          createdAt: (deal) => deal.createdAt,
+          updatedAt: (deal) => deal.updatedAt,
+          status: computeDealStatus,
+          formatTimestamp: VenueDealsRepository.relativeTimeLabel,
+        )
+        .map(
+          (activity) => VenueDashboardActivity(
+            title: activity.title,
+            timestampLabel: activity.timestampLabel,
+            icon: Icons.local_offer_outlined,
+          ),
+        )
+        .toList();
   }
 
   void _clearStatusFilters() {
@@ -498,6 +486,12 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
         _pruneSelection(deals);
         final displayed = _displayDeals(deals);
 
+        final dealMetrics = WebExperienceContentSupport.summary.dealMetrics(
+          deals: deals,
+          featured: (deal) => deal.featured,
+          status: computeDealStatus,
+        );
+
         return VenueDashboardPageScaffold(
           tab: VenueDashboardTab.deals,
           onPrimaryAction: () => _openAddDealDialog(deals),
@@ -510,24 +504,22 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
                 metrics: [
                   VenuePageMetricCard(
                     label: 'Total deals',
-                    value: '${deals.length}',
+                    value: '${dealMetrics.total}',
                     icon: Icons.local_offer_outlined,
                   ),
                   VenuePageMetricCard(
                     label: 'Active',
-                    value:
-                        '${deals.where((d) => computeDealStatus(d) == DealStatus.active).length}',
+                    value: '${dealMetrics.active}',
                     icon: Icons.check_circle_outline_rounded,
                   ),
                   VenuePageMetricCard(
                     label: 'Scheduled',
-                    value:
-                        '${deals.where((d) => computeDealStatus(d) == DealStatus.scheduled).length}',
+                    value: '${dealMetrics.scheduled}',
                     icon: Icons.schedule_outlined,
                   ),
                   VenuePageMetricCard(
                     label: 'Featured',
-                    value: '${deals.where((d) => d.featured).length}',
+                    value: '${dealMetrics.featured}',
                     icon: Icons.star_outline_rounded,
                   ),
                 ],

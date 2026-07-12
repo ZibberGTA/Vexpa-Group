@@ -1,4 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
+
+const _presentation = VenuePresentationSupport();
 
 class DrinkModel {
   const DrinkModel({
@@ -60,15 +63,10 @@ class DrinkModel {
     return null;
   }
 
-  bool get hasValidPrice {
-    if (price.isNaN || !price.isFinite) return false;
-    return price > 0;
-  }
+  bool get hasValidPrice => _presentation.hasValidPrice(price);
 
-  String get formattedPrice =>
-      hasValidPrice ? '£${price.toStringAsFixed(2)}' : '—';
+  String get formattedPrice => _presentation.formatPrice(price);
 
   /// Spreadsheet export value — blank unless the drink has a genuine price.
-  String get exportPriceValue =>
-      hasValidPrice ? price.toStringAsFixed(2) : '';
+  String get exportPriceValue => _presentation.exportPriceValue(price);
 }

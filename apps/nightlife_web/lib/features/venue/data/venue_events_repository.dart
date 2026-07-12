@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
 import 'package:vex_engines/experience/application/experience_content_orchestrator.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
+import 'package:vex_engines/experience/application/venue_featured_content_service.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_event_mapper.dart';
@@ -22,6 +25,8 @@ class VenueEventsRepository {
        _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
 
   static const _defaultOrchestrator = ExperienceContentOrchestrator();
+  static const _ordering = VenueContentOrderingService();
+  static const _featured = VenueFeaturedContentService();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueEventDataService _venueEventDataService;
@@ -49,14 +54,17 @@ class VenueEventsRepository {
 
   List<EventModel> _visibleEvents(List<VenueEvent> events, {DateTime? now}) {
     final mapped = events.map(eventModelFromVexVenueEvent).toList();
-    return _contentOrchestrator.filterPublicVisibleEvents(
-      mapped,
-      isDeleted: (event) => event.isDeleted,
-      isActive: (event) => event.isActive,
+    return _ordering.sortEventsByStart(
+      events: _contentOrchestrator.filterPublicVisibleEvents(
+        mapped,
+        isDeleted: (event) => event.isDeleted,
+        isActive: (event) => event.isActive,
+        startDateTime: (event) => event.startDateTime,
+        endDateTime: (event) => event.endDateTime,
+        now: now,
+      ),
       startDateTime: (event) => event.startDateTime,
-      endDateTime: (event) => event.endDateTime,
-      now: now,
-    )..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+    );
   }
 
   Stream<List<EventModel>> watchManagementEvents(String venueId) async* {
@@ -72,8 +80,10 @@ class VenueEventsRepository {
         .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
-      final events = snapshot.docs.map(EventModel.fromDoc).toList()
-        ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+      final events = _ordering.sortEventsByStart(
+        events: snapshot.docs.map(EventModel.fromDoc).toList(),
+        startDateTime: (event) => event.startDateTime,
+      );
       return events;
     });
   }
@@ -158,9 +168,8 @@ class VenueEventsRepository {
     required String venueName,
     required String createdBy,
   }) async {
-    final trimmedTitle = source.title.trim();
-    final copyTitle =
-        trimmedTitle.endsWith(' Copy') ? trimmedTitle : '$trimmedTitle Copy';
+    final copyTitle = _featured.duplicateCopyTitle(source.title.trim());
+    final defaults = _featured.duplicateEventDefaults();
 
     return addEvent(
       venueId: source.venueId,
@@ -169,8 +178,8 @@ class VenueEventsRepository {
       description: source.description,
       startDateTime: source.startDateTime,
       endDateTime: source.endDateTime,
-      isActive: false,
-      featured: false,
+      isActive: defaults.isActive,
+      featured: defaults.featured,
       createdBy: createdBy,
       category: source.category,
       imageUrl: source.imageUrl,
@@ -211,13 +220,8 @@ class VenueEventsRepository {
     }
   }
 
-  static String relativeTimeLabel(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutes ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  static const _presentation = VenuePresentationSupport();
+
+  static String relativeTimeLabel(DateTime date) =>
+      _presentation.managementRelativeTimeLabel(date);
 }

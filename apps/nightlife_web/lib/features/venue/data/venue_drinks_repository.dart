@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_drink_mapper.dart';
@@ -300,13 +301,8 @@ class VenueDrinksRepository {
     }
   }
 
-  static String relativeTimeLabel(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutes ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  static const _presentation = VenuePresentationSupport();
+
+  static String relativeTimeLabel(DateTime date) =>
+      _presentation.managementRelativeTimeLabel(date);
 }

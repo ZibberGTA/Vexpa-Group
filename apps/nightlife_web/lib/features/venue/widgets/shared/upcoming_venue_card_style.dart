@@ -1,52 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 
-const _weekdayLabels = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-
-const _monthLabels = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+const _presentation = VenuePresentationSupport();
 
 /// Customer-facing start label for upcoming deals/events.
-String formatUpcomingStartLabel(DateTime start, {DateTime? now}) {
-  final clock = now ?? DateTime.now();
-  final weekday = _weekdayLabels[start.weekday - 1];
-  final hour = start.hour % 12 == 0 ? 12 : start.hour % 12;
-  final minute = start.minute.toString().padLeft(2, '0');
-  final period = start.hour >= 12 ? 'PM' : 'AM';
-  final timeLabel = '$hour:$minute $period';
-
-  final daysUntil = DateTime(start.year, start.month, start.day)
-      .difference(DateTime(clock.year, clock.month, clock.day))
-      .inDays;
-
-  if (daysUntil >= 0 && daysUntil <= 6) {
-    return 'Starts $weekday at $timeLabel';
-  }
-
-  return 'Available from ${start.day} ${_monthLabels[start.month - 1]}';
-}
+String formatUpcomingStartLabel(DateTime start, {DateTime? now}) =>
+    _presentation.formatUpcomingStartLabel(start, now: now);
 
 /// Small badge used on upcoming public cards.
 class UpcomingVenueBadge extends StatelessWidget {

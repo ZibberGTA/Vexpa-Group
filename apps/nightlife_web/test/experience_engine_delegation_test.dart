@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nightlife_web/features/venue/data/venue_deals_repository.dart';
+import 'package:nightlife_web/features/venue/data/venue_highlights_mapper.dart';
+import 'package:nightlife_web/features/venues/models/venue_model.dart';
 import 'package:nightlife_web/features/venue/data/models/deal_model.dart';
 import 'package:nightlife_web/features/venue/data/models/drink_model.dart';
 import 'package:nightlife_web/features/venue/data/models/event_model.dart';
@@ -16,6 +19,13 @@ import 'package:vex_engines/experience/application/experience_drink_grouper.dart
 import 'package:vex_engines/experience/application/experience_event_status.dart';
 import 'package:vex_engines/experience/application/experience_event_visibility.dart';
 import 'package:vex_engines/experience/application/experience_write_preparation.dart';
+import 'package:nightlife_web/features/venue_management/widgets/deals/deal_table_sort.dart';
+import 'package:nightlife_web/features/venue_management/widgets/events/event_form.dart';
+import 'package:nightlife_web/features/venue/widgets/shared/upcoming_venue_card_style.dart';
+import 'package:vex_engines/experience/application/experience_event_validator.dart';
+import 'package:vex_engines/experience/application/venue_content_ordering_service.dart';
+import 'package:vex_engines/experience/application/venue_featured_content_service.dart';
+import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 import 'package:vex_engines/experience/shared/experience_deal_types.dart';
 import 'package:vex_engines/experience/shared/experience_drink_categories.dart';
 
@@ -185,6 +195,93 @@ void main() {
         ),
       );
       expect(computeEventStatus(event, now: now), EventStatus.draft);
+    });
+
+    test('deal table sort delegates featured-first ordering to engine', () {
+      final deals = [
+        DealModel(
+          id: '1',
+          venueId: 'v',
+          title: 'Regular',
+          description: '',
+          featured: false,
+        ),
+        DealModel(
+          id: '2',
+          venueId: 'v',
+          title: 'Featured',
+          description: '',
+          featured: true,
+        ),
+      ];
+
+      final sorted = sortDeals(deals, const DealTableSort());
+      expect(sorted.first.featured, isTrue);
+    });
+
+    test('event form validation delegates to ExperienceEventValidator', () {
+      expect(
+        AddEventFormValidator.validateTitle(''),
+        ExperienceEventValidator.validateTitle(''),
+      );
+      expect(
+        validateEventDateTimeRange(
+          startDate: DateTime(2026, 7, 10),
+          startTime: '20:00',
+          endDate: DateTime(2026, 7, 10),
+          endTime: '23:00',
+        ),
+        ExperienceEventValidator.validateDateTimeRange(
+          startDate: DateTime(2026, 7, 10),
+          startTime: '20:00',
+          endDate: DateTime(2026, 7, 10),
+          endTime: '23:00',
+        ),
+      );
+    });
+
+    test('presentation shims delegate to VenuePresentationSupport', () {
+      const presentation = VenuePresentationSupport();
+      const featured = VenueFeaturedContentService();
+
+      expect(
+        formatUpcomingStartLabel(DateTime(2026, 7, 13, 20)),
+        presentation.formatUpcomingStartLabel(DateTime(2026, 7, 13, 20)),
+      );
+      expect(
+        featured.duplicateCopyTitle('Two-for-one'),
+        'Two-for-one Copy',
+      );
+    });
+
+    test('repository relative time delegates to management label format', () {
+      const presentation = VenuePresentationSupport();
+      final timestamp = DateTime.now().subtract(const Duration(hours: 2));
+
+      expect(
+        VenueDealsRepository.relativeTimeLabel(timestamp),
+        presentation.managementRelativeTimeLabel(timestamp),
+      );
+    });
+
+    test('venue highlights mapper delegates to public presentation service', () {
+      final venue = VenueModel(
+        id: 'v1',
+        name: 'Test',
+        address: '1 High St',
+        area: 'Centre',
+        city: 'Leeds',
+        category: 'Bar',
+        venueType: 'Cocktail Bar',
+        crowdLevel: 'quiet',
+        featureTags: const ['Cocktails'],
+        features: const ['Rooftop'],
+      );
+
+      expect(
+        VenueHighlightsMapper.fromVenueModel(venue),
+        ['Cocktails', 'Rooftop'],
+      );
     });
   });
 }
