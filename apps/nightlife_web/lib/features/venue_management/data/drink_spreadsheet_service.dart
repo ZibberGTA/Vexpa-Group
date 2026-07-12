@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
+import 'package:vex_engines/experience/application/experience_drink_import_validator.dart';
+import 'package:vex_engines/experience/domain/experience_drink_import.dart';
 
 import '../../venue/data/models/drink_model.dart';
 import '../models/drink_categories.dart';
@@ -13,13 +15,7 @@ import '../models/drink_import_row.dart';
 class DrinkSpreadsheetService {
   DrinkSpreadsheetService._();
 
-  static const requiredColumns = [
-    'name',
-    'category',
-    'price',
-    'available',
-    'featured',
-  ];
+  static const requiredColumns = ExperienceDrinkImportValidator.requiredColumns;
 
   static const templateFilename = 'vexda-drinks-import-template.xlsx';
   static const templateMimeType =
@@ -167,22 +163,60 @@ class DrinkSpreadsheetService {
     required List<DrinkImportRow> rows,
     required bool includeDuplicates,
   }) {
-    return rows
-        .where((row) {
-          if (row.isBlocking) return false;
-          if (row.isDuplicateWarning) return includeDuplicates;
-          return true;
-        })
+    final engineRows = rows
+        .map(
+          (row) => ExperienceDrinkImportRow(
+            rowNumber: row.rowNumber,
+            name: row.name,
+            category: row.category,
+            priceRaw: row.priceRaw,
+            availableRaw: row.availableRaw,
+            featuredRaw: row.featuredRaw,
+            price: row.price,
+            available: row.available,
+            featured: row.featured,
+            status: _toEngineStatus(row.status),
+            statusLabel: row.statusLabel,
+            isBlocking: row.isBlocking,
+            isDuplicateWarning: row.isDuplicateWarning,
+          ),
+        )
+        .toList();
+
+    return ExperienceDrinkImportValidator.rowsToCommit(
+      rows: engineRows,
+      includeDuplicates: includeDuplicates,
+    )
         .map(
           (row) => DrinkImportCommitRow(
-            name: row.name.trim(),
-            category: row.category.trim(),
+            name: row.name,
+            category: row.category,
             price: row.price,
             available: row.available,
             featured: row.featured,
           ),
         )
         .toList();
+  }
+
+  static ExperienceDrinkImportRowStatus _toEngineStatus(
+    DrinkImportRowStatus status,
+  ) {
+    return switch (status) {
+      DrinkImportRowStatus.ready => ExperienceDrinkImportRowStatus.ready,
+      DrinkImportRowStatus.missingName =>
+        ExperienceDrinkImportRowStatus.missingName,
+      DrinkImportRowStatus.invalidCategory =>
+        ExperienceDrinkImportRowStatus.invalidCategory,
+      DrinkImportRowStatus.invalidPrice =>
+        ExperienceDrinkImportRowStatus.invalidPrice,
+      DrinkImportRowStatus.invalidAvailable =>
+        ExperienceDrinkImportRowStatus.invalidAvailable,
+      DrinkImportRowStatus.invalidFeatured =>
+        ExperienceDrinkImportRowStatus.invalidFeatured,
+      DrinkImportRowStatus.possibleDuplicate =>
+        ExperienceDrinkImportRowStatus.possibleDuplicate,
+    };
   }
 
   static List<List<String>> _parseCsv(Uint8List bytes) {
@@ -236,75 +270,57 @@ class DrinkSpreadsheetService {
     required Map<String, int> columnMap,
     required Set<String> existingDrinkNames,
   }) {
-    final name = _cellValue(cells, columnMap['name']!);
-    final category = _cellValue(cells, columnMap['category']!);
-    final priceRaw = _cellValue(cells, columnMap['price']!);
-    final availableRaw = _cellValue(cells, columnMap['available']!);
-    final featuredRaw = _cellValue(cells, columnMap['featured']!);
-
-    final parsedAvailable = parseOptionalBoolean(availableRaw);
-    final parsedFeatured = parseOptionalBoolean(featuredRaw);
-    final parsedPrice = parseOptionalPrice(priceRaw);
-
-    final available = parsedAvailable ?? true;
-    final featured = parsedFeatured ?? false;
-
-    DrinkImportRowStatus status = DrinkImportRowStatus.ready;
-    var isBlocking = false;
-    var isDuplicate = false;
-
-    if (name.trim().isEmpty) {
-      status = DrinkImportRowStatus.missingName;
-      isBlocking = true;
-    } else if (category.trim().isEmpty || !DrinkCategories.isAllowed(category)) {
-      status = DrinkImportRowStatus.invalidCategory;
-      isBlocking = true;
-    } else if (parsedPrice == null && priceRaw.trim().isNotEmpty) {
-      status = DrinkImportRowStatus.invalidPrice;
-      isBlocking = true;
-    } else if (availableRaw.trim().isNotEmpty && parsedAvailable == null) {
-      status = DrinkImportRowStatus.invalidAvailable;
-      isBlocking = true;
-    } else if (featuredRaw.trim().isNotEmpty && parsedFeatured == null) {
-      status = DrinkImportRowStatus.invalidFeatured;
-      isBlocking = true;
-    } else if (existingDrinkNames.contains(name.trim().toLowerCase())) {
-      status = DrinkImportRowStatus.possibleDuplicate;
-      isDuplicate = true;
-    }
+    final validated = ExperienceDrinkImportValidator.validateRow(
+      rowNumber: rowNumber,
+      name: _cellValue(cells, columnMap['name']!),
+      category: _cellValue(cells, columnMap['category']!),
+      priceRaw: _cellValue(cells, columnMap['price']!),
+      availableRaw: _cellValue(cells, columnMap['available']!),
+      featuredRaw: _cellValue(cells, columnMap['featured']!),
+      existingDrinkNames: existingDrinkNames,
+      isAllowedCategory: DrinkCategories.isAllowed,
+    );
 
     return DrinkImportRow(
-      rowNumber: rowNumber,
-      name: name,
-      category: category,
-      priceRaw: priceRaw,
-      availableRaw: availableRaw,
-      featuredRaw: featuredRaw,
-      price: parsedPrice,
-      available: available,
-      featured: featured,
-      status: status,
-      statusLabel: _statusLabel(status),
-      isBlocking: isBlocking,
-      isDuplicateWarning: isDuplicate,
+      rowNumber: validated.rowNumber,
+      name: validated.name,
+      category: validated.category,
+      priceRaw: validated.priceRaw,
+      availableRaw: validated.availableRaw,
+      featuredRaw: validated.featuredRaw,
+      price: validated.price,
+      available: validated.available,
+      featured: validated.featured,
+      status: _fromEngineStatus(validated.status),
+      statusLabel: validated.statusLabel,
+      isBlocking: validated.isBlocking,
+      isDuplicateWarning: validated.isDuplicateWarning,
     );
+  }
+
+  static DrinkImportRowStatus _fromEngineStatus(
+    ExperienceDrinkImportRowStatus status,
+  ) {
+    return switch (status) {
+      ExperienceDrinkImportRowStatus.ready => DrinkImportRowStatus.ready,
+      ExperienceDrinkImportRowStatus.missingName =>
+        DrinkImportRowStatus.missingName,
+      ExperienceDrinkImportRowStatus.invalidCategory =>
+        DrinkImportRowStatus.invalidCategory,
+      ExperienceDrinkImportRowStatus.invalidPrice =>
+        DrinkImportRowStatus.invalidPrice,
+      ExperienceDrinkImportRowStatus.invalidAvailable =>
+        DrinkImportRowStatus.invalidAvailable,
+      ExperienceDrinkImportRowStatus.invalidFeatured =>
+        DrinkImportRowStatus.invalidFeatured,
+      ExperienceDrinkImportRowStatus.possibleDuplicate =>
+        DrinkImportRowStatus.possibleDuplicate,
+    };
   }
 
   static String _cellValue(List<String> cells, int index) {
     if (index < 0 || index >= cells.length) return '';
     return cells[index];
-  }
-
-  static String _statusLabel(DrinkImportRowStatus status) {
-    return switch (status) {
-      DrinkImportRowStatus.ready => 'Ready',
-      DrinkImportRowStatus.missingName => 'Missing name',
-      DrinkImportRowStatus.invalidCategory => 'Invalid category',
-      DrinkImportRowStatus.invalidPrice => 'Invalid price',
-      DrinkImportRowStatus.invalidAvailable => 'Invalid available',
-      DrinkImportRowStatus.invalidFeatured => 'Invalid featured',
-      DrinkImportRowStatus.possibleDuplicate => 'Possible duplicate',
-    };
   }
 
   static String _extension(String filename) {
@@ -313,17 +329,9 @@ class DrinkSpreadsheetService {
     return filename.substring(dot + 1).toLowerCase();
   }
 
-  static double? parseOptionalPrice(String raw) {
-    final trimmed = raw.trim().replaceAll('£', '').replaceAll(',', '');
-    if (trimmed.isEmpty) return null;
-    return double.tryParse(trimmed);
-  }
+  static double? parseOptionalPrice(String raw) =>
+      ExperienceDrinkImportValidator.parseOptionalPrice(raw);
 
-  static bool? parseOptionalBoolean(String raw) {
-    final value = raw.trim().toLowerCase();
-    if (value.isEmpty) return null;
-    if (const {'true', 'yes', 'y', '1'}.contains(value)) return true;
-    if (const {'false', 'no', 'n', '0'}.contains(value)) return false;
-    return null;
-  }
+  static bool? parseOptionalBoolean(String raw) =>
+      ExperienceDrinkImportValidator.parseOptionalBoolean(raw);
 }
