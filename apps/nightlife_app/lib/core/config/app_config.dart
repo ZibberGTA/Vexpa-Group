@@ -1,14 +1,15 @@
-/// Central runtime configuration for DrinkSpot.
+/// Central runtime configuration for Vexda mobile.
+library;
+
+/// Google Routes API key precedence:
+/// 1. `--dart-define=GOOGLE_ROUTES_API_KEY=...` (CI/release override)
+/// 2. Untracked [AppSecrets.localRoutesApiKey] from `app_secrets.local.dart`
+/// 3. Empty — in-app routes fail with existing user-facing error handling
 ///
-/// Keep secrets out of source code. Values are read from Flutter's
-/// `--dart-define` system, or from IDE run configurations that pass the same
-/// values automatically.
-///
-/// Required for in-app walking routes:
-///   GOOGLE_ROUTES_API_KEY
-///
-/// Optional legacy fallback while migrating older local run configs:
-///   GOOGLE_DIRECTIONS_API_KEY
+/// Run `dart run tool/ensure_local_platform_config.dart` once after clone.
+/// See docs/platform/API_KEYS_SETUP.md.
+import 'app_secrets.dart';
+
 class AppConfig {
   const AppConfig._();
 
@@ -16,16 +17,12 @@ class AppConfig {
     'GOOGLE_ROUTES_API_KEY',
   );
 
-  static const String googleDirectionsApiKey = String.fromEnvironment(
-    'GOOGLE_DIRECTIONS_API_KEY',
-  );
-
   static String get routesApiKey {
-    final routesKey = googleRoutesApiKey.trim();
-    if (routesKey.isNotEmpty) return routesKey;
+    final fromDefine = googleRoutesApiKey.trim();
+    if (fromDefine.isNotEmpty) return fromDefine;
 
-    final legacyDirectionsKey = googleDirectionsApiKey.trim();
-    if (legacyDirectionsKey.isNotEmpty) return legacyDirectionsKey;
+    final fromLocal = AppSecrets.localRoutesApiKey.trim();
+    if (fromLocal.isNotEmpty) return fromLocal;
 
     return '';
   }
