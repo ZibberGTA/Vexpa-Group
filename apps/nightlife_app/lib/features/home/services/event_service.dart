@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_engines/experience/application/experience_event_visibility.dart';
 
 import '../models/event_model.dart';
+import 'experience_content_support.dart';
 import '../../notifications/services/smart_notification_service.dart';
+import '../../owner/data/mobile_event_write_payload.dart';
 
 class EventService {
   static final _events = FirebaseFirestore.instance.collection('events');
@@ -26,8 +28,10 @@ class EventService {
             ),
           )
           .toList();
-      events.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-      return events;
+      return MobileExperienceContentSupport.ordering.sortEventsByStart(
+        events: events,
+        startDateTime: (event) => event.startDateTime,
+      );
     });
   }
 
@@ -50,8 +54,10 @@ class EventService {
             ),
           )
           .toList();
-      events.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-      return events;
+      return MobileExperienceContentSupport.ordering.sortEventsByStart(
+        events: events,
+        startDateTime: (event) => event.startDateTime,
+      );
     });
   }
 
@@ -64,19 +70,17 @@ class EventService {
     required String category,
     String imageUrl = '',
   }) async {
-    final eventRef = await _events.add({
-      'venueId': venueId,
-      'title': title.trim(),
-      'description': description.trim(),
-      'dateTime': Timestamp.fromDate(startDateTime),
-      'startDateTime': Timestamp.fromDate(startDateTime),
-      'endDateTime': Timestamp.fromDate(endDateTime),
-      'createdAt': Timestamp.now(),
-      'category': category,
-      'imageUrl': imageUrl.trim(),
-      'isDeleted': false,
-      'notificationSent': false,
-    });
+    final eventRef = await _events.add(
+      MobileEventWritePayload.buildCreate(
+        venueId: venueId,
+        title: title,
+        description: description,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+        category: category,
+        imageUrl: imageUrl,
+      ),
+    );
 
     try {
       final venueSnapshot = await FirebaseFirestore.instance.collection('venues').doc(venueId).get();

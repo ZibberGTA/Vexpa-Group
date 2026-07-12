@@ -1,64 +1,80 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nightlife_app/features/home/models/deal_model.dart';
-import 'package:nightlife_app/features/home/models/event_model.dart';
-import 'package:vex_engines/experience/application/experience_deal_visibility.dart';
-import 'package:vex_engines/experience/application/experience_event_visibility.dart';
+import 'package:nightlife_app/features/home/services/experience_content_support.dart';
+import 'package:nightlife_app/features/owner/data/mobile_deal_write_payload.dart';
+import 'package:nightlife_app/features/owner/data/mobile_drink_write_payload.dart';
+import 'package:nightlife_app/features/owner/data/mobile_event_write_payload.dart';
+import 'package:vex_engines/experience/application/experience_drink_import_validator.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 void main() {
   group('Mobile experience engine delegation', () {
-    test('deal model visibility delegates to ExperienceDealVisibility', () {
-      final now = DateTime.now();
-      final deal = DealModel(
-        id: '1',
-        venueId: 'v',
-        title: 'Current',
-        description: '',
-        startTime: '',
-        endTime: '',
-        startDateTime: now.subtract(const Duration(hours: 1)),
-        endDateTime: now.add(const Duration(hours: 2)),
-        isActive: true,
+    test('mobile drink write payload delegates preset create to engine', () {
+      final payload = MobileDrinkWritePayload.buildPresetCreate(
+        venueId: 'v1',
+        venueName: 'Bar',
+        drinkName: 'Guinness',
+        categoryDisplayName: 'Beer',
+        price: 5.5,
       );
 
-      expect(deal.isCurrentlyVisible, isTrue);
+      expect(payload['category'], 'beer');
+      expect(payload['isPresetDrink'], isTrue);
+      expect(payload['createdAt'], isNotNull);
       expect(
-        deal.isCurrentlyVisible,
-        ExperienceDealVisibility.isPublicCurrent(
-          isDeleted: deal.isDeleted,
-          isActive: deal.isActive,
-          startDateTime: deal.startDateTime,
-          endDateTime: deal.endDateTime,
-          effectiveEndDateTime: deal.effectiveEndDateTime,
-        ),
+        payload['searchTerms'],
+        ExperienceOwnerWriteService.mobilePresetDrinkCreateFields(
+          venueId: 'v1',
+          venueName: 'Bar',
+          drinkName: 'Guinness',
+          categoryDisplayName: 'Beer',
+          price: 5.5,
+        )['searchTerms'],
       );
     });
 
-    test('event model visibility delegates to ExperienceEventVisibility', () {
-      final now = DateTime.now();
-      final event = EventModel(
-        id: '1',
-        venueId: 'v',
-        title: 'Upcoming',
-        description: '',
-        startDateTime: now.add(const Duration(days: 1)),
-        endDateTime: now.add(const Duration(days: 1, hours: 3)),
-        createdAt: now,
-        category: 'General',
-        imageUrl: '',
-        isDeleted: false,
-        isActive: true,
+    test('mobile deal write payload delegates create to engine', () {
+      final start = DateTime(2026, 7, 10, 17);
+      final end = DateTime(2026, 7, 10, 20);
+
+      final payload = MobileDealWritePayload.buildCreate(
+        venueId: 'v1',
+        venueName: 'Bar',
+        title: 'Happy Hour',
+        description: '2 for 1',
+        startDateTime: start,
+        endDateTime: end,
+        startTime: '17:00',
+        endTime: '20:00',
       );
 
-      expect(event.isLiveOrUpcoming, isTrue);
-      expect(
-        event.isLiveOrUpcoming,
-        ExperienceEventVisibility.isPublicVisible(
-          isDeleted: event.isDeleted,
-          isActive: event.isActive,
-          startDateTime: event.startDateTime,
-          endDateTime: event.endDateTime,
-        ),
+      expect(payload['dealType'], 'drink_offer');
+      expect(payload['startDateTime'], isNotNull);
+      expect(payload['updatedAt'], isNotNull);
+    });
+
+    test('mobile event write payload delegates create to engine', () {
+      final start = DateTime(2026, 7, 12, 20);
+      final end = DateTime(2026, 7, 13);
+
+      final payload = MobileEventWritePayload.buildCreate(
+        venueId: 'v1',
+        title: 'Quiz Night',
+        description: 'Weekly quiz',
+        startDateTime: start,
+        endDateTime: end,
+        category: 'Quiz Night',
       );
+
+      expect(payload['notificationSent'], isFalse);
+      expect(payload['createdAt'], isNotNull);
+      expect(payload['dateTime'], isNotNull);
+    });
+
+    test('MobileExperienceContentSupport exposes owner write facade', () {
+      expect(MobileExperienceContentSupport.ownerWrite,
+          const ExperienceOwnerWriteService());
+      expect(MobileExperienceContentSupport.drinkImport,
+          const ExperienceDrinkImportValidator());
     });
   });
 }

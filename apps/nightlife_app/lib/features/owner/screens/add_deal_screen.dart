@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 import '../../home/models/venue_model.dart';
 import '../../search/services/search_index_service.dart';
 import '../../notifications/services/smart_notification_service.dart';
+import '../data/mobile_deal_write_payload.dart';
 
 class AddDealScreen extends StatefulWidget {
   const AddDealScreen({
@@ -43,8 +45,16 @@ class _AddDealScreenState extends State<AddDealScreen> {
     final startTime = startTimeController.text.trim();
     final endTime = endTimeController.text.trim();
 
-    if (title.isEmpty || description.isEmpty || startTime.isEmpty || endTime.isEmpty || startDate == null || endDate == null) {
-      _showMessage('Please complete title, description, dates and times.');
+    final validationError = ExperienceOwnerWriteService.validateMobileDealCreate(
+      title: title,
+      description: description,
+      startTime: startTime,
+      endTime: endTime,
+      startDate: startDate,
+      endDate: endDate,
+    );
+    if (validationError != null) {
+      _showMessage(validationError);
       return;
     }
 
@@ -56,43 +66,26 @@ class _AddDealScreenState extends State<AddDealScreen> {
       final dealRef = firestore.collection('deals').doc();
       final venueRef = firestore.collection('venues').doc(widget.venue.id);
 
-      final searchTerms = {
-        title.toLowerCase(),
-        description.toLowerCase(),
-        widget.venue.name.toLowerCase(),
-        ...title.toLowerCase().split(' '),
-        ...description.toLowerCase().split(' '),
-        if (startTime.isNotEmpty) startTime.toLowerCase(),
-        if (endTime.isNotEmpty) endTime.toLowerCase(),
-      }.where((term) => term.trim().isNotEmpty).toList();
-
       final batch = firestore.batch();
 
-      final startDateTime = _combineDateAndTime(startDate!, startTime);
-      final endDateTime = _combineDateAndTime(endDate!, endTime);
+      final startDateTime =
+          ExperienceOwnerWriteService.combineDateAndTime(startDate!, startTime)!;
+      final endDateTime =
+          ExperienceOwnerWriteService.combineDateAndTime(endDate!, endTime)!;
 
-      if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
-        _showMessage('Please use valid start/end times. End must be after start.');
-        setState(() => isLoading = false);
-        return;
-      }
-
-      batch.set(dealRef, {
-        'venueId': widget.venue.id,
-        'venueName': widget.venue.name,
-        'title': title,
-        'description': description,
-        'dealType': 'drink_offer',
-        'startTime': startTime,
-        'endTime': endTime,
-        'startDateTime': Timestamp.fromDate(startDateTime),
-        'endDateTime': Timestamp.fromDate(endDateTime),
-        'isActive': true,
-        'isDeleted': false,
-        'searchTerms': searchTerms,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      batch.set(
+        dealRef,
+        MobileDealWritePayload.buildCreate(
+          venueId: widget.venue.id,
+          venueName: widget.venue.name,
+          title: title,
+          description: description,
+          startDateTime: startDateTime,
+          endDateTime: endDateTime,
+          startTime: startTime,
+          endTime: endTime,
+        ),
+      );
 
       batch.update(venueRef, {
         'hasDeals': true,
@@ -120,15 +113,6 @@ class _AddDealScreenState extends State<AddDealScreen> {
         setState(() => isLoading = false);
       }
     }
-  }
-
-  DateTime? _combineDateAndTime(DateTime date, String time) {
-    final parts = time.split(':');
-    if (parts.length < 2) return null;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), ''));
-    if (hour == null || minute == null) return null;
-    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   Future<void> _pickDate({required bool start}) async {

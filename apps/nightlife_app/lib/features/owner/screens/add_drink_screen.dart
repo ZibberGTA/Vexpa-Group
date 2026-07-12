@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:vex_engines/experience/shared/experience_search_term_builder.dart';
+import 'package:vex_engines/experience/application/experience_drink_import_validator.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../home/models/venue_model.dart';
 import '../../search/services/search_index_service.dart';
+import '../data/mobile_drink_write_payload.dart';
 
 class AddDrinkScreen extends StatefulWidget {
   const AddDrinkScreen({
@@ -172,8 +174,78 @@ void initState() {
     return count;
   }
 
-  List<String> _buildSearchTerms(List<String> values) =>
-      ExperienceSearchTermBuilder.buildFromValues(values);
+  Future<void> _saveSelected() async {
+    final chosen = selected.entries.where((entry) => entry.value).toList();
+
+    final selectionError =
+        ExperienceOwnerWriteService.validatePresetDrinkSelection(
+      selectedCount: chosen.length,
+    );
+    if (selectionError != null) {
+      _showMessage(selectionError);
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final drinksCollection = FirebaseFirestore.instance.collection('drinks');
+
+      for (final item in chosen) {
+        final drinkName = item.key;
+
+        if (ExperienceDrinkImportValidator.isDuplicateName(
+          name: drinkName,
+          existingDrinkNamesLowercase: existingDrinks,
+        )) {
+          continue;
+        }
+        final category = _categoryForDrink(drinkName);
+        final priceText = priceControllers[drinkName]?.text.trim() ?? '';
+
+        final priceError = ExperienceOwnerWriteService.validatePresetDrinkPrice(
+          drinkName: drinkName,
+          priceText: priceText,
+        );
+        if (priceError != null) {
+          _showMessage(priceError);
+          setState(() => isLoading = false);
+          return;
+        }
+
+        final price =
+            ExperienceOwnerWriteService.parsePresetDrinkPrice(priceText);
+
+        final docRef = drinksCollection.doc();
+
+        batch.set(
+          docRef,
+          MobileDrinkWritePayload.buildPresetCreate(
+            venueId: widget.venue.id,
+            venueName: widget.venue.name,
+            drinkName: drinkName,
+            categoryDisplayName: category,
+            price: price,
+          ),
+        );
+      }
+
+      await batch.commit();
+      await SearchIndexService.updateVenueSearchTerms(widget.venue.id);
+
+      if (!mounted) return;
+
+      _showMessage('${chosen.length} drink${chosen.length == 1 ? '' : 's'} added.');
+      Navigator.pop(context);
+    } catch (e) {
+      _showMessage('Failed to save drinks: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
 
   String _categoryForDrink(String drinkName) {
     for (final entry in drinkLibrary.entries) {
@@ -202,74 +274,6 @@ void initState() {
         })
         .where((entry) => entry.value.isNotEmpty)
         .toList();
-  }
-
-  Future<void> _saveSelected() async {
-    final chosen = selected.entries.where((entry) => entry.value).toList();
-
-    if (chosen.isEmpty) {
-      _showMessage('Select at least one drink.');
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-      final drinksCollection = FirebaseFirestore.instance.collection('drinks');
-
-      for (final item in chosen) {
-        final drinkName = item.key;
-
-        if (existingDrinks.contains(drinkName.toLowerCase())) {
-          continue;
-        }
-        final category = _categoryForDrink(drinkName);
-        final priceText = priceControllers[drinkName]?.text.trim() ?? '';
-        final price = priceText.isEmpty ? null : double.tryParse(priceText);
-
-        if (priceText.isNotEmpty && price == null) {
-          _showMessage('Please enter a valid price for $drinkName.');
-          setState(() => isLoading = false);
-          return;
-        }
-
-        final docRef = drinksCollection.doc();
-
-        batch.set(docRef, {
-          'venueId': widget.venue.id,
-          'venueName': widget.venue.name,
-          'name': drinkName,
-          'category': category.toLowerCase(),
-          'price': price,
-          'description': '',
-          'available': true,
-          'isDeleted': false,
-          'isPresetDrink': true,
-          'searchTerms': _buildSearchTerms([
-            drinkName,
-            category,
-            widget.venue.name,
-          ]),
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-      await SearchIndexService.updateVenueSearchTerms(widget.venue.id);
-
-      if (!mounted) return;
-
-      _showMessage('${chosen.length} drink${chosen.length == 1 ? '' : 's'} added.');
-      Navigator.pop(context);
-    } catch (e) {
-      _showMessage('Failed to save drinks: $e');
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
-    }
   }
 
   void _showMessage(String message) {

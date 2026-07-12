@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 import '../../home/models/event_model.dart';
 import '../../home/services/event_service.dart';
@@ -84,14 +85,18 @@ class _AddEventScreenState extends State<AddEventScreen> {
     setState(() {
       selectedStartDateTime = picked;
       if (selectedEndDateTime == null || !selectedEndDateTime!.isAfter(picked)) {
-        selectedEndDateTime = picked.add(const Duration(hours: 4));
+        selectedEndDateTime = ExperienceOwnerWriteService.defaultMobileEventEnd(
+          start: picked,
+        );
       }
     });
   }
 
   Future<void> pickEndDateTime() async {
     final initial = selectedEndDateTime ??
-        (selectedStartDateTime ?? DateTime.now()).add(const Duration(hours: 4));
+        ExperienceOwnerWriteService.defaultMobileEventEnd(
+          start: selectedStartDateTime ?? DateTime.now(),
+        );
     final picked = await _pickDateTime(initialDateTime: initial);
 
     if (picked == null) return;
@@ -106,19 +111,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
     final description = descriptionController.text.trim();
     final imageUrl = imageUrlController.text.trim();
 
-    if (title.isEmpty ||
-        description.isEmpty ||
-        selectedStartDateTime == null ||
-        selectedEndDateTime == null) {
+    final validationError = ExperienceOwnerWriteService.validateMobileEventCreate(
+      title: title,
+      description: description,
+      startDateTime: selectedStartDateTime,
+      endDateTime: selectedEndDateTime,
+    );
+    if (validationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete title, description, start time and end time')),
-      );
-      return;
-    }
-
-    if (!selectedEndDateTime!.isAfter(selectedStartDateTime!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End time must be after start time')),
+        SnackBar(content: Text(validationError)),
       );
       return;
     }

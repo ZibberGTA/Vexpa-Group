@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 import '../../home/models/drink_model.dart';
 import '../../search/services/search_index_service.dart';
+import '../data/mobile_drink_write_payload.dart';
 
 class EditDrinkScreen extends StatefulWidget {
   const EditDrinkScreen({
@@ -51,8 +53,14 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
     final price = priceController.text.trim();
     final description = descriptionController.text.trim();
 
-    if (name.isEmpty || category.isEmpty || price.isEmpty || description.isEmpty) {
-      _showMessage('Please complete all fields.');
+    final validationError = ExperienceOwnerWriteService.validateMobileDrinkEdit(
+      name: name,
+      category: category,
+      price: price,
+      description: description,
+    );
+    if (validationError != null) {
+      _showMessage(validationError);
       return;
     }
 
@@ -62,13 +70,14 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
       await FirebaseFirestore.instance
           .collection('drinks')
           .doc(widget.drink.id)
-          .update({
-        'name': name,
-        'category': category,
-        'price': price,
-        'description': description,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(
+            MobileDrinkWritePayload.buildEditUpdate(
+              name: name,
+              category: category,
+              price: price,
+              description: description,
+            ),
+          );
 
       // ✅ Update search index
       await SearchIndexService.updateVenueSearchTerms(widget.drink.venueId);

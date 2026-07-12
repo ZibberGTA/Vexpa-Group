@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vex_engines/experience/application/experience_owner_write_service.dart';
 
 import '../../../core/widgets/home_icon_button.dart';
 import '../../home/models/deal_model.dart';
 import '../../search/services/search_index_service.dart';
+import '../data/mobile_deal_write_payload.dart';
 
 class EditDealScreen extends StatefulWidget {
   const EditDealScreen({
@@ -71,39 +73,40 @@ class _EditDealScreenState extends State<EditDealScreen> {
     final startTime = startTimeController.text.trim();
     final endTime = endTimeController.text.trim();
 
-    if (title.isEmpty ||
-        description.isEmpty ||
-        startTime.isEmpty ||
-        endTime.isEmpty || startDate == null || endDate == null) {
-      _showMessage('Please complete all fields, dates and times.');
+    final validationError = ExperienceOwnerWriteService.validateMobileDealUpdate(
+      title: title,
+      description: description,
+      startTime: startTime,
+      endTime: endTime,
+      startDate: startDate,
+      endDate: endDate,
+    );
+    if (validationError != null) {
+      _showMessage(validationError);
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      final startDateTime = _combineDateAndTime(startDate!, startTime);
-      final endDateTime = _combineDateAndTime(endDate!, endTime);
-
-      if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
-        _showMessage('Please use valid start/end times. End must be after start.');
-        setState(() => isLoading = false);
-        return;
-      }
+      final startDateTime =
+          ExperienceOwnerWriteService.combineDateAndTime(startDate!, startTime)!;
+      final endDateTime =
+          ExperienceOwnerWriteService.combineDateAndTime(endDate!, endTime)!;
 
       await FirebaseFirestore.instance
           .collection('deals')
           .doc(widget.deal.id)
-          .update({
-        'title': title,
-        'description': description,
-        'startTime': startTime,
-        'endTime': endTime,
-        'startDateTime': Timestamp.fromDate(startDateTime),
-        'endDateTime': Timestamp.fromDate(endDateTime),
-        'isActive': true,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(
+            MobileDealWritePayload.buildUpdate(
+              title: title,
+              description: description,
+              startDateTime: startDateTime,
+              endDateTime: endDateTime,
+              startTime: startTime,
+              endTime: endTime,
+            ),
+          );
 
       // ✅ Update search index
       await SearchIndexService.updateVenueSearchTerms(widget.deal.venueId);
@@ -118,15 +121,6 @@ class _EditDealScreenState extends State<EditDealScreen> {
         setState(() => isLoading = false);
       }
     }
-  }
-
-  DateTime? _combineDateAndTime(DateTime date, String time) {
-    final parts = time.split(':');
-    if (parts.length < 2) return null;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), ''));
-    if (hour == null || minute == null) return null;
-    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   Future<void> _pickDate({required bool start}) async {
