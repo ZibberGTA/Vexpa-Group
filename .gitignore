@@ -54,6 +54,13 @@ ehthumbs.db
 **/*.key
 **/secrets/
 
+# Vexda platform API keys (local only — see docs/platform/API_KEYS_SETUP.md)
+**/app_secrets.local.dart
+**/vexda_maps_config.js
+!**/vexda_maps_config.example.js
+**/ios/Flutter/Secrets.xcconfig
+!**/ios/Flutter/Secrets.xcconfig.example
+
 # Mobile signing (keep example configs in source if present)
 **/android/key.properties
 **/android/app/google-services.json.bak
