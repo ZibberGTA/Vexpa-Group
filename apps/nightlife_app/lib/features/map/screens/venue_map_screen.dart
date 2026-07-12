@@ -636,9 +636,6 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
     }
   }
 
-  String _formatVenueTagLabel(String tag) =>
-      MobileExperienceContentSupport.presentation.formatVenueTagLabel(tag);
-
   List<String> _venuePreviewTags(VenueModel venue) =>
       MobileExperienceContentSupport.publicPresentation.venuePreviewTags(
         featureTags: venue.featureTags,
