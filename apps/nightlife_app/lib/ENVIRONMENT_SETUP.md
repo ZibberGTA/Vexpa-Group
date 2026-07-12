@@ -1,65 +1,33 @@
-# DrinkSpot Environment Setup
+# DrinkSpot / Vexda mobile environment setup
 
-The app now reads Google routing configuration from Flutter `--dart-define` values via:
+Platform API keys (Maps, Routes) are documented in:
 
-```dart
-AppConfig.routesApiKey
-```
+**[docs/platform/API_KEYS_SETUP.md](../../docs/platform/API_KEYS_SETUP.md)**
 
-## Required key
+## Quick start
 
-```text
-GOOGLE_ROUTES_API_KEY=your_google_routes_api_key
-```
-
-## Quick command-line run
+From the repository root:
 
 ```bash
-flutter run -d emulator-5554 --dart-define="GOOGLE_ROUTES_API_KEY=your_google_routes_api_key"
+dart run tool/ensure_local_platform_config.dart
 ```
 
-## VS Code: avoid typing the key every time
+Then configure:
 
-Create this file in the project root, not inside `lib`:
+- **Android Maps:** `apps/nightlife_app/android/local.properties` → `VEXDA_ANDROID_MAPS_API_KEY`
+- **Routes:** `apps/nightlife_app/lib/core/config/app_secrets.local.dart` → `kLocalRoutesApiKey`
+- **iOS Maps (macOS):** `apps/nightlife_app/ios/Flutter/Secrets.xcconfig` → `MAPS_API_KEY`
 
-```text
-.vscode/launch.json
+After that, ordinary development is:
+
+```bash
+flutter run
 ```
 
-Example:
+## Routes override (CI)
 
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "DrinkSpot Dev",
-      "request": "launch",
-      "type": "dart",
-      "program": "lib/main.dart",
-      "toolArgs": [
-        "--dart-define=GOOGLE_ROUTES_API_KEY=your_google_routes_api_key"
-      ]
-    }
-  ]
-}
-```
-
-Do not commit your real key to a public repository.
-
-## Android Studio: avoid typing the key every time
-
-Run > Edit Configurations > Additional run args:
-
-```text
---dart-define=GOOGLE_ROUTES_API_KEY=your_google_routes_api_key
-```
+`--dart-define=GOOGLE_ROUTES_API_KEY=...` still overrides the local Routes key when needed.
 
 ## Production note
 
-Before public release, restrict the API key in Google Cloud to:
-
-- Android package name
-- Android SHA-1 certificate
-- iOS bundle ID
-- Only the APIs DrinkSpot uses
+Restrict each Google Cloud API key to the minimum APIs and platform identifiers (Android package + SHA-1, iOS bundle, web referrers).

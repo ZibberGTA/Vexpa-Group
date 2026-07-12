@@ -52,6 +52,8 @@ flutter build web --release --dart-define=PRIVATE_DEVELOPMENT_MODE=true
 | Web Hosting config | `apps/nightlife_web/firebase.json` |
 | Mobile Firebase config | `apps/nightlife_app/firebase.json` |
 
+Google Maps and Routes API keys (separate from Firebase) are configured locally — see [docs/platform/API_KEYS_SETUP.md](docs/platform/API_KEYS_SETUP.md).
+
 Web hosting deploys from `apps/nightlife_web`. That project's `firebase.json` references mobile rules via `../nightlife_app/firestore.rules` and `../nightlife_app/storage.rules` (sibling paths under `apps/`).
 
 ### Deploy hosting (from web app)
