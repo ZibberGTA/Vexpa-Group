@@ -1,0 +1,8 @@
+# Copy to android/local.properties (gitignored). Do not commit real keys.
+#
+# Flutter SDK path is normally added automatically by Android Studio / flutter run.
+# flutter.sdk=C:\\path\\to\\flutter
+
+# Google Maps SDK for Android — separate from Firebase keys.
+# Restrict this key to package com.drinkspot.app and your debug/release SHA-1.
+VEXDA_ANDROID_MAPS_API_KEY=
