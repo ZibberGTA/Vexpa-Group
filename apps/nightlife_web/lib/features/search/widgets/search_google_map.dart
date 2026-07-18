@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/constants/google_maps_web_config.dart';
 import '../../../core/constants/vexda_cloud_map_config.dart';
 import '../../../core/map/dark_map_style.dart';
+import '../../../core/map/google_maps_bootstrap.dart';
 import '../../../core/map/google_maps_load_state.dart';
 import '../../../core/map/map_camera_motion.dart';
 import '../../../core/map/vexda_map_constants.dart';
@@ -46,6 +47,7 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
   LatLng _cameraTarget = SearchMapCoordinates.londonCenter;
   Set<Marker> _markers = const {};
   bool _mapReady = false;
+  bool _mapsApiReady = !kIsWeb;
   String? _loadError;
   String? _loadErrorDetail;
   int _markerRequestId = 0;
@@ -55,6 +57,18 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
     super.initState();
     _cameraTarget = SearchVenueMapGeometry.initialCenterFor(widget.venues);
     _loadMarkers();
+    if (kIsWeb) {
+      GoogleMapsBootstrap.ensureReady().then((_) {
+        if (!mounted) return;
+        setState(() => _mapsApiReady = true);
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() {
+          _loadError = GoogleMapsLoadState.error ?? 'Maps API unavailable';
+          _loadErrorDetail = GoogleMapsLoadState.errorDetail;
+        });
+      });
+    }
     _pollMapsLoadState();
   }
 
@@ -157,33 +171,34 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          SizedBox.expand(
-            child: GoogleMap(
-              mapId: VexdaCloudMapConfig.usesVectorMaps
-                  ? VexdaCloudMapConfig.mapId
-                  : null,
-              style: VexdaCloudMapConfig.usesVectorMaps
-                  ? null
-                  : DarkMapStyle.json,
-              initialCameraPosition: CameraPosition(
-                target: _cameraTarget,
-                zoom: _cameraZoom,
+          if (_mapsApiReady && !showFailure)
+            SizedBox.expand(
+              child: GoogleMap(
+                mapId: VexdaCloudMapConfig.usesVectorMaps
+                    ? VexdaCloudMapConfig.mapId
+                    : null,
+                style: VexdaCloudMapConfig.usesVectorMaps
+                    ? null
+                    : DarkMapStyle.json,
+                initialCameraPosition: CameraPosition(
+                  target: _cameraTarget,
+                  zoom: _cameraZoom,
+                ),
+                padding: widget.padding,
+                markers: _markers,
+                onMapCreated: _onMapCreated,
+                onCameraMove: _onCameraMove,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                compassEnabled: false,
+                myLocationButtonEnabled: false,
+                myLocationEnabled: false,
+                rotateGesturesEnabled: true,
+                scrollGesturesEnabled: true,
+                zoomGesturesEnabled: true,
+                tiltGesturesEnabled: false,
               ),
-              padding: widget.padding,
-              markers: _markers,
-              onMapCreated: _onMapCreated,
-              onCameraMove: _onCameraMove,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
-              myLocationButtonEnabled: false,
-              myLocationEnabled: false,
-              rotateGesturesEnabled: true,
-              scrollGesturesEnabled: true,
-              zoomGesturesEnabled: true,
-              tiltGesturesEnabled: false,
             ),
-          ),
           if (showFailure)
             _MapLoadFailureOverlay(
               error: _loadError!,

@@ -9,12 +9,21 @@ void main() {
     expect(GoogleMapsWebConfig.gcpProjectId, 'nightlife-app-19acd');
   });
 
-  test('index.html loads vexda_maps_config.js and not an inline Maps API key', () {
+  test('index.html loads Maps scripts before Flutter bootstrap', () {
     final indexHtml = File('web/index.html');
     expect(indexHtml.existsSync(), isTrue);
     final content = indexHtml.readAsStringSync();
+    expect(content, contains('vexda_maps_state.js'));
     expect(content, contains('vexda_maps_config.js'));
+    expect(content, contains('vexda_maps_loader.js'));
     expect(content, isNot(contains('maps.googleapis.com/maps/api/js?key=AIza')));
+
+    final stateIndex = content.indexOf('vexda_maps_state.js');
+    final loaderIndex = content.indexOf('vexda_maps_loader.js');
+    final bootstrapIndex = content.indexOf('flutter_bootstrap.js');
+    expect(stateIndex, greaterThan(-1));
+    expect(loaderIndex, greaterThan(stateIndex));
+    expect(bootstrapIndex, greaterThan(loaderIndex));
   });
 
   test('example web maps config exists and real config is not committed', () {

@@ -16,26 +16,26 @@ void main() {
     expect(File('docs/cloud_map_style/vexda_web_dark.json').existsSync(), isTrue);
   });
 
-  test('maps loader falls back to raster API when mapId is missing', () {
+  test('maps loader exposes vexdaMapsReady and resolves google.maps', () {
     final loader = File('web/vexda_maps_loader.js').readAsStringSync();
-    expect(loader, isNot(contains("'missing_map_id'")));
-    expect(loader, contains('raster Maps JavaScript API fallback'));
-    expect(loader, contains("if (hasMapId)"));
+    expect(loader, contains('window.vexdaMapsReady'));
+    expect(loader, contains('importLibrary(\'maps\')'));
+    expect(loader, contains('typeof window.google.maps.Map === \'function\''));
   });
 
-  test('search map widget avoids empty mapId when vector maps are disabled', () {
+  test('search map waits for Google Maps bootstrap before constructing map', () {
     final searchMap = File(
       'lib/features/search/widgets/search_google_map.dart',
     ).readAsStringSync();
-    expect(searchMap, contains('VexdaCloudMapConfig.usesVectorMaps'));
-    expect(searchMap, contains('DarkMapStyle.json'));
+    expect(searchMap, contains('GoogleMapsBootstrap.ensureReady'));
+    expect(searchMap, contains('if (_mapsApiReady && !showFailure)'));
   });
 
-  test('admin map widget avoids empty mapId when vector maps are disabled', () {
+  test('admin map waits for Google Maps bootstrap before constructing map', () {
     final adminMap = File(
       'lib/features/admin/widgets/admin_claim_venue_map.dart',
     ).readAsStringSync();
-    expect(adminMap, contains('VexdaCloudMapConfig.usesVectorMaps'));
-    expect(adminMap, contains('DarkMapStyle.json'));
+    expect(adminMap, contains('GoogleMapsBootstrap.ensureReady'));
+    expect(adminMap, contains('if (!_mapsApiReady)'));
   });
 }

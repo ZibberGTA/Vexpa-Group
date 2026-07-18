@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/constants/vexda_cloud_map_config.dart';
 import '../../../core/map/dark_map_style.dart';
+import '../../../core/map/google_maps_bootstrap.dart';
+import '../../../core/map/google_maps_load_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/admin_claim_venue.dart';
 
@@ -35,6 +38,8 @@ class _AdminClaimVenueMapState extends State<AdminClaimVenueMap> {
   );
   Set<Marker> _markers = const {};
   Timer? _markerDebounce;
+  bool _mapsApiReady = !kIsWeb;
+  String? _loadError;
 
   @override
   void initState() {
@@ -44,6 +49,18 @@ class _AdminClaimVenueMapState extends State<AdminClaimVenueMap> {
       zoom: 5.4,
     );
     unawaited(_rebuildMarkers());
+    if (kIsWeb) {
+      GoogleMapsBootstrap.ensureReady().then((_) {
+        if (!mounted) return;
+        setState(() => _mapsApiReady = true);
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() {
+          _loadError =
+              GoogleMapsLoadState.error ?? 'Google Maps failed to initialise';
+        });
+      });
+    }
   }
 
   @override
@@ -214,6 +231,18 @@ class _AdminClaimVenueMapState extends State<AdminClaimVenueMap> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_mapsApiReady) {
+      return ColoredBox(
+        color: AppColors.background,
+        child: Center(
+          child: Text(
+            _loadError ?? 'Loading map…',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
     return ColoredBox(
       color: AppColors.background,
       child: GoogleMap(
