@@ -213,8 +213,13 @@ class _PermissionGateState extends State<_PermissionGate> {
           );
         }
 
-        final allowed =
-            identity != null && _isAllowedSync(identity);
+        if (identity == null || identity.uid != widget.uid) {
+          return const PublicPageShell(
+            child: PublicLoadingState(message: 'Loading your permissions…'),
+          );
+        }
+
+        final allowed = _isAllowedSync(identity);
         if (!allowed) {
           return PublicPageShell(
             child: _AuthPrompt(

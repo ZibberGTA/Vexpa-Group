@@ -311,6 +311,124 @@ void main() {
       },
     );
   });
+
+  group('AuthGuard venue dashboard route (/venue/dashboard)', () {
+    const venueChildKey = Key('venue-dashboard-content');
+
+    Future<void> pumpVenueGuard(WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AuthGuard(
+            requirement: AuthGuardRequirement.venueStaff,
+            child: const SizedBox(
+              key: venueChildKey,
+              child: Text('Venue Dashboard'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('venue owner can access /venue/dashboard', (tester) async {
+      fakeAuth.emitAuthState(testAuthenticatedUser);
+      fakeIdentity.emitIdentity(
+        testIdentity(
+          uid: testAuthenticatedUser.uid,
+          dashboardRole: DashboardRole.venueOwner,
+        ),
+      );
+
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsOneWidget);
+      expect(find.text('Access restricted'), findsNothing);
+    });
+
+    testWidgets('venue employee can access /venue/dashboard', (tester) async {
+      fakeAuth.emitAuthState(testAuthenticatedUser);
+      fakeIdentity.emitIdentity(
+        testIdentity(
+          uid: testAuthenticatedUser.uid,
+          dashboardRole: DashboardRole.employee,
+        ),
+      );
+
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsOneWidget);
+    });
+
+    testWidgets('admin can access /venue/dashboard', (tester) async {
+      fakeAuth.emitAuthState(testAuthenticatedUser);
+      fakeIdentity.emitIdentity(
+        testIdentity(
+          uid: testAuthenticatedUser.uid,
+          dashboardRole: DashboardRole.admin,
+          roleLevel: 30,
+          staffFlag: true,
+        ),
+      );
+
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsOneWidget);
+    });
+
+    testWidgets('customer cannot access /venue/dashboard', (tester) async {
+      fakeAuth.emitAuthState(testAuthenticatedUser);
+      fakeIdentity.emitIdentity(
+        testIdentity(
+          uid: testAuthenticatedUser.uid,
+          dashboardRole: DashboardRole.regularUser,
+        ),
+      );
+
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsNothing);
+      expect(find.text('Access restricted'), findsOneWidget);
+    });
+
+    testWidgets('signed-out user cannot access /venue/dashboard', (
+      tester,
+    ) async {
+      fakeAuth.emitAuthState(null);
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsNothing);
+      expect(find.text('Sign in required'), findsOneWidget);
+    });
+
+    testWidgets('does not show final denial while identity is still resolving', (
+      tester,
+    ) async {
+      fakeAuth.emitAuthState(testAuthenticatedUser);
+      fakeIdentity = FakeIdentityService();
+      WebVexCore.identityOverride = fakeIdentity;
+
+      await pumpVenueGuard(tester);
+      await tester.pump();
+
+      expect(find.text('Loading your permissions…'), findsOneWidget);
+      expect(find.text('Access restricted'), findsNothing);
+      expect(find.byKey(venueChildKey), findsNothing);
+
+      fakeIdentity.emitIdentity(
+        testIdentity(
+          uid: testAuthenticatedUser.uid,
+          dashboardRole: DashboardRole.venueOwner,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(venueChildKey), findsOneWidget);
+    });
+  });
 }
 
 class _AuthGuardRebuildHarness extends StatefulWidget {

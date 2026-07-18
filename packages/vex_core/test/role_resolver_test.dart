@@ -76,6 +76,45 @@ void main() {
         DashboardRole.venueOwner,
       );
     });
+
+    test(
+      'returns venueOwner when users doc role is user but venues are owned',
+      () {
+        expect(
+          RoleResolver.resolveFromUserContext(
+            data: const {'role': 'user'},
+            venueIdsCount: 0,
+            ownedVenuesCount: 2,
+          ),
+          DashboardRole.venueOwner,
+        );
+      },
+    );
+
+    test(
+      'returns employee when users doc role is user but venueIds are assigned',
+      () {
+        expect(
+          RoleResolver.resolveFromUserContext(
+            data: const {'role': 'user'},
+            venueIdsCount: 1,
+            ownedVenuesCount: 0,
+          ),
+          DashboardRole.employee,
+        );
+      },
+    );
+
+    test('returns regularUser for customer role without ownership', () {
+      expect(
+        RoleResolver.resolveFromUserContext(
+          data: const {'role': 'user'},
+          venueIdsCount: 0,
+          ownedVenuesCount: 0,
+        ),
+        DashboardRole.regularUser,
+      );
+    });
   });
 
   group('RoleResolver.resolveStaffFromDocument', () {

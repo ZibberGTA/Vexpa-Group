@@ -189,6 +189,8 @@ abstract final class RoleResolver {
     }
 
     if (rawRole == 'customer' || rawRole == 'user') {
+      if (ownedVenuesCount > 0) return DashboardRole.venueOwner;
+      if (venueIdsCount > 0) return DashboardRole.employee;
       return DashboardRole.regularUser;
     }
 
