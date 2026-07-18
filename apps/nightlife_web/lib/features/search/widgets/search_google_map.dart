@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/constants/google_maps_web_config.dart';
+import '../../../core/constants/vexda_cloud_map_config.dart';
 import '../../../core/map/dark_map_style.dart';
 import '../../../core/map/google_maps_load_state.dart';
 import '../../../core/map/map_camera_motion.dart';
@@ -158,13 +159,18 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
         children: [
           SizedBox.expand(
             child: GoogleMap(
+              mapId: VexdaCloudMapConfig.usesVectorMaps
+                  ? VexdaCloudMapConfig.mapId
+                  : null,
+              style: VexdaCloudMapConfig.usesVectorMaps
+                  ? null
+                  : DarkMapStyle.json,
               initialCameraPosition: CameraPosition(
                 target: _cameraTarget,
                 zoom: _cameraZoom,
               ),
               padding: widget.padding,
               markers: _markers,
-              style: DarkMapStyle.json,
               onMapCreated: _onMapCreated,
               onCameraMove: _onCameraMove,
               zoomControlsEnabled: false,

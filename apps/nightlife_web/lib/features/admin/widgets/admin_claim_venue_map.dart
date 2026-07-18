@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/constants/vexda_cloud_map_config.dart';
 import '../../../core/map/dark_map_style.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/admin_claim_venue.dart';
@@ -216,10 +217,13 @@ class _AdminClaimVenueMapState extends State<AdminClaimVenueMap> {
     return ColoredBox(
       color: AppColors.background,
       child: GoogleMap(
+        mapId: VexdaCloudMapConfig.usesVectorMaps
+            ? VexdaCloudMapConfig.mapId
+            : null,
+        style: VexdaCloudMapConfig.usesVectorMaps ? null : DarkMapStyle.json,
         initialCameraPosition: _cameraPosition,
         padding: widget.padding,
         markers: _markers,
-        style: DarkMapStyle.json,
         onMapCreated: (controller) {
           _controller = controller;
           unawaited(_rebuildMarkers());
