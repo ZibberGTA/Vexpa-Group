@@ -27,6 +27,7 @@ import '../permissions/staff_permission.dart';
 import '../permissions/staff_role.dart';
 import '../widgets/admin_claim_venue_map.dart';
 import '../widgets/claims/admin_venue_claims_page.dart';
+import '../widgets/trails/admin_trail_participation_review_page.dart';
 import '../widgets/users/admin_users_crm_page.dart';
 import '../widgets/venues/admin_venues_crm_page.dart';
 
@@ -443,6 +444,16 @@ class _AdminPageScaffold extends StatelessWidget {
           VenueDashboardPageHeader(title: page.label, subtitle: page.subtitle),
           const SizedBox(height: AppSpacing.xl),
           AdminVenueClaimsPage(permissions: permissions),
+        ],
+      );
+    }
+    if (page == AdminDashboardPage.trailParticipationReview) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          VenueDashboardPageHeader(title: page.label, subtitle: page.subtitle),
+          const SizedBox(height: AppSpacing.xl),
+          AdminTrailParticipationReviewPage(permissions: permissions),
         ],
       );
     }

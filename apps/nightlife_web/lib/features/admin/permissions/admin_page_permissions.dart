@@ -16,7 +16,8 @@ class AdminPagePermissions {
       AdminDashboardPage.drinks => StaffPermission.drinksView,
       AdminDashboardPage.deals => StaffPermission.dealsView,
       AdminDashboardPage.events => StaffPermission.eventsView,
-      AdminDashboardPage.trails => StaffPermission.trailsView,
+      AdminDashboardPage.trails ||
+      AdminDashboardPage.trailParticipationReview => StaffPermission.trailsView,
       AdminDashboardPage.platformAnalytics => StaffPermission.analyticsView,
       AdminDashboardPage.searchIntelligence =>
         StaffPermission.searchIntelligenceView,
@@ -51,7 +52,8 @@ class AdminPagePermissions {
       AdminDashboardPage.drinks => StaffPermission.drinksManage,
       AdminDashboardPage.deals => StaffPermission.dealsManage,
       AdminDashboardPage.events => StaffPermission.eventsManage,
-      AdminDashboardPage.trails => StaffPermission.trailsManage,
+      AdminDashboardPage.trails ||
+      AdminDashboardPage.trailParticipationReview => StaffPermission.trailsManage,
       AdminDashboardPage.subscriptions => StaffPermission.subscriptionsManage,
       AdminDashboardPage.payments => StaffPermission.paymentsManage,
       AdminDashboardPage.platformAnalytics => StaffPermission.analyticsAdvanced,
@@ -151,8 +153,16 @@ class AdminPagePermissions {
     if (page == AdminDashboardPage.events) {
       return StaffPermission.eventsManage;
     }
-    if (page == AdminDashboardPage.trails) {
-      return StaffPermission.trailsManage;
+    if (page == AdminDashboardPage.trails ||
+        page == AdminDashboardPage.trailParticipationReview) {
+      return switch (normalized) {
+        'view' => StaffPermission.trailsView,
+        'request information' ||
+        'request more information' => StaffPermission.trailsManage,
+        'approve' => StaffPermission.trailsManage,
+        'reject' => StaffPermission.trailsManage,
+        _ => StaffPermission.trailsManage,
+      };
     }
     if (page == AdminDashboardPage.subscriptions) {
       return StaffPermission.subscriptionsManage;

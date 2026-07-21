@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vex_core/vex_core.dart';
 
 /// Central permission engine for the Vexda admin platform.
@@ -19,6 +20,12 @@ class PermissionService {
   /// Bridge helper until callers migrate off stored role name strings.
   factory PermissionService.fromRoleName(String roleName) {
     return PermissionService.forRole(StaffRole.fromName(roleName));
+  }
+
+  /// Test-only constructor for explicit permission grants.
+  @visibleForTesting
+  factory PermissionService.testing(Set<StaffPermission> granted) {
+    return PermissionService._(Set.unmodifiable(granted));
   }
 
   final Set<StaffPermission> _granted;

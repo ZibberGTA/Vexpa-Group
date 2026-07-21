@@ -77,6 +77,15 @@ enum AdminDashboardPage {
     collectionPath: 'trails',
     subtitle: 'Trail publishing, archive state, analytics and moderation.',
   ),
+  trailParticipationReview(
+    label: 'Trail Participation',
+    section: 'Content',
+    icon: Icons.how_to_reg_outlined,
+    selectedIcon: Icons.how_to_reg_rounded,
+    collectionPath: 'workflow_requests',
+    subtitle:
+        'Review venue trail participation requests, decisions and audit history.',
+  ),
   reviews(
     label: 'Reviews',
     section: 'Content',

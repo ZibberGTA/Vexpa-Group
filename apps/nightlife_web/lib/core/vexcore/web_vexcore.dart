@@ -138,7 +138,7 @@ abstract final class WebVexCore {
   static WorkflowAuditRepository get workflowAuditRepository =>
       workflowAuditRepositoryOverride ?? _defaultWorkflowAuditRepository;
 
-  static const workflowCommandGateway = FirebaseWorkflowCommandGateway();
+  static final workflowCommandGateway = FirebaseWorkflowCommandGateway();
 
   static const discoveryVenueSearchService = DiscoveryVenueSearchService();
 

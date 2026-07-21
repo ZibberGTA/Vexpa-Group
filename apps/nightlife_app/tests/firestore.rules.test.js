@@ -116,6 +116,19 @@ async function seedBaseData() {
       status: 'active',
     });
 
+    await setDoc(doc(db, 'users/support-1'), {
+      role: 'support',
+      status: 'active',
+    });
+
+    await setDoc(doc(db, 'staff/support-1'), {
+      role: 'support',
+      roleLevel: 10,
+      staff: true,
+      email: 'support@vexda.test',
+      status: 'active',
+    });
+
     await setDoc(doc(db, 'venue_claims/claim-1'), {
       claimId: 'claim-1',
       venueId: 'public-venue',
@@ -659,15 +672,13 @@ describe('venue management activity regression safety', () => {
 describe('workflow_requests trail venue participation', () => {
   // Atomicity / enforcement notes:
   // - Submit/resubmit/withdraw + audit in the same batch is allowed when the parent
-  //   request already exists (get() resolves against the post-batch parent state).
-  // - Draft create + audit in the same batch is denied: audit create get() on the
-  //   parent request throws a null-value error before the parent write is visible.
-  // - Audit create rules do not validate action/fromStatus/toStatus alignment, actorUid,
-  //   or monotonic revision on the parent request; venue managers can append audit docs
-  //   with arbitrary action values if they manage the venue and own the request.
-  // - Admin updates bypass workflowVenueCanUpdate field guards (isAdmin() short-circuit);
-  //   privileged transitions are blocked in application code, not in these rules.
-  // - Revision monotonicity is not enforced in rules; only changedKeys are restricted.
+  //   request already exists (get() resolves against the pre-batch parent state).
+  // - Draft create + audit in the same batch is allowed via getAfter() on the parent.
+  // - Venue audit create is constrained to submitter actorKind and venue action allowlist.
+  // - Privileged audit create requires isAdmin(), admin/reviewer actorKind, and allowlist.
+  // - Audit entries remain append-only (update/delete denied).
+  // - Full action-to-parent-state consistency for standalone admin audit writes without
+  //   a matching parent update remains an application-layer responsibility.
 
   test('managed venue user can create draft for venue they manage', async () => {
     await seedBaseData();
@@ -802,7 +813,7 @@ describe('workflow_requests trail venue participation', () => {
     await assertSucceeds(batch.commit());
   });
 
-  test('managed venue user cannot atomically create draft and audit in batch', async () => {
+  test('managed venue user can atomically create draft and audit in batch', async () => {
     await seedBaseData();
     const db = testEnv.authenticatedContext('owner-1').firestore();
     const batch = writeBatch(db);
@@ -816,7 +827,7 @@ describe('workflow_requests trail venue participation', () => {
         toStatus: 'draft',
       }),
     );
-    await assertFails(batch.commit());
+    await assertSucceeds(batch.commit());
   });
 
   test('unrelated user cannot create for another venue', async () => {
@@ -1105,11 +1116,11 @@ describe('workflow_requests trail venue participation', () => {
     );
   });
 
-  test('rules allow venue user to create audit with arbitrary action value', async () => {
+  test('venue user cannot create audit with forged approval action', async () => {
     await seedBaseData();
     await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
     const db = testEnv.authenticatedContext('owner-1').firestore();
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-forged'),
         validWorkflowAudit({
@@ -1118,9 +1129,210 @@ describe('workflow_requests trail venue participation', () => {
           fromStatus: 'submitted',
           toStatus: 'approved',
           actorUid: 'owner-1',
+          actorKind: 'submitter',
         }),
       ),
     );
+  });
+
+  test('venue user cannot create audit with arbitrary action string', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-forged'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-forged',
+          action: 'totally_made_up',
+          fromStatus: 'draft',
+          toStatus: 'draft',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot set actorKind to admin', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-admin-kind'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-admin-kind',
+          action: 'submitted',
+          fromStatus: 'draft',
+          toStatus: 'submitted',
+          actorKind: 'admin',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot set actorKind to reviewer', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-reviewer-kind'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-reviewer-kind',
+          action: 'submitted',
+          fromStatus: 'draft',
+          toStatus: 'submitted',
+          actorKind: 'reviewer',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot create rejection audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-rejected'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-rejected',
+          action: 'rejected',
+          fromStatus: 'submitted',
+          toStatus: 'rejected',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot create request-information audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-information_requested'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-information_requested',
+          action: 'information_requested',
+          fromStatus: 'submitted',
+          toStatus: 'information_requested',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot create audit with mismatched requestId field', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-mismatch'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-mismatch',
+          requestId: 'wf-req-other',
+          action: 'draft_updated',
+          fromStatus: 'draft',
+          toStatus: 'draft',
+        }),
+      ),
+    );
+  });
+
+  test('venue user can create draft_updated audit for own draft request', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-2-draft_updated'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-2-draft_updated',
+          action: 'draft_updated',
+          fromStatus: 'draft',
+          toStatus: 'draft',
+        }),
+      ),
+    );
+  });
+
+  test('venue user can create withdrawn audit in batch', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'workflow_requests/wf-req-1'), {
+      status: 'withdrawn',
+      revision: 3,
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-withdrawn'),
+      validWorkflowAudit({
+        auditId: 'wf-req-1-3-withdrawn',
+        action: 'withdrawn',
+        fromStatus: 'submitted',
+        toStatus: 'withdrawn',
+      }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  test('venue user can create resubmitted audit in batch', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'information_requested',
+        revision: 3,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+        reviewNotesSummary: 'Please clarify stop order.',
+      }),
+    );
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'workflow_requests/wf-req-1'), {
+      status: 'submitted',
+      payload: validTrailParticipationPayload({
+        requestedStopOrder: 3,
+        participationNote: 'Clarified stop order.',
+      }),
+      revision: 4,
+      submittedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-4-resubmitted'),
+      validWorkflowAudit({
+        auditId: 'wf-req-1-4-resubmitted',
+        action: 'resubmitted',
+        fromStatus: 'information_requested',
+        toStatus: 'submitted',
+      }),
+    );
+    await assertSucceeds(batch.commit());
   });
 
   test('rules allow venue user to decrease revision on draft update', async () => {
@@ -1143,9 +1355,16 @@ describe('workflow_requests trail venue participation', () => {
     );
   });
 
-  test('admin can read workflow request', async () => {
+  test('admin can read submitted workflow request', async () => {
     await seedBaseData();
-    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
     const db = testEnv.authenticatedContext('admin-1').firestore();
     await assertSucceeds(getDoc(doc(db, 'workflow_requests/wf-req-1')));
   });
@@ -1166,6 +1385,295 @@ describe('workflow_requests trail venue participation', () => {
     const db = testEnv.authenticatedContext('admin-1').firestore();
     await assertSucceeds(
       getDoc(doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-1-draft_created')),
+    );
+  });
+
+  test('support staff can read workflow request but cannot approve', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('support-1').firestore();
+    await assertSucceeds(getDoc(doc(db, 'workflow_requests/wf-req-1')));
+    await assertFails(
+      updateDoc(doc(db, 'workflow_requests/wf-req-1'), {
+        status: 'approved',
+        revision: 3,
+        decidedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test('admin can request information on submitted request', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'workflow_requests/wf-req-1'), {
+        status: 'information_requested',
+        reviewNotesSummary: 'Please confirm stop order.',
+        revision: 3,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test('admin can reject submitted request', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'workflow_requests/wf-req-1'), {
+        status: 'rejected',
+        decisionReason: 'Not eligible for this trail.',
+        revision: 3,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test('admin can create privileged audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-information_requested'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-3-information_requested',
+          action: 'information_requested',
+          fromStatus: 'submitted',
+          toStatus: 'information_requested',
+          actorUid: 'admin-1',
+          actorKind: 'admin',
+          notes: 'Need clearer participation note.',
+        }),
+      ),
+    );
+  });
+
+  test('venue user cannot forge administrator audit docs', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest('wf-req-1', seededWorkflowRequest());
+    const db = testEnv.authenticatedContext('owner-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-9-admin-approved'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-9-admin-approved',
+          action: 'approved',
+          fromStatus: 'submitted',
+          toStatus: 'approved',
+          actorUid: 'owner-1',
+          actorKind: 'admin',
+        }),
+      ),
+    );
+  });
+
+  test('admin can create approved audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-approved'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-3-approved',
+          action: 'approved',
+          fromStatus: 'submitted',
+          toStatus: 'approved',
+          actorUid: 'admin-1',
+          actorKind: 'admin',
+        }),
+      ),
+    );
+  });
+
+  test('admin can create rejected audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-rejected'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-3-rejected',
+          action: 'rejected',
+          fromStatus: 'submitted',
+          toStatus: 'rejected',
+          actorUid: 'admin-1',
+          actorKind: 'admin',
+          reason: 'Not eligible',
+        }),
+      ),
+    );
+  });
+
+  test('admin can atomically approve request and create audit in batch', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'workflow_requests/wf-req-1'), {
+      status: 'approved',
+      revision: 3,
+      decisionCode: 'approved',
+      decisionReason: 'Looks good',
+      decidedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-approved'),
+      validWorkflowAudit({
+        auditId: 'wf-req-1-3-approved',
+        action: 'approved',
+        fromStatus: 'submitted',
+        toStatus: 'approved',
+        actorUid: 'admin-1',
+        actorKind: 'admin',
+      }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  test('admin can atomically reject request and create audit in batch', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'workflow_requests/wf-req-1'), {
+      status: 'rejected',
+      revision: 3,
+      decisionReason: 'Not eligible',
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-rejected'),
+      validWorkflowAudit({
+        auditId: 'wf-req-1-3-rejected',
+        action: 'rejected',
+        fromStatus: 'submitted',
+        toStatus: 'rejected',
+        actorUid: 'admin-1',
+        actorKind: 'admin',
+        reason: 'Not eligible',
+      }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  test('admin can atomically request information and create audit in batch', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('admin-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'workflow_requests/wf-req-1'), {
+      status: 'information_requested',
+      reviewNotesSummary: 'Please confirm stop order.',
+      revision: 3,
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-information_requested'),
+      validWorkflowAudit({
+        auditId: 'wf-req-1-3-information_requested',
+        action: 'information_requested',
+        fromStatus: 'submitted',
+        toStatus: 'information_requested',
+        actorUid: 'admin-1',
+        actorKind: 'admin',
+        notes: 'Please confirm stop order.',
+      }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  test('support staff cannot create admin decision audit entry', async () => {
+    await seedBaseData();
+    await seedWorkflowRequest(
+      'wf-req-1',
+      seededWorkflowRequest({
+        status: 'submitted',
+        revision: 2,
+        submittedAt: new Date('2026-07-17T12:00:00.000Z'),
+      }),
+    );
+    const db = testEnv.authenticatedContext('support-1').firestore();
+    await assertFails(
+      setDoc(
+        doc(db, 'workflow_requests/wf-req-1/audit/wf-req-1-3-approved'),
+        validWorkflowAudit({
+          auditId: 'wf-req-1-3-approved',
+          action: 'approved',
+          fromStatus: 'submitted',
+          toStatus: 'approved',
+          actorUid: 'support-1',
+          actorKind: 'admin',
+        }),
+      ),
     );
   });
 

@@ -111,6 +111,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "workflow_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "workflowType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

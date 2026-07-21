@@ -458,6 +458,163 @@ service cloud.firestore {
         ]);
     }
 
+    function workflowParentRequestPath(requestId) {
+      return /databases/$(database)/documents/workflow_requests/$(requestId);
+    }
+
+    function workflowParentRequestExistsBefore(requestId) {
+      return exists(workflowParentRequestPath(requestId));
+    }
+
+    function workflowParentRequestBeforeData(requestId) {
+      return get(workflowParentRequestPath(requestId)).data;
+    }
+
+    function workflowParentRequestAfterData(requestId) {
+      return getAfter(workflowParentRequestPath(requestId)).data;
+    }
+
+    function workflowTrailParticipationRequest(parentRequest) {
+      return parentRequest.workflowType == 'trail.venue_participation';
+    }
+
+    function workflowAuditFieldsValid() {
+      return request.resource.data.keys().hasOnly([
+        'auditId',
+        'requestId',
+        'action',
+        'fromStatus',
+        'toStatus',
+        'actorUid',
+        'actorKind',
+        'notes',
+        'reason',
+        'metadata',
+        'createdAt'
+      ]) &&
+        request.resource.data.auditId is string &&
+        request.resource.data.requestId is string &&
+        request.resource.data.action is string &&
+        request.resource.data.fromStatus is string &&
+        request.resource.data.toStatus is string &&
+        request.resource.data.actorUid is string &&
+        request.resource.data.actorKind is string &&
+        (!('metadata' in request.resource.data) ||
+          request.resource.data.metadata is map) &&
+        (!('notes' in request.resource.data) ||
+          request.resource.data.notes is string) &&
+        (!('reason' in request.resource.data) ||
+          request.resource.data.reason is string);
+    }
+
+    function workflowAuditRequestIdMatches(requestId, auditId) {
+      return request.resource.data.requestId == requestId &&
+        request.resource.data.auditId == auditId;
+    }
+
+    function workflowVenueAuditActionAllowed(action) {
+      return action in [
+        'draft_created',
+        'draft_updated',
+        'submitted',
+        'resubmitted',
+        'withdrawn',
+      ];
+    }
+
+    function workflowPrivilegedAuditActionAllowed(action) {
+      return action in [
+        'review_started',
+        'information_requested',
+        'approved',
+        'rejected',
+        'reviewer_assigned',
+        'cancelled',
+      ];
+    }
+
+    function workflowVenueAuditParentOwnershipValid(parentRequest) {
+      return workflowTrailParticipationRequest(parentRequest) &&
+        parentRequest.submittedByUid == request.auth.uid &&
+        canManageVenue(parentRequest.subjectVenueId);
+    }
+
+    function workflowVenueAuditStatusesPlausible(action, fromStatus, toStatus) {
+      return (action == 'draft_created' &&
+          fromStatus == 'draft' &&
+          toStatus == 'draft') ||
+        (action == 'draft_updated' &&
+          fromStatus == 'draft' &&
+          toStatus == 'draft') ||
+        (action == 'submitted' &&
+          fromStatus == 'draft' &&
+          toStatus == 'submitted') ||
+        (action == 'resubmitted' &&
+          fromStatus == 'information_requested' &&
+          toStatus == 'submitted') ||
+        (action == 'withdrawn' &&
+          fromStatus in ['submitted', 'under_review', 'information_requested'] &&
+          toStatus == 'withdrawn');
+    }
+
+    function workflowParentRequestDataForAudit(requestId) {
+      let requestPath = workflowParentRequestPath(requestId);
+      return exists(requestPath)
+        ? get(requestPath).data
+        : getAfter(requestPath).data;
+    }
+
+    function workflowVenueCanCreateAudit(requestId, auditId) {
+      let audit = request.resource.data;
+      let parent = workflowParentRequestDataForAudit(requestId);
+      return signedIn() &&
+        workflowAuditFieldsValid() &&
+        workflowAuditRequestIdMatches(requestId, auditId) &&
+        audit.actorUid == request.auth.uid &&
+        audit.actorKind == 'submitter' &&
+        workflowVenueAuditActionAllowed(audit.action) &&
+        workflowVenueAuditParentOwnershipValid(parent) &&
+        workflowVenueAuditStatusesPlausible(
+          audit.action,
+          audit.fromStatus,
+          audit.toStatus
+        );
+    }
+    function workflowPrivilegedAuditStatusesValid(action, fromStatus, toStatus) {
+      return (action == 'review_started' &&
+          fromStatus == 'submitted' &&
+          toStatus == 'under_review') ||
+        (action == 'information_requested' &&
+          fromStatus in ['submitted', 'under_review'] &&
+          toStatus == 'information_requested') ||
+        (action == 'approved' &&
+          fromStatus in ['submitted', 'under_review'] &&
+          toStatus == 'approved') ||
+        (action == 'rejected' &&
+          fromStatus in ['submitted', 'under_review', 'information_requested'] &&
+          toStatus == 'rejected') ||
+        (action == 'reviewer_assigned' &&
+          fromStatus == toStatus) ||
+        (action == 'cancelled' &&
+          toStatus == 'cancelled');
+    }
+
+    function workflowAdminCanCreateAudit(requestId, auditId) {
+      let audit = request.resource.data;
+      let parent = workflowParentRequestDataForAudit(requestId);
+      return workflowAuditFieldsValid() &&
+        workflowAuditRequestIdMatches(requestId, auditId) &&
+        audit.actorUid == request.auth.uid &&
+        audit.actorKind in ['admin', 'reviewer'] &&
+        workflowTrailParticipationRequest(parent) &&
+        workflowPrivilegedAuditActionAllowed(audit.action) &&
+        workflowPrivilegedAuditStatusesValid(
+          audit.action,
+          audit.fromStatus,
+          audit.toStatus
+        );
+    }
+
     match /workflow_requests/{requestId} {
       allow read: if isSupportOrAbove() || workflowVenueCanRead();
       allow create: if workflowVenueCanCreate();
@@ -469,11 +626,9 @@ service cloud.firestore {
           signedIn() &&
           canManageVenue(get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.subjectVenueId)
         );
-        allow create: if isAdmin() || (
-          signedIn() &&
-          get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.submittedByUid == request.auth.uid &&
-          canManageVenue(get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.subjectVenueId)
-        );
+        allow create: if isAdmin()
+          ? workflowAdminCanCreateAudit(requestId, auditId)
+          : workflowVenueCanCreateAudit(requestId, auditId);
         allow update, delete: if false;
       }
     }
