@@ -13,6 +13,8 @@ import 'package:nightlife_web/features/venue/data/models/drink_model.dart';
 import 'package:nightlife_web/features/venue/models/venue_details_view.dart';
 import 'package:nightlife_web/features/venue/models/venue_opening_hours_entry.dart';
 import 'package:nightlife_web/features/venue/widgets/venue_details_hero.dart';
+import 'package:nightlife_web/features/venue/widgets/venue_hero_action_button_row.dart';
+import 'package:nightlife_web/features/venue/widgets/venue_hero_action_specs.dart';
 import 'package:nightlife_web/features/venue/widgets/venue_details_info_panel.dart';
 import 'package:nightlife_web/features/venues/models/venue_model.dart';
 
@@ -62,8 +64,32 @@ void main() {
       expect(view.phone, '+44 20 7946 0958');
       expect(view.description, 'A premium late-night cocktail destination.');
       expect(view.galleryImageUrls, ['https://example.com/1.jpg']);
+      expect(view.tags, ['Cocktails', 'Late Night', 'Live Music']);
       expect(view.highlights, isNotEmpty);
       expect(view.hasOpeningHours, isTrue);
+    });
+
+    test('hero tags use configured feature tags from venueFeatures', () {
+      final venue = VenueModel.fromMap('venue-1', {
+        'name': 'The Neon Room',
+        'category': 'Cocktail Bar',
+        'venueType': 'Cocktail Bar',
+        'venueFeatures': {'dj': true, 'foodServed': true},
+      });
+
+      final view = VenueDetailsMapper.fromVenueModel(venue);
+
+      expect(view.tags, ['DJ', 'Food Served']);
+    });
+
+    test('hero tags stay empty when none configured', () {
+      final venue = VenueModel.fromMap('venue-1', {
+        'name': 'The Neon Room',
+        'category': 'Cocktail Bar',
+        'venueType': 'Cocktail Bar',
+      });
+
+      expect(VenueDetailsMapper.fromVenueModel(venue).tags, isEmpty);
     });
   });
 
@@ -169,6 +195,31 @@ void main() {
       expect(find.text('Save venue'), findsOneWidget);
       expect(find.text('Share'), findsOneWidget);
       expect(find.text('View on map'), findsOneWidget);
+      expect(find.text('4.8'), findsNothing);
+    });
+  });
+
+  group('VenueHeroActionButtonRow', () {
+    testWidgets('customer preview shows approved actions without side effects', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VenueHeroActionButtonRow(
+              actions: VenueHeroActionConfigs.customerHeroActions,
+              previewOnly: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Directions'), findsOneWidget);
+      expect(find.text('Phone'), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+      expect(find.text('View Venue'), findsOneWidget);
+      expect(find.text('Share'), findsNothing);
+      expect(find.text('Get directions'), findsNothing);
     });
   });
 

@@ -9,3 +9,5 @@ export 'discovery/discovery_engine.dart';
 export 'experience/experience_engine.dart';
 export 'growth/growth_engine.dart';
 export 'venue/venue_engine.dart';
+export 'workflow/workflow_engine.dart';
+export 'trail/trail_engine.dart';

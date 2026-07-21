@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,8 +13,8 @@ import '../../data/deal_spreadsheet_service.dart';
 import '../../data/experience_content_support.dart';
 import '../../models/bulk_deal_patch.dart';
 import '../../models/deal_status.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/deal_types.dart';
-import '../../models/venue_dashboard_activity.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_page_quick_action.dart';
 import '../drinks/drinks_search_field.dart';
@@ -62,6 +63,7 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
   String _searchQuery = '';
   final Set<String> _selectedStatuses = {};
   bool _exportingDeals = false;
+  bool _pendingCreateDealActionHandled = false;
   DealTableSort _sort = const DealTableSort();
 
   @override
@@ -105,9 +107,26 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
     );
     if (!mounted || !added) return;
 
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Deal created successfully.')),
     );
+  }
+
+  void _maybeOpenPendingCreateDealDialog(List<DealModel> deals) {
+    if (_pendingCreateDealActionHandled) return;
+
+    final pendingActionKey =
+        VenueDashboardController.maybeOf(context)?.takePendingTabActionKey?.call();
+    if (pendingActionKey != VenuePageActionKeys.createDeal) return;
+
+    _pendingCreateDealActionHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_openAddDealDialog(deals));
+    });
   }
 
   Future<void> _openEditDealDialog(
@@ -129,6 +148,8 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
         const SnackBar(content: Text('Deal deleted successfully.')),
       );
     }
+
+    await reloadVenueManagementPageActivity(context);
   }
 
   Future<void> _handleEditSelected(List<DealModel> allDeals) async {
@@ -152,6 +173,9 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
       testUpdatedBy: widget.testCreatedBy,
     );
     if (!mounted || !applied) return;
+
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
 
     _clearSelection();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +212,7 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
 
     try {
       await _repository.bulkDeleteDeals(
-        dealIds: selected.map((deal) => deal.id).toList(),
+        deals: selected,
         deletedBy: userId,
       );
     } catch (_) {
@@ -301,6 +325,7 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
       for (final deal in pausable) {
         await _repository.patchDeal(
           dealId: deal.id,
+          venueId: deal.venueId,
           venueName: venueName,
           title: deal.title,
           description: deal.description,
@@ -411,26 +436,6 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
     }
   }
 
-  List<VenueDashboardActivity> _buildRecentActivity(List<DealModel> deals) {
-    return WebExperienceContentSupport.summary
-        .recentDealActivity(
-          deals: deals,
-          title: (deal) => deal.title,
-          createdAt: (deal) => deal.createdAt,
-          updatedAt: (deal) => deal.updatedAt,
-          status: computeDealStatus,
-          formatTimestamp: VenueDealsRepository.relativeTimeLabel,
-        )
-        .map(
-          (activity) => VenueDashboardActivity(
-            title: activity.title,
-            timestampLabel: activity.timestampLabel,
-            icon: Icons.local_offer_outlined,
-          ),
-        )
-        .toList();
-  }
-
   void _clearStatusFilters() {
     setState(_selectedStatuses.clear);
   }
@@ -484,6 +489,7 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
 
         final deals = snapshot.data ?? const [];
         _pruneSelection(deals);
+        _maybeOpenPendingCreateDealDialog(deals);
         final displayed = _displayDeals(deals);
 
         final dealMetrics = WebExperienceContentSupport.summary.dealMetrics(
@@ -496,7 +502,6 @@ class _VenueDealsManagementPageState extends State<VenueDealsManagementPage> {
           tab: VenueDashboardTab.deals,
           onPrimaryAction: () => _openAddDealDialog(deals),
           onQuickAction: (action) => _handleQuickAction(action, deals),
-          activities: _buildRecentActivity(deals),
           mainContent: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

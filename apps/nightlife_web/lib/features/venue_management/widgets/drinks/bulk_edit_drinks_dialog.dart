@@ -121,6 +121,7 @@ class _BulkEditDrinksDialogState extends State<BulkEditDrinksDialog> {
       for (final row in _rows) {
         await widget.repository.updateDrink(
           drinkId: row.drinkId,
+          venueId: widget.drinks.first.venueId,
           venueName: widget.venueName,
           name: row.nameController.text,
           category: row.category!,

@@ -8,6 +8,8 @@ import 'package:nightlife_web/features/venue_management/models/venue_dashboard_c
 import 'package:nightlife_web/features/venue_management/widgets/events/venue_events_management_page.dart';
 import 'package:nightlife_web/features/venue_management/widgets/venue_dashboard_controller.dart';
 
+import 'venue_management_activity_test_support.dart';
+
 class FakeVenueEventsRepository extends VenueEventsRepository {
   FakeVenueEventsRepository({List<EventModel>? initial})
       : _events = List.of(initial ?? []),
@@ -53,6 +55,8 @@ class FakeVenueEventsRepository extends VenueEventsRepository {
 }
 
 void main() {
+  registerDefaultVenueManagementActivityTestIsolation();
+
   group('VenueEventsManagementPage quick actions', () {
     late FakeVenueEventsRepository repository;
 
@@ -74,7 +78,7 @@ void main() {
           theme: ThemeData.dark(),
           home: Scaffold(
             body: VenueDashboardController(
-              selectTab: (_) {},
+              selectTab: (_, {pendingActionKey}) {},
               contextData: const VenueDashboardContext(
                 ownerName: 'Alex Morgan',
                 ownerFirstName: 'Alex',

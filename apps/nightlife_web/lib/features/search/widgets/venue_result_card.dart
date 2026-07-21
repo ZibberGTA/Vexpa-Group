@@ -145,8 +145,6 @@ class _VenueResultCardState extends State<VenueResultCard> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: AppSpacing.sm),
-                                    _RatingBadge(rating: widget.venue.rating),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -392,43 +390,6 @@ class _LogoInitial extends StatelessWidget {
           fontSize: 16,
           fontWeight: FontWeight.w800,
         ),
-      ),
-    );
-  }
-}
-
-class _RatingBadge extends StatelessWidget {
-  const _RatingBadge({required this.rating});
-
-  final double rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.background.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.star_rounded,
-            size: 12,
-            color: AppColors.primaryPink,
-          ),
-          const SizedBox(width: 2),
-          Text(
-            rating.toStringAsFixed(1),
-            style: const TextStyle(
-              color: AppColors.white,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }

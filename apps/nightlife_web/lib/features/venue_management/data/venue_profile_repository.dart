@@ -6,19 +6,26 @@ import 'package:vex_engines/venue/domain/venue_profile_search_context.dart';
 
 import '../../../core/vexcore/web_vexcore.dart';
 import '../../auth/services/user_role_service.dart';
+import '../models/venue_management_activity.dart';
+import '../models/venue_management_activity_types.dart';
 import '../services/venue_media_access_service.dart';
+import 'venue_management_activity_service.dart';
 
 /// Writes venue profile fields for the owner dashboard.
 class VenueProfileRepository {
   VenueProfileRepository({
     VenueProfileUpdateService? updateService,
     VenueProfileWriteRepository? writeRepository,
+    VenueManagementActivityService? activityService,
   }) : _updateService = updateService ?? WebVexCore.venueProfileUpdateService,
        _writeRepository =
-           writeRepository ?? WebVexCore.venueProfileWriteRepository;
+           writeRepository ?? WebVexCore.venueProfileWriteRepository,
+       _activityService =
+           activityService ?? WebVexCore.venueManagementActivityService;
 
   final VenueProfileUpdateService _updateService;
   final VenueProfileWriteRepository _writeRepository;
+  final VenueManagementActivityService _activityService;
 
   Future<void> updateVenueName({
     required String venueId,
@@ -33,6 +40,8 @@ class VenueProfileRepository {
         name: name,
         context: _searchContext(context),
       ),
+      actionType: VenueManagementActivityActionTypes.updated,
+      description: 'Venue name updated',
     );
   }
 
@@ -49,6 +58,8 @@ class VenueProfileRepository {
         category: category,
         context: _searchContext(context),
       ),
+      actionType: VenueManagementActivityActionTypes.updated,
+      description: 'Venue category updated',
     );
   }
 
@@ -65,6 +76,8 @@ class VenueProfileRepository {
         address: address,
         context: _searchContext(context),
       ),
+      actionType: VenueManagementActivityActionTypes.contactUpdated,
+      description: 'Venue address updated',
     );
   }
 
@@ -81,6 +94,8 @@ class VenueProfileRepository {
         description: description,
         context: _searchContext(context),
       ),
+      actionType: VenueManagementActivityActionTypes.updated,
+      description: 'Venue description updated',
     );
   }
 
@@ -96,6 +111,27 @@ class VenueProfileRepository {
         venueId: venueId,
         website: website,
       ),
+      actionType: VenueManagementActivityActionTypes.contactUpdated,
+      description: 'Venue contact details updated',
+    );
+  }
+
+  Future<void> updateVenueContactDetails({
+    required String venueId,
+    required String phone,
+    required String email,
+    required VenueModelSnapshot context,
+  }) {
+    return _savePreparedUpdate(
+      venueId: venueId,
+      context: context,
+      prepared: _updateService.prepareContactDetailsUpdate(
+        venueId: venueId,
+        phone: phone,
+        email: email,
+      ),
+      actionType: VenueManagementActivityActionTypes.contactUpdated,
+      description: 'Venue contact details updated',
     );
   }
 
@@ -111,6 +147,8 @@ class VenueProfileRepository {
         venueId: venueId,
         openingHours: openingHours,
       ),
+      actionType: VenueManagementActivityActionTypes.openingHoursUpdated,
+      description: 'Venue opening hours updated',
     );
   }
 
@@ -128,6 +166,8 @@ class VenueProfileRepository {
         selectedKeys: selectedKeys,
         ageRestricted: ageRestricted,
       ),
+      actionType: VenueManagementActivityActionTypes.updated,
+      description: 'Venue profile updated',
     );
   }
 
@@ -144,6 +184,8 @@ class VenueProfileRepository {
         crowdLevel: crowdLevel,
         context: _searchContext(context),
       ),
+      actionType: VenueManagementActivityActionTypes.updated,
+      description: 'Venue crowd level updated',
     );
   }
 
@@ -165,6 +207,8 @@ class VenueProfileRepository {
     required String venueId,
     required VenueModelSnapshot context,
     required DataResult<VenueProfileUpdate> prepared,
+    required String actionType,
+    required String description,
   }) async {
     if (!VenueMediaAccessService.canManageMediaForVenue(
       userId: context.userId,
@@ -190,6 +234,18 @@ class VenueProfileRepository {
 
     switch (result) {
       case DataSuccess():
+        await _activityService.recordActivity(
+          VenueManagementActivity(
+            venueId: venueId,
+            sourceArea: VenueManagementActivitySourceAreas.venueProfile,
+            actionType: actionType,
+            entityType: VenueManagementActivityEntityTypes.venue,
+            entityId: venueId,
+            entityName: context.name.trim().isEmpty ? 'Venue profile' : context.name,
+            description: description,
+            actorUid: context.userId,
+          ),
+        );
         return;
       case DataFailure(:final error):
         throw error;

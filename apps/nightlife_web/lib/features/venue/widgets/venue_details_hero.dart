@@ -7,10 +7,11 @@ import '../../../core/constants/breakpoints.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../shared/components/drinkspot_button.dart';
 import '../../../shared/components/pill_tag.dart';
 import '../../../shared/widgets/positioned_venue_image.dart';
 import '../models/venue_details_view.dart';
+import 'venue_hero_action_button_row.dart';
+import 'venue_hero_action_specs.dart';
 
 /// Cinematic venue header with banner, floating logo, glass info layer and actions.
 class VenueDetailsHero extends StatelessWidget {
@@ -357,7 +358,7 @@ class _GlassInfoLayer extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.lg),
-                _HeroActions(
+                VenueDetailsHeroActions(
                   venue: venue,
                   onViewOnMap: () {
                     Navigator.of(context).pushNamed(AppRouter.search);
@@ -457,11 +458,6 @@ class _HeroMetaRow extends StatelessWidget {
       runSpacing: AppSpacing.sm,
       children: [
         _MetaChip(
-          icon: Icons.star_rounded,
-          label: venue.rating.toStringAsFixed(1),
-          accent: AppColors.trailGold,
-        ),
-        _MetaChip(
           icon: venue.isOpen ? Icons.circle : Icons.circle_outlined,
           label: venue.isOpen ? 'Open now' : 'Closed',
           accent: venue.isOpen
@@ -512,8 +508,10 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-class _HeroActions extends StatelessWidget {
-  const _HeroActions({
+/// Customer-facing hero action buttons for the public web venue page.
+class VenueDetailsHeroActions extends StatelessWidget {
+  const VenueDetailsHeroActions({
+    super.key,
     required this.venue,
     required this.onViewOnMap,
     required this.onPlaceholder,
@@ -538,48 +536,28 @@ class _HeroActions extends StatelessWidget {
     }
   }
 
+  void _handleAction(VenueHeroActionId action) {
+    switch (action) {
+      case VenueHeroActionId.directions:
+        _openDirections();
+      case VenueHeroActionId.saveVenue:
+        onPlaceholder('Save venue');
+      case VenueHeroActionId.share:
+        onPlaceholder('Share');
+      case VenueHeroActionId.viewOnMap:
+        onViewOnMap();
+      case VenueHeroActionId.phone:
+      case VenueHeroActionId.saved:
+      case VenueHeroActionId.viewVenue:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isMobile = Breakpoints.isMobile(context);
-
-    final primaryButtons = [
-      DrinkSpotButton(
-        label: 'Get directions',
-        icon: Icons.directions_outlined,
-        variant: DrinkSpotButtonVariant.primary,
-        compact: isMobile,
-        onPressed: _openDirections,
-      ),
-    ];
-
-    final secondaryButtons = [
-      DrinkSpotButton(
-        label: 'Save venue',
-        icon: Icons.bookmark_border_rounded,
-        variant: DrinkSpotButtonVariant.secondary,
-        compact: isMobile,
-        onPressed: () => onPlaceholder('Save venue'),
-      ),
-      DrinkSpotButton(
-        label: 'Share',
-        icon: Icons.ios_share_rounded,
-        variant: DrinkSpotButtonVariant.ghost,
-        compact: isMobile,
-        onPressed: () => onPlaceholder('Share'),
-      ),
-      DrinkSpotButton(
-        label: 'View on map',
-        icon: Icons.map_outlined,
-        variant: DrinkSpotButtonVariant.ghost,
-        compact: isMobile,
-        onPressed: onViewOnMap,
-      ),
-    ];
-
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [...primaryButtons, ...secondaryButtons],
+    return VenueHeroActionButtonRow(
+      actions: VenueHeroActionConfigs.publicWebHeroActions,
+      onAction: _handleAction,
     );
   }
 }

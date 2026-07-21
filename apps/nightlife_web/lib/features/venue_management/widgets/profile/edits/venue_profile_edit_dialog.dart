@@ -20,6 +20,7 @@ enum VenueProfileEditableField {
   address('Address'),
   description('Description'),
   website('Website'),
+  contactDetails('Contact Details'),
   openingHours('Opening Hours'),
   featureTags('Feature Tags'),
   crowdLevel('Crowd Level'),
@@ -91,6 +92,7 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _textController;
   late final TextEditingController _multilineController;
+  late final TextEditingController _emailController;
   late String? _selectedCategory;
   late String? _selectedCrowdLevel;
   late Set<String> _selectedFeatureKeys;
@@ -111,6 +113,7 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
 
     _textController = TextEditingController();
     _multilineController = TextEditingController();
+    _emailController = TextEditingController();
     _selectedCategory = venue.category.trim().isNotEmpty
         ? venue.category.trim()
         : VenueProfileConstants.categories.first;
@@ -152,6 +155,9 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
         _textController.text = venue.address;
       case VenueProfileEditableField.website:
         _textController.text = venue.website;
+      case VenueProfileEditableField.contactDetails:
+        _textController.text = venue.phone;
+        _emailController.text = venue.email;
       case VenueProfileEditableField.description:
         _multilineController.text = venue.description;
       default:
@@ -163,6 +169,7 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
   void dispose() {
     _textController.dispose();
     _multilineController.dispose();
+    _emailController.dispose();
     for (final controller in _openControllers.values) {
       controller.dispose();
     }
@@ -248,6 +255,13 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
           await widget.repository.updateVenueWebsite(
             venueId: widget.venue.id,
             website: _textController.text.trim(),
+            context: snapshot,
+          );
+        case VenueProfileEditableField.contactDetails:
+          await widget.repository.updateVenueContactDetails(
+            venueId: widget.venue.id,
+            phone: _textController.text.trim(),
+            email: _emailController.text.trim(),
             context: snapshot,
           );
         case VenueProfileEditableField.openingHours:
@@ -420,6 +434,8 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
         'Tell customers what makes your venue special.',
       VenueProfileEditableField.website =>
         'Optional link to your venue website or booking page.',
+      VenueProfileEditableField.contactDetails =>
+        'Phone and email shown to customers on your public venue profile.',
       VenueProfileEditableField.openingHours =>
         'These times control the Open / Closed status on map and search cards. Use 24-hour time.',
       VenueProfileEditableField.featureTags =>
@@ -461,6 +477,7 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
             value ?? '',
           ),
         ),
+      VenueProfileEditableField.contactDetails => _buildContactDetailsField(),
       VenueProfileEditableField.description => _buildTextField(
           controller: _multilineController,
           label: 'Description',
@@ -507,6 +524,28 @@ class _VenueProfileFieldEditDialogState extends State<VenueProfileFieldEditDialo
       style: const TextStyle(color: AppColors.white),
       decoration: _inputDecoration(label),
       validator: validator,
+    );
+  }
+
+  Widget _buildContactDetailsField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTextField(
+          controller: _textController,
+          label: 'Phone number',
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _buildTextField(
+          controller: _emailController,
+          label: 'Email address',
+          keyboardType: TextInputType.emailAddress,
+          validator: (value) => VenueProfileFieldCodec.validateEmail(
+            value ?? '',
+          ),
+        ),
+      ],
     );
   }
 

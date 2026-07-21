@@ -49,7 +49,6 @@ class _VenueDetailsPageState extends State<VenueDetailsPage> {
       address: venue.displayAddress,
       phone: venue.phone,
       website: venue.website,
-      rating: venue.rating,
       latitude: venue.latitude,
       longitude: venue.longitude,
     );

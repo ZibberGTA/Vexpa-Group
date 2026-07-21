@@ -21,6 +21,7 @@ import '../drinks/venue_drinks_management_page.dart';
 import '../image_reposition/image_reposition_dialog.dart';
 import '../page/venue_dashboard_page_scaffold.dart';
 import '../../data/venue_profile_repository.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../page/venue_dashboard_page_widgets.dart';
 import '../profile/edits/venue_profile_edit_dialog.dart';
 import '../venue_dashboard_controller.dart';
@@ -108,6 +109,8 @@ class _VenueProfileManagementPageState
     );
 
     if (!mounted || saved != true) return;
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
     _showMessage('${field.label} saved successfully.');
   }
 
@@ -147,10 +150,7 @@ class _VenueProfileManagementPageState
                         details: details,
                         usableBannerUrl: bannerUrl,
                         usableLogoUrl: logoUrl,
-                        onEditProfileDetails: _scrollToProfileDetails,
-                      ),
-                      searchPreview: VenueProfileSearchPreviewCard(
-                        venue: venue,
+                        rawVenueDocument: data,
                       ),
                       profileDetails: KeyedSubtree(
                         key: _profileDetailsKey,
@@ -160,6 +160,11 @@ class _VenueProfileManagementPageState
                           onEditField: (label) =>
                               _handleEditField(label, venue, data),
                         ),
+                      ),
+                      openingTimes: VenueProfileOpeningTimesCard(
+                        venue: venue,
+                        onEdit: () =>
+                            _handleEditField('Opening Hours', venue, data),
                       ),
                       branding: VenueProfileBrandingCard(
                         venue: venue,

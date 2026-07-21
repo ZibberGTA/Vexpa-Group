@@ -355,6 +355,53 @@ Authenticated area for venue owners and managers. Remains visually and logically
 
 **Principle:** Reuse mobile management UI and Firestore write paths wherever practical. Adapt layout for desktop, not logic.
 
+### Venue Dashboard — Recent Activity (Feature 1.8)
+
+The dashboard home tab shows a read-only **Recent Activity** feed in the right-hand column (below Quick Actions, above Go Premium). It consumes the Feature 1.7 `venue_management_activity` foundation — no direct Firestore access in UI widgets.
+
+| Aspect | Behaviour |
+|---|---|
+| Purpose | Help venue managers see what recently changed in their venue |
+| Data source | `VenueManagementActivityService.loadRecentActivity()` → `VenueManagementActivityRepository.fetchRecentForVenue()` |
+| Scope | Strictly filtered by the authorised active `venueId` from dashboard context |
+| Ordering | Newest first (`occurredAt` descending) |
+| Limit | Maximum 10 items |
+| Refresh | Loads when the dashboard opens, when the active venue changes, and on inline Retry after error |
+| Real-time | One-time reads only — no listeners or polling |
+| Presentation | `VenueManagementActivityPresentationMapper` maps source area + action type to icon, title, description, actor and relative timestamp |
+| Unknown actions | Generic “Venue activity” fallback — must not crash |
+| Empty state | “No recent activity” with supporting copy |
+| Error state | Compact inline message with Retry; rest of dashboard remains usable |
+
+Write path (CRUD repositories after successful operations) and read path (dashboard feed) share the same model and collection. Firestore rules and indexes were added in Patch 1.7.1.
+
+### Venue Management Activity — Entity Pages (Feature 1.8.1)
+
+Entity management pages (Drinks, Deals, Events, Gallery, Venue Profile) now read the same persisted `venue_management_activity` records as the dashboard home feed. Legacy in-memory rows derived from entity timestamps or mock page config data have been removed.
+
+| Aspect | Behaviour |
+|---|---|
+| Data source | `VenueManagementActivityService.loadRecentActivityForSourceArea()` → `VenueManagementActivityRepository.fetchRecentForSourceArea()` |
+| Scope | Active authorised `venueId` plus page `sourceArea` (`drinks`, `deals`, `events`, `gallery`, `venue_profile`) |
+| Ordering | Newest first (`occurredAt` descending) |
+| Limit | 10 items by default; Gallery uses 5 |
+| Refresh | Loads when the page opens, when the active venue changes, after successful mutations on that page, and via Retry |
+| Presentation | Shared `VenueManagementActivityPresentationMapper` |
+| Write path | Unchanged — repositories record activity after successful mutations; failures are logged without blocking CRUD |
+
+Supported repository query scopes:
+
+1. Venue-wide recent activity (`fetchRecentForVenue`)
+2. Source-area scoped activity (`fetchRecentForSourceArea`)
+3. Entity scoped activity (`fetchRecentForEntity`)
+
+Required Firestore composite indexes for source-area and entity queries are declared in `apps/nightlife_app/firestore.indexes.json`.
+
+Legacy components retained for non-management use:
+
+- `VenueActivityService` — analytics/content aggregation for future analytics surfaces (not entity page feeds)
+- `VenueDashboardActivity` — internal DTO for analytics engine mapping only
+
 ---
 
 ## Admin

@@ -5,6 +5,7 @@ import 'package:nightlife_web/features/auth/services/user_role_service.dart';
 import 'package:nightlife_web/features/venue_management/data/venue_media_migration_helper.dart';
 import 'package:nightlife_web/features/venue_management/data/venue_media_repository.dart';
 import 'package:nightlife_web/features/venue_management/data/venue_media_storage_service.dart';
+import 'package:nightlife_web/features/venue_management/data/venue_media_upload_errors.dart';
 import 'package:nightlife_web/features/venue_management/data/venue_media_upload_service.dart';
 import 'package:nightlife_web/features/venue_management/models/media_library_tab.dart';
 import 'package:nightlife_web/features/venue_management/models/venue_media_type.dart';
@@ -184,6 +185,68 @@ void main() {
       expect(deals.first.mediaType, VenueMediaType.deal);
     });
 
+    test('deal tab loads existing venues with more than five images', () async {
+      store['wine-central'] = {
+        for (var i = 0; i < 8; i++)
+          'd$i': {
+            'venueId': 'wine-central',
+            'mediaType': 'deal',
+            'imageUrl': 'https://example.com/d$i.jpg',
+            'visible': true,
+            'sortOrder': i,
+          },
+      };
+
+      final deals = await repository
+          .watchMediaItems(
+            venueId: 'wine-central',
+            tab: MediaLibraryTab.dealImages,
+          )
+          .first;
+
+      expect(deals, hasLength(8));
+      expect(
+        deals.every((item) => item.mediaType == VenueMediaType.deal),
+        isTrue,
+      );
+    });
+
+    test('deal images above limit can still be deleted', () async {
+      store['wine-central'] = {
+        for (var i = 0; i < 8; i++)
+          'd$i': {
+            'venueId': 'wine-central',
+            'mediaType': 'deal',
+            'imageUrl': 'https://example.com/d$i.jpg',
+            'storagePath': 'venues/wine-central/media/deal/d$i.jpg',
+            'visible': true,
+            'sortOrder': i,
+          },
+      };
+
+      final deals = await repository
+          .watchMediaItems(
+            venueId: 'wine-central',
+            tab: MediaLibraryTab.dealImages,
+          )
+          .first;
+
+      await repository.deleteMediaItems(
+        venueId: 'wine-central',
+        itemIds: const ['d7'],
+        itemsForStorage: [deals.last],
+        storageService: VenueMediaStorageService(deleteOverride: (_) async {}),
+      );
+
+      final remaining = await repository
+          .watchMediaItems(
+            venueId: 'wine-central',
+            tab: MediaLibraryTab.dealImages,
+          )
+          .first;
+      expect(remaining, hasLength(7));
+    });
+
     test('event tab loads only event mediaType', () async {
       store['wine-central'] = {
         'e1': {
@@ -206,16 +269,84 @@ void main() {
       expect(events.first.mediaType, VenueMediaType.event);
     });
 
-    test('does not synthesize legacy gallery rows when media collection is empty', () async {
-      final gallery = await repository
+    test(
+      'event tab loads existing venues with more than five images',
+      () async {
+        store['wine-central'] = {
+          for (var i = 0; i < 8; i++)
+            'e$i': {
+              'venueId': 'wine-central',
+              'mediaType': 'event',
+              'imageUrl': 'https://example.com/e$i.jpg',
+              'visible': true,
+              'sortOrder': i,
+            },
+        };
+
+        final events = await repository
+            .watchMediaItems(
+              venueId: 'wine-central',
+              tab: MediaLibraryTab.eventImages,
+            )
+            .first;
+
+        expect(events, hasLength(8));
+        expect(
+          events.every((item) => item.mediaType == VenueMediaType.event),
+          isTrue,
+        );
+      },
+    );
+
+    test('event images above limit can still be deleted', () async {
+      store['wine-central'] = {
+        for (var i = 0; i < 8; i++)
+          'e$i': {
+            'venueId': 'wine-central',
+            'mediaType': 'event',
+            'imageUrl': 'https://example.com/e$i.jpg',
+            'storagePath': 'venues/wine-central/media/event/e$i.jpg',
+            'visible': true,
+            'sortOrder': i,
+          },
+      };
+
+      final events = await repository
           .watchMediaItems(
             venueId: 'wine-central',
-            tab: MediaLibraryTab.venueGallery,
+            tab: MediaLibraryTab.eventImages,
           )
           .first;
 
-      expect(gallery, isEmpty);
+      await repository.deleteMediaItems(
+        venueId: 'wine-central',
+        itemIds: const ['e7'],
+        itemsForStorage: [events.last],
+        storageService: VenueMediaStorageService(deleteOverride: (_) async {}),
+      );
+
+      final remaining = await repository
+          .watchMediaItems(
+            venueId: 'wine-central',
+            tab: MediaLibraryTab.eventImages,
+          )
+          .first;
+      expect(remaining, hasLength(7));
     });
+
+    test(
+      'does not synthesize legacy gallery rows when media collection is empty',
+      () async {
+        final gallery = await repository
+            .watchMediaItems(
+              venueId: 'wine-central',
+              tab: MediaLibraryTab.venueGallery,
+            )
+            .first;
+
+        expect(gallery, isEmpty);
+      },
+    );
 
     test('delete removes gallery media from store and storage path', () async {
       store['wine-central'] = {
@@ -230,13 +361,14 @@ void main() {
         },
       };
 
-      final item = (await repository
-              .watchMediaItems(
-                venueId: 'wine-central',
-                tab: MediaLibraryTab.venueGallery,
-              )
-              .first)
-          .single;
+      final item =
+          (await repository
+                  .watchMediaItems(
+                    venueId: 'wine-central',
+                    tab: MediaLibraryTab.venueGallery,
+                  )
+                  .first)
+              .single;
       final deletedPaths = <String>[];
 
       await repository.deleteMediaItems(
@@ -262,39 +394,43 @@ void main() {
       expect(gallery, isEmpty);
     });
 
-    test('delete still removes firestore metadata when storage delete fails', () async {
-      store['wine-central'] = {
-        'g1': {
-          'venueId': 'wine-central',
-          'mediaType': 'gallery',
-          'imageUrl': 'https://example.com/g1.jpg',
-          'storagePath': 'venues/wine-central/media/gallery/g1.jpg',
-          'visible': true,
-          'sortOrder': 0,
-        },
-      };
-
-      final item = (await repository
-              .watchMediaItems(
-                venueId: 'wine-central',
-                tab: MediaLibraryTab.venueGallery,
-              )
-              .first)
-          .single;
-
-      await repository.deleteMediaItems(
-        venueId: 'wine-central',
-        itemIds: const ['g1'],
-        itemsForStorage: [item],
-        storageService: VenueMediaStorageService(
-          deleteOverride: (_) async {
-            throw StateError('object-not-found');
+    test(
+      'delete still removes firestore metadata when storage delete fails',
+      () async {
+        store['wine-central'] = {
+          'g1': {
+            'venueId': 'wine-central',
+            'mediaType': 'gallery',
+            'imageUrl': 'https://example.com/g1.jpg',
+            'storagePath': 'venues/wine-central/media/gallery/g1.jpg',
+            'visible': true,
+            'sortOrder': 0,
           },
-        ),
-      );
+        };
 
-      expect(store['wine-central'], isEmpty);
-    });
+        final item =
+            (await repository
+                    .watchMediaItems(
+                      venueId: 'wine-central',
+                      tab: MediaLibraryTab.venueGallery,
+                    )
+                    .first)
+                .single;
+
+        await repository.deleteMediaItems(
+          venueId: 'wine-central',
+          itemIds: const ['g1'],
+          itemsForStorage: [item],
+          storageService: VenueMediaStorageService(
+            deleteOverride: (_) async {
+              throw StateError('object-not-found');
+            },
+          ),
+        );
+
+        expect(store['wine-central'], isEmpty);
+      },
+    );
 
     test('brand assets tab loads logo and banner media only', () async {
       store['wine-central'] = {
@@ -331,10 +467,10 @@ void main() {
           .first;
 
       expect(brandAssets, hasLength(2));
-      expect(
-        brandAssets.map((item) => item.mediaType).toSet(),
-        {VenueMediaType.logo, VenueMediaType.banner},
-      );
+      expect(brandAssets.map((item) => item.mediaType).toSet(), {
+        VenueMediaType.logo,
+        VenueMediaType.banner,
+      });
 
       final gallery = await repository
           .watchMediaItems(
@@ -388,16 +524,17 @@ void main() {
       final service = VenueMediaUploadService(
         repository: repository,
         storageService: VenueMediaStorageService(
-          uploadOverride: ({
-            required storagePath,
-            required bytes,
-            required contentType,
-          }) async {
-            return (
-              downloadUrl: 'https://storage.example.com/$storagePath',
-              storagePath: storagePath,
-            );
-          },
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
         ),
       );
 
@@ -425,21 +562,25 @@ void main() {
     test('branding upload updates venue logoUrl and currentLogoMediaId', () async {
       final store = <String, Map<String, Map<String, dynamic>>>{};
       final repository = VenueMediaRepository.inMemory(store);
-      final venueDoc = <String, dynamic>{'ownerId': 'owner-1', 'name': 'Wine Central'};
+      final venueDoc = <String, dynamic>{
+        'ownerId': 'owner-1',
+        'name': 'Wine Central',
+      };
 
       final service = VenueMediaUploadService(
         repository: repository,
         storageService: VenueMediaStorageService(
-          uploadOverride: ({
-            required storagePath,
-            required bytes,
-            required contentType,
-          }) async {
-            return (
-              downloadUrl: 'https://storage.example.com/$storagePath',
-              storagePath: storagePath,
-            );
-          },
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
         ),
       );
 
@@ -463,100 +604,413 @@ void main() {
       expect(item.storagePath, startsWith('venues/wine-central/media/logo/'));
       expect(store['wine-central']![item.id]!['mediaType'], 'logo');
       expect(store['wine-central']![item.id]!['isCurrent'], isTrue);
-      expect(store['wine-central']![item.id]!['imageUrl'], startsWith('https://storage.example.com/'));
-    });
-
-    test('clearVenueBrandingFields is callable on in-memory repository', () async {
-      final store = <String, Map<String, Map<String, dynamic>>>{};
-      final repository = VenueMediaRepository.inMemory(store);
-
-      await repository.clearVenueBrandingFields(
-        venueId: 'wine-central',
-        mediaType: VenueMediaType.logo,
+      expect(
+        store['wine-central']![item.id]!['imageUrl'],
+        startsWith('https://storage.example.com/'),
       );
-
-      expect(repository, isNotNull);
     });
 
-    test('removeBrokenMediaItem deletes media metadata from in-memory store', () async {
-      final store = <String, Map<String, Map<String, dynamic>>>{
-        'wine-central': {
-          'broken-logo': {
-            'venueId': 'wine-central',
-            'mediaType': 'logo',
-            'imageUrl': 'https://example.com/missing.png',
-            'visible': true,
+    test(
+      'clearVenueBrandingFields is callable on in-memory repository',
+      () async {
+        final store = <String, Map<String, Map<String, dynamic>>>{};
+        final repository = VenueMediaRepository.inMemory(store);
+
+        await repository.clearVenueBrandingFields(
+          venueId: 'wine-central',
+          mediaType: VenueMediaType.logo,
+        );
+
+        expect(repository, isNotNull);
+      },
+    );
+
+    test(
+      'removeBrokenMediaItem deletes media metadata from in-memory store',
+      () async {
+        final store = <String, Map<String, Map<String, dynamic>>>{
+          'wine-central': {
+            'broken-logo': {
+              'venueId': 'wine-central',
+              'mediaType': 'logo',
+              'imageUrl': 'https://example.com/missing.png',
+              'visible': true,
+            },
           },
-        },
-      };
-      final repository = VenueMediaRepository.inMemory(store);
+        };
+        final repository = VenueMediaRepository.inMemory(store);
 
-      await repository.removeBrokenMediaItem(
-        venueId: 'wine-central',
-        mediaId: 'broken-logo',
-      );
+        await repository.removeBrokenMediaItem(
+          venueId: 'wine-central',
+          mediaId: 'broken-logo',
+        );
 
-      expect(store['wine-central'], isEmpty);
-    });
+        expect(store['wine-central'], isEmpty);
+      },
+    );
   });
 
   group('VenueMediaUploadService', () {
-    test('upload creates storage file and firestore metadata for venue', () async {
+    test(
+      'upload creates storage file and firestore metadata for venue',
+      () async {
+        final store = <String, Map<String, Map<String, dynamic>>>{};
+        final repository = VenueMediaRepository.inMemory(store);
+        final uploadedPaths = <String>[];
+
+        final service = VenueMediaUploadService(
+          repository: repository,
+          storageService: VenueMediaStorageService(
+            uploadOverride:
+                ({
+                  required storagePath,
+                  required bytes,
+                  required contentType,
+                }) async {
+                  uploadedPaths.add(storagePath);
+                  return (
+                    downloadUrl: 'https://storage.example.com/$storagePath',
+                    storagePath: storagePath,
+                  );
+                },
+          ),
+        );
+
+        final items = await service.uploadLibraryImages(
+          venueId: 'wine-central',
+          uploadedByUid: 'owner-1',
+          tab: MediaLibraryTab.venueGallery,
+          files: [
+            (bytes: Uint8List.fromList([1, 2, 3]), fileName: 'bar.jpg'),
+          ],
+          profile: const UserRoleProfile(
+            role: VexdaUserRole.venueOwner,
+            ownedVenuesCount: 1,
+          ),
+          venueOwnerId: 'owner-1',
+          startingSortOrder: 0,
+        );
+
+        expect(
+          uploadedPaths.single,
+          startsWith('venues/wine-central/media/gallery/'),
+        );
+        expect(store['wine-central'], isNotNull);
+        expect(store['wine-central']!.values.single['venueId'], 'wine-central');
+        expect(store['wine-central']!.values.single['mediaType'], 'gallery');
+        expect(
+          store['wine-central']!.values.single['uploadedByUid'],
+          'owner-1',
+        );
+        expect(
+          items.single.imageUrl,
+          startsWith('https://storage.example.com/'),
+        );
+      },
+    );
+
+    test('deal upload allowed below limit', () async {
       final store = <String, Map<String, Map<String, dynamic>>>{};
       final repository = VenueMediaRepository.inMemory(store);
-      final uploadedPaths = <String>[];
 
       final service = VenueMediaUploadService(
         repository: repository,
         storageService: VenueMediaStorageService(
-          uploadOverride: ({
-            required storagePath,
-            required bytes,
-            required contentType,
-          }) async {
-            uploadedPaths.add(storagePath);
-            return (
-              downloadUrl: 'https://storage.example.com/$storagePath',
-              storagePath: storagePath,
-            );
-          },
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
         ),
       );
 
       final items = await service.uploadLibraryImages(
         venueId: 'wine-central',
         uploadedByUid: 'owner-1',
-        tab: MediaLibraryTab.venueGallery,
+        tab: MediaLibraryTab.dealImages,
         files: [
-          (bytes: Uint8List.fromList([1, 2, 3]), fileName: 'bar.jpg'),
+          (bytes: Uint8List.fromList([1, 2, 3]), fileName: 'deal.jpg'),
         ],
         profile: const UserRoleProfile(
           role: VexdaUserRole.venueOwner,
           ownedVenuesCount: 1,
         ),
         venueOwnerId: 'owner-1',
-        startingSortOrder: 0,
+        subscriptionPlanId: 'professional',
+        currentItemCount: 4,
       );
 
-      expect(uploadedPaths.single, startsWith('venues/wine-central/media/gallery/'));
-      expect(store['wine-central'], isNotNull);
-      expect(store['wine-central']!.values.single['venueId'], 'wine-central');
-      expect(store['wine-central']!.values.single['mediaType'], 'gallery');
-      expect(store['wine-central']!.values.single['uploadedByUid'], 'owner-1');
-      expect(items.single.imageUrl, startsWith('https://storage.example.com/'));
+      expect(items, hasLength(1));
+      expect(store['wine-central'], hasLength(1));
     });
+
+    test('deal upload blocked at limit', () async {
+      final service = VenueMediaUploadService(
+        repository: VenueMediaRepository.inMemory({}),
+        storageService: VenueMediaStorageService(
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
+        ),
+      );
+
+      expect(
+        () => service.uploadLibraryImages(
+          venueId: 'wine-central',
+          uploadedByUid: 'owner-1',
+          tab: MediaLibraryTab.dealImages,
+          files: [
+            (bytes: Uint8List.fromList([1]), fileName: 'deal.jpg'),
+          ],
+          profile: const UserRoleProfile(
+            role: VexdaUserRole.venueOwner,
+            ownedVenuesCount: 1,
+          ),
+          venueOwnerId: 'owner-1',
+          subscriptionPlanId: 'professional',
+          currentItemCount: 5,
+        ),
+        throwsA(
+          isA<VenueMediaUploadException>().having(
+            (error) => error.kind,
+            'kind',
+            VenueMediaUploadFailureKind.uploadLimitExceeded,
+          ),
+        ),
+      );
+    });
+
+    test('deal upload blocked when venue already above limit', () async {
+      final service = VenueMediaUploadService(
+        repository: VenueMediaRepository.inMemory({}),
+        storageService: VenueMediaStorageService(
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
+        ),
+      );
+
+      expect(
+        () => service.uploadLibraryImages(
+          venueId: 'wine-central',
+          uploadedByUid: 'owner-1',
+          tab: MediaLibraryTab.dealImages,
+          files: [
+            (bytes: Uint8List.fromList([1]), fileName: 'deal.jpg'),
+          ],
+          profile: const UserRoleProfile(
+            role: VexdaUserRole.venueOwner,
+            ownedVenuesCount: 1,
+          ),
+          venueOwnerId: 'owner-1',
+          subscriptionPlanId: 'professional',
+          currentItemCount: 8,
+        ),
+        throwsA(isA<VenueMediaUploadException>()),
+      );
+    });
+
+    test('event upload allowed below limit', () async {
+      final store = <String, Map<String, Map<String, dynamic>>>{};
+      final repository = VenueMediaRepository.inMemory(store);
+
+      final service = VenueMediaUploadService(
+        repository: repository,
+        storageService: VenueMediaStorageService(
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
+        ),
+      );
+
+      final items = await service.uploadLibraryImages(
+        venueId: 'wine-central',
+        uploadedByUid: 'owner-1',
+        tab: MediaLibraryTab.eventImages,
+        files: [
+          (bytes: Uint8List.fromList([1, 2, 3]), fileName: 'event.jpg'),
+        ],
+        profile: const UserRoleProfile(
+          role: VexdaUserRole.venueOwner,
+          ownedVenuesCount: 1,
+        ),
+        venueOwnerId: 'owner-1',
+        subscriptionPlanId: 'professional',
+        currentItemCount: 4,
+      );
+
+      expect(items, hasLength(1));
+      expect(store['wine-central'], hasLength(1));
+    });
+
+    test('event upload blocked at limit', () async {
+      final service = VenueMediaUploadService(
+        repository: VenueMediaRepository.inMemory({}),
+        storageService: VenueMediaStorageService(
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
+        ),
+      );
+
+      expect(
+        () => service.uploadLibraryImages(
+          venueId: 'wine-central',
+          uploadedByUid: 'owner-1',
+          tab: MediaLibraryTab.eventImages,
+          files: [
+            (bytes: Uint8List.fromList([1]), fileName: 'event.jpg'),
+          ],
+          profile: const UserRoleProfile(
+            role: VexdaUserRole.venueOwner,
+            ownedVenuesCount: 1,
+          ),
+          venueOwnerId: 'owner-1',
+          subscriptionPlanId: 'professional',
+          currentItemCount: 5,
+        ),
+        throwsA(
+          isA<VenueMediaUploadException>().having(
+            (error) => error.kind,
+            'kind',
+            VenueMediaUploadFailureKind.uploadLimitExceeded,
+          ),
+        ),
+      );
+    });
+
+    test('event upload blocked when venue already above limit', () async {
+      final service = VenueMediaUploadService(
+        repository: VenueMediaRepository.inMemory({}),
+        storageService: VenueMediaStorageService(
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://storage.example.com/$storagePath',
+                  storagePath: storagePath,
+                );
+              },
+        ),
+      );
+
+      expect(
+        () => service.uploadLibraryImages(
+          venueId: 'wine-central',
+          uploadedByUid: 'owner-1',
+          tab: MediaLibraryTab.eventImages,
+          files: [
+            (bytes: Uint8List.fromList([1]), fileName: 'event.jpg'),
+          ],
+          profile: const UserRoleProfile(
+            role: VexdaUserRole.venueOwner,
+            ownedVenuesCount: 1,
+          ),
+          venueOwnerId: 'owner-1',
+          subscriptionPlanId: 'professional',
+          currentItemCount: 8,
+        ),
+        throwsA(isA<VenueMediaUploadException>()),
+      );
+    });
+
+    test(
+      'venue gallery upload limit remains twenty on professional plan',
+      () async {
+        final service = VenueMediaUploadService(
+          repository: VenueMediaRepository.inMemory({}),
+          storageService: VenueMediaStorageService(
+            uploadOverride:
+                ({
+                  required storagePath,
+                  required bytes,
+                  required contentType,
+                }) async {
+                  return (
+                    downloadUrl: 'https://storage.example.com/$storagePath',
+                    storagePath: storagePath,
+                  );
+                },
+          ),
+        );
+
+        expect(
+          () => service.uploadLibraryImages(
+            venueId: 'wine-central',
+            uploadedByUid: 'owner-1',
+            tab: MediaLibraryTab.venueGallery,
+            files: [
+              (bytes: Uint8List.fromList([1]), fileName: 'gallery.jpg'),
+            ],
+            profile: const UserRoleProfile(
+              role: VexdaUserRole.venueOwner,
+              ownedVenuesCount: 1,
+            ),
+            venueOwnerId: 'owner-1',
+            subscriptionPlanId: 'professional',
+            currentItemCount: 20,
+          ),
+          throwsA(isA<VenueMediaUploadException>()),
+        );
+      },
+    );
 
     test('staff upload denied for unassigned venue', () async {
       final service = VenueMediaUploadService(
         repository: VenueMediaRepository.inMemory({}),
         storageService: VenueMediaStorageService(
-          uploadOverride: ({
-            required storagePath,
-            required bytes,
-            required contentType,
-          }) async {
-            return (downloadUrl: 'https://example.com/x.jpg', storagePath: storagePath);
-          },
+          uploadOverride:
+              ({
+                required storagePath,
+                required bytes,
+                required contentType,
+              }) async {
+                return (
+                  downloadUrl: 'https://example.com/x.jpg',
+                  storagePath: storagePath,
+                );
+              },
         ),
       );
 
@@ -579,16 +1033,19 @@ void main() {
   });
 
   group('VenueMediaMigrationHelper', () {
-    test('legacy gallery helper is not used as live gallery table fallback', () {
-      final legacy = VenueMediaMigrationHelper.legacyGalleryItems(
-        venueId: 'wine-central',
-        urls: const ['https://example.com/existing.jpg'],
-      );
+    test(
+      'legacy gallery helper is not used as live gallery table fallback',
+      () {
+        final legacy = VenueMediaMigrationHelper.legacyGalleryItems(
+          venueId: 'wine-central',
+          urls: const ['https://example.com/existing.jpg'],
+        );
 
-      expect(legacy, hasLength(1));
-      expect(legacy.first.fileName, 'Gallery photo 1');
-      expect(legacy.first.isLegacy, isTrue);
-    });
+        expect(legacy, hasLength(1));
+        expect(legacy.first.fileName, 'Gallery photo 1');
+        expect(legacy.first.isLegacy, isTrue);
+      },
+    );
 
     test('can build metadata from existing gallery URLs', () {
       final map = VenueMediaMigrationHelper.metadataFromExistingUrl(

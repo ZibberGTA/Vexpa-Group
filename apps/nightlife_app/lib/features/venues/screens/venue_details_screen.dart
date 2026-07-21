@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vex_engines/experience/application/experience_drink_grouper.dart';
 import 'package:vex_engines/experience/application/venue_presentation_support.dart';
+import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/premium_scaffold.dart';
@@ -14,6 +15,7 @@ import '../../crowd/services/smart_crowd_service.dart';
 import '../services/venue_details_service.dart';
 import '../services/venue_media_service.dart';
 import '../utils/venue_image_resolver.dart';
+import '../models/venue_details_model.dart';
 import '../models/venue_media_model.dart';
 import '../../home/models/event_model.dart';
 import '../../home/models/deal_model.dart';
@@ -314,7 +316,7 @@ class _VenueGallery extends StatelessWidget {
 
 
 class _VenueHeroCard extends StatelessWidget {
-  final dynamic venue;
+  final VenueDetailsModel venue;
   final String venueId;
   final String logoUrl;
 
@@ -326,7 +328,11 @@ class _VenueHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final description = venue.description.toString().trim();
+    final description = venue.description.trim();
+    final heroTags = VenueProfileFieldCodec.displayFeatureTags(
+      featureTags: venue.featureTags,
+      features: venue.features,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -404,12 +410,8 @@ class _VenueHeroCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _Pill(
-                    icon: Icons.local_bar,
-                    label: venue.venueType.toString().isNotEmpty
-                        ? venue.venueType.toString()
-                        : 'Venue',
-                  ),
+                  for (final tag in heroTags)
+                    _Pill(icon: Icons.label_outline_rounded, label: tag),
                   _SmartCrowdPill(
                     venueId: venueId,
                     level: venue.currentCrowdLevel.toString(),

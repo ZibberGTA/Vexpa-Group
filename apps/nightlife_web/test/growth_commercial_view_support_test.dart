@@ -58,7 +58,7 @@ void main() {
                 targetTab: VenueDashboardTab.events,
               ),
             ],
-            recentActivity: const [],
+            nextSevenDaysSchedule: VenueDashboardHomeData.empty().nextSevenDaysSchedule,
             analyticsAvailable: true,
           ),
         ),
@@ -88,7 +88,7 @@ void main() {
 
     test('fromDashboard delegates through controller context and home data', () {
       final controller = VenueDashboardController(
-        selectTab: (_) {},
+        selectTab: (_, {pendingActionKey}) {},
         contextData: const VenueDashboardContext(
           ownerName: 'Alex Morgan',
           ownerFirstName: 'Alex',

@@ -5,6 +5,14 @@ import 'package:nightlife_web/features/venue_management/models/media_subscriptio
 
 void main() {
   group('MediaSubscriptionLimits', () {
+    test('deal images upload limit is five', () {
+      expect(MediaSubscriptionLimits.dealImagesUploadLimit, 5);
+    });
+
+    test('event images upload limit is five', () {
+      expect(MediaSubscriptionLimits.eventImagesUploadLimit, 5);
+    });
+
     test('starter plan has no media centre access', () {
       expect(MediaSubscriptionLimits.hasMediaCentreAccess('starter'), isFalse);
       expect(
@@ -29,18 +37,18 @@ void main() {
           planId: 'professional',
           tab: MediaLibraryTab.dealImages,
         ),
-        15,
+        5,
       );
       expect(
         MediaSubscriptionLimits.limitFor(
           planId: 'professional',
           tab: MediaLibraryTab.eventImages,
         ),
-        15,
+        5,
       );
     });
 
-    test('premium plan limits match spec', () {
+    test('premium web caps use five for deal and event images', () {
       expect(
         MediaSubscriptionLimits.limitFor(
           planId: 'premium',
@@ -53,7 +61,14 @@ void main() {
           planId: 'premium',
           tab: MediaLibraryTab.dealImages,
         ),
-        25,
+        5,
+      );
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'premium',
+          tab: MediaLibraryTab.eventImages,
+        ),
+        5,
       );
     });
 
@@ -66,31 +81,147 @@ void main() {
         ),
         40,
       );
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'corporate',
+          tab: MediaLibraryTab.dealImages,
+          customLimits: const {'dealImages': 40},
+        ),
+        5,
+      );
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'corporate',
+          tab: MediaLibraryTab.eventImages,
+          customLimits: const {'eventImages': 40},
+        ),
+        5,
+      );
     });
 
-    test('validateUpload blocks when over limit', () {
+    group('validateUpload for deal images', () {
+      test('allows upload below limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.dealImages,
+            currentCount: 4,
+            uploadCount: 1,
+          ),
+          isNull,
+        );
+      });
+
+      test('blocks upload at limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.dealImages,
+            currentCount: 5,
+            uploadCount: 1,
+          ),
+          contains('reached your deal images limit (5)'),
+        );
+      });
+
+      test('blocks partial upload when selection exceeds remaining slots', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.dealImages,
+            currentCount: 4,
+            uploadCount: 2,
+          ),
+          contains('only upload 1'),
+        );
+      });
+
+      test('blocks upload for venues already above limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.dealImages,
+            currentCount: 8,
+            uploadCount: 1,
+          ),
+          contains('reached your deal images limit (5)'),
+        );
+      });
+    });
+
+    group('validateUpload for event images', () {
+      test('allows upload below limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.eventImages,
+            currentCount: 4,
+            uploadCount: 1,
+          ),
+          isNull,
+        );
+      });
+
+      test('blocks upload at limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.eventImages,
+            currentCount: 5,
+            uploadCount: 1,
+          ),
+          contains('reached your event images limit (5)'),
+        );
+      });
+
+      test('blocks partial upload when selection exceeds remaining slots', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.eventImages,
+            currentCount: 4,
+            uploadCount: 2,
+          ),
+          contains('only upload 1'),
+        );
+      });
+
+      test('blocks upload for venues already above limit', () {
+        expect(
+          MediaSubscriptionLimits.validateUpload(
+            planId: 'professional',
+            tab: MediaLibraryTab.eventImages,
+            currentCount: 8,
+            uploadCount: 1,
+          ),
+          contains('reached your event images limit (5)'),
+        );
+      });
+    });
+
+    test('venue gallery limits remain unchanged', () {
       expect(
-        MediaSubscriptionLimits.validateUpload(
+        MediaSubscriptionLimits.limitFor(
           planId: 'professional',
-          tab: MediaLibraryTab.dealImages,
-          currentCount: 14,
-          uploadCount: 2,
+          tab: MediaLibraryTab.venueGallery,
         ),
-        contains('only upload 1'),
+        20,
       );
     });
   });
 
   group('MediaLibraryPageConfig', () {
     test('venue gallery quick actions include cover and export', () {
-      final config = MediaLibraryPageConfig.forTab(MediaLibraryTab.venueGallery);
+      final config = MediaLibraryPageConfig.forTab(
+        MediaLibraryTab.venueGallery,
+      );
       expect(config.primaryActionLabel, 'Upload Photos');
       expect(
         config.quickActions.map((action) => action.label),
         containsAll([
           'Upload Photos',
           'Reorder Gallery',
-          'Set Cover Photo',
+          'Set Featured Image',
           'Export Gallery List',
           'Delete Selected',
         ]),

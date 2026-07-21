@@ -77,7 +77,7 @@ void main() {
       expect(result.longitude, -1.5491);
     });
 
-    test('uses default rating when averageRating is absent', () {
+    test('uses zero rating when averageRating is absent', () {
       final venue = VenueModel.fromMap('venue-4', {
         'name': 'Rated Later',
         'address': 'Soho, London',
@@ -88,7 +88,7 @@ void main() {
       final result = SearchVenueMapper.fromVenueModel(venue);
 
       expect(result, isNotNull);
-      expect(result!.rating, 4.5);
+      expect(result!.rating, 0);
     });
   });
 

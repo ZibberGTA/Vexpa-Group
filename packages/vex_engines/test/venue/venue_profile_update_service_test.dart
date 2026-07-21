@@ -40,6 +40,30 @@ void main() {
     });
   });
 
+  group('VenueProfileUpdateService.prepareContactDetailsUpdate', () {
+    test('prepares phone and email fields', () {
+      final result = service.prepareContactDetailsUpdate(
+        venueId: 'venue-1',
+        phone: ' 020 7946 0958 ',
+        email: ' hello@example.com ',
+      );
+
+      final update = (result as DataSuccess).value;
+      expect(update.fields['phone'], '020 7946 0958');
+      expect(update.fields['email'], 'hello@example.com');
+    });
+
+    test('rejects invalid email addresses', () {
+      final result = service.prepareContactDetailsUpdate(
+        venueId: 'venue-1',
+        phone: '',
+        email: 'not-an-email',
+      );
+
+      expect(result, isA<DataFailure>());
+    });
+  });
+
   group('VenueProfileUpdateService.prepareWebsiteUpdate', () {
     test('normalises valid website urls', () {
       final result = service.prepareWebsiteUpdate(

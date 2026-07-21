@@ -36,6 +36,15 @@ void main() {
       expect(VenueProfileFieldCodec.validateWebsite('not a url'), isNotNull);
     });
 
+    test('validateEmail accepts empty and rejects invalid addresses', () {
+      expect(VenueProfileFieldCodec.validateEmail(''), isNull);
+      expect(
+        VenueProfileFieldCodec.validateEmail('hello@example.com'),
+        isNull,
+      );
+      expect(VenueProfileFieldCodec.validateEmail('not-an-email'), isNotNull);
+    });
+
     test('validateOpeningHours requires 24-hour times for open days', () {
       final error = VenueProfileFieldCodec.validateOpeningHours({
         'monday': {'closed': false, 'open': '18:00', 'close': '02:00'},

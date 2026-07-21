@@ -24,6 +24,7 @@ import 'package:nightlife_web/features/venue_management/widgets/venue_dashboard_
 import 'package:nightlife_web/features/venue_management/widgets/venue_dashboard_shell.dart';
 
 import 'venue_dashboard_test_data.dart';
+import 'venue_management_activity_test_support.dart';
 
 Uint8List buildDrinksImportCsv(List<List<String>> rows) {
   final content = csv.encode(rows);
@@ -69,11 +70,13 @@ Future<void> doubleTapText(WidgetTester tester, String text) async {
 }
 
 void main() {
+  registerDefaultVenueManagementActivityTestIsolation();
+
   group('Venue dashboard Support tab', () {
     testWidgets('Support tab appears in sidebar before Settings', (
       WidgetTester tester,
     ) async {
-      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.physicalSize = const Size(1440, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
@@ -98,7 +101,7 @@ void main() {
     testWidgets('Support page loads in dashboard shell', (
       WidgetTester tester,
     ) async {
-      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.physicalSize = const Size(1440, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
@@ -151,7 +154,7 @@ void main() {
           theme: ThemeData.dark(),
           home: Scaffold(
             body: VenueDashboardController(
-              selectTab: (_) {},
+              selectTab: (_, {pendingActionKey}) {},
               contextData: const VenueDashboardContext(
                 ownerName: 'Alex Morgan',
                 ownerFirstName: 'Alex',
@@ -1235,7 +1238,7 @@ void main() {
           theme: ThemeData.dark(),
           home: Scaffold(
             body: VenueDashboardController(
-              selectTab: (tab) => selectedTab = tab,
+              selectTab: (tab, {String? pendingActionKey}) => selectedTab = tab,
               contextData: const VenueDashboardContext(
                 ownerName: 'Alex Morgan',
                 ownerFirstName: 'Alex',
@@ -1328,6 +1331,10 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
   }
 
   @override
+  Stream<List<DrinkModel>> watchManagementDrinks(String venueId) =>
+      watchDrinks(venueId);
+
+  @override
   Future<String> addDrink({
     required String venueId,
     required String venueName,
@@ -1367,6 +1374,7 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
   @override
   Future<void> updateDrink({
     required String drinkId,
+    required String venueId,
     required String venueName,
     required String name,
     required String category,
@@ -1411,6 +1419,8 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
     required String drinkId,
     required String deletedBy,
     String? deletedByEmail,
+    String? venueId,
+    String? drinkName,
   }) async {
     final index = _drinks.indexWhere((drink) => drink.id == drinkId);
     if (index == -1) {
@@ -1439,6 +1449,7 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
   @override
   Future<void> patchDrink({
     required String drinkId,
+    required String venueId,
     required String venueName,
     required String drinkName,
     required String category,
@@ -1485,6 +1496,7 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
     for (final drink in drinks) {
       await patchDrink(
         drinkId: drink.id,
+        venueId: drink.venueId,
         venueName: venueName,
         drinkName: drink.name,
         category: drink.category,
@@ -1496,16 +1508,18 @@ class FakeVenueDrinksRepository extends VenueDrinksRepository {
 
   @override
   Future<void> bulkDeleteDrinks({
-    required List<String> drinkIds,
+    required List<DrinkModel> drinks,
     required String deletedBy,
     String? deletedByEmail,
   }) async {
-    lastBulkDeletedIds = List.of(drinkIds);
-    for (final drinkId in drinkIds) {
+    lastBulkDeletedIds = drinks.map((drink) => drink.id).toList();
+    for (final drink in drinks) {
       await deleteDrink(
-        drinkId: drinkId,
+        drinkId: drink.id,
         deletedBy: deletedBy,
         deletedByEmail: deletedByEmail,
+        venueId: drink.venueId,
+        drinkName: drink.name,
       );
     }
   }

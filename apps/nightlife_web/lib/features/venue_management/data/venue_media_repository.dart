@@ -4,10 +4,14 @@ import 'package:vex_engines/experience/application/venue_content_ordering_servic
 import 'package:vex_engines/experience/application/venue_presentation_support.dart';
 
 import '../../../core/firebase/vexda_firebase.dart';
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../venues/models/image_position_metadata.dart';
 import '../models/media_library_tab.dart';
+import '../models/venue_management_activity.dart';
+import '../models/venue_management_activity_types.dart';
 import '../models/venue_media_item.dart';
 import '../models/venue_media_type.dart';
+import 'venue_management_activity_service.dart';
 import 'venue_media_storage_service.dart';
 
 /// Reads and writes venue-owned media under venues/{venueId}/media/{mediaId}.
@@ -16,7 +20,10 @@ class VenueMediaRepository {
     FirebaseFirestore? firestore,
     this._inMemoryStore,
     VenueMediaStorageService? storageService,
-  }) : _firestoreOverride = firestore;
+    VenueManagementActivityService? activityService,
+  }) : _firestoreOverride = firestore,
+       _activityService =
+           activityService ?? WebVexCore.venueManagementActivityService;
 
   static const mediaCollection = 'media';
 
@@ -25,6 +32,7 @@ class VenueMediaRepository {
 
   final FirebaseFirestore? _firestoreOverride;
   final Map<String, Map<String, Map<String, dynamic>>>? _inMemoryStore;
+  final VenueManagementActivityService _activityService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -130,6 +138,7 @@ class VenueMediaRepository {
       if (item.mediaType == VenueMediaType.gallery && item.visible) {
         await _syncGalleryImageUrlsFromStore(venueId);
       }
+      await _recordMediaActivityForSave(item: item);
       return;
     }
 
@@ -140,6 +149,8 @@ class VenueMediaRepository {
     if (item.mediaType == VenueMediaType.gallery && item.visible) {
       await _syncGalleryImageUrlsBestEffort(venueId);
     }
+
+    await _recordMediaActivityForSave(item: item);
   }
 
   Future<void> _syncGalleryImageUrlsBestEffort(String venueId) async {
@@ -172,12 +183,14 @@ class VenueMediaRepository {
     required Iterable<String> itemIds,
     Iterable<VenueMediaItem> itemsForStorage = const [],
     VenueMediaStorageService? storageService,
+    String? actorUid,
   }) async {
     final ids = itemIds.toList();
     if (ids.isEmpty) return;
 
     final items = itemsForStorage.toList();
-    final storage = storageService ??
+    final storage =
+        storageService ??
         (items.any((item) => (item.storagePath?.trim().isNotEmpty ?? false))
             ? VenueMediaStorageService()
             : null);
@@ -223,6 +236,11 @@ class VenueMediaRepository {
           mediaType: item.mediaType,
         );
       }
+      await _recordGalleryDeletes(
+        venueId: venueId,
+        items: items,
+        actorUid: actorUid,
+      );
       return;
     }
 
@@ -248,6 +266,12 @@ class VenueMediaRepository {
         mediaType: item.mediaType,
       );
     }
+
+    await _recordGalleryDeletes(
+      venueId: venueId,
+      items: items,
+      actorUid: actorUid,
+    );
   }
 
   Future<void> _reconcileBrandingAfterDelete({
@@ -311,28 +335,67 @@ class VenueMediaRepository {
   Future<void> setCoverPhoto({
     required String venueId,
     required String itemId,
+    String? actorUid,
   }) async {
     final items = await _loadGalleryItems(venueId);
+    final target = items.where((item) => item.id == itemId).firstOrNull;
+    if (target == null || !target.canBeFeatured) {
+      throw StateError(
+        'Featured image must be an active venue gallery photo with a saved URL.',
+      );
+    }
+
+    final previousFeatured = items.where((item) => item.featured).firstOrNull;
     final updated = items
         .map((item) => item.copyWith(featured: item.id == itemId))
         .toList();
+    final itemsToPersist = <VenueMediaItem>[
+      target.copyWith(featured: true),
+      if (previousFeatured != null && previousFeatured.id != itemId)
+        previousFeatured.copyWith(featured: false),
+    ];
 
     if (_inMemoryStore != null) {
-      for (final item in updated) {
+      for (final item in itemsToPersist) {
         await saveMediaItem(venueId: venueId, item: item);
       }
     } else {
       final batch = _resolveFirestore()!.batch();
-      for (final item in updated) {
-        batch.set(_mediaCollection(venueId).doc(item.id), {
-          'featured': item.featured,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      for (final item in itemsToPersist) {
+        batch.set(
+          _mediaCollection(venueId).doc(item.id),
+          _featuredSelectionWritePayload(venueId: venueId, item: item),
+          SetOptions(merge: true),
+        );
       }
       await batch.commit();
     }
 
     await _syncGalleryImageUrls(venueId: venueId, items: updated);
+    final coverItem = updated.where((item) => item.id == itemId).firstOrNull;
+    await _recordGalleryActivity(
+      venueId: venueId,
+      entityId: itemId,
+      entityName: coverItem?.displayName ?? 'Gallery photo',
+      actorUid: actorUid ?? coverItem?.uploadedByUid ?? '',
+      actionType: VenueManagementActivityActionTypes.galleryUpdated,
+      description: 'Gallery featured image updated',
+    );
+  }
+
+  /// Merge payload that satisfies media update rules for featured toggles.
+  static Map<String, dynamic> _featuredSelectionWritePayload({
+    required String venueId,
+    required VenueMediaItem item,
+  }) {
+    return {
+      'featured': item.featured,
+      'venueId': item.venueId.isNotEmpty ? item.venueId : venueId,
+      'mediaId': item.id,
+      'status': item.status,
+      'visible': item.visible,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 
   Future<List<VenueMediaItem>> _loadGalleryItems(String venueId) async {
@@ -466,6 +529,7 @@ class VenueMediaRepository {
     required String venueId,
     required MediaLibraryTab tab,
     required List<VenueMediaItem> orderedItems,
+    String? actorUid,
   }) async {
     if (_inMemoryStore != null) {
       for (var i = 0; i < orderedItems.length; i++) {
@@ -486,6 +550,14 @@ class VenueMediaRepository {
 
     if (tab == MediaLibraryTab.venueGallery) {
       await _syncGalleryImageUrls(venueId: venueId, items: orderedItems);
+      await _recordGalleryActivity(
+        venueId: venueId,
+        entityId: venueId,
+        entityName: 'Gallery',
+        actorUid: actorUid ?? orderedItems.firstOrNull?.uploadedByUid ?? '',
+        actionType: VenueManagementActivityActionTypes.galleryUpdated,
+        description: 'Gallery reordered',
+      );
     }
   }
 
@@ -495,6 +567,7 @@ class VenueMediaRepository {
     required String mediaId,
     required String imageUrl,
     ImagePositionMetadata? position,
+    String? actorUid,
   }) async {
     if (mediaType != VenueMediaType.logo &&
         mediaType != VenueMediaType.banner) {
@@ -531,6 +604,15 @@ class VenueMediaRepository {
       imageUrl: imageUrl,
       mediaId: mediaId,
       position: position,
+    );
+
+    final brandingLabel = mediaType == VenueMediaType.logo ? 'Logo' : 'Banner';
+    await _recordProfileBrandingActivity(
+      venueId: venueId,
+      entityId: mediaId,
+      entityName: brandingLabel,
+      actorUid: actorUid ?? '',
+      description: 'Venue branding updated',
     );
   }
 
@@ -648,6 +730,95 @@ class VenueMediaRepository {
     Map<String, Map<String, Map<String, dynamic>>> store,
   ) {
     return VenueMediaRepository(inMemoryStore: store);
+  }
+
+  Future<void> _recordMediaActivityForSave({
+    required VenueMediaItem item,
+  }) async {
+    final actorUid = item.uploadedByUid.trim();
+    if (item.mediaType == VenueMediaType.gallery && item.visible) {
+      await _recordGalleryActivity(
+        venueId: item.venueId,
+        entityId: item.id,
+        entityName: item.displayName,
+        actorUid: actorUid,
+        actionType: VenueManagementActivityActionTypes.photoUploaded,
+        description: 'Photo uploaded',
+      );
+      return;
+    }
+
+    if (item.mediaType == VenueMediaType.logo ||
+        item.mediaType == VenueMediaType.banner) {
+      await _recordProfileBrandingActivity(
+        venueId: item.venueId,
+        entityId: item.id,
+        entityName: item.displayName,
+        actorUid: actorUid,
+        description: 'Venue branding updated',
+      );
+    }
+  }
+
+  Future<void> _recordGalleryDeletes({
+    required String venueId,
+    required List<VenueMediaItem> items,
+    String? actorUid,
+  }) async {
+    for (final item in items) {
+      if (item.mediaType != VenueMediaType.gallery) continue;
+      await _recordGalleryActivity(
+        venueId: venueId,
+        entityId: item.id,
+        entityName: item.displayName,
+        actorUid: actorUid ?? item.uploadedByUid,
+        actionType: VenueManagementActivityActionTypes.photoDeleted,
+        description: 'Photo removed',
+      );
+    }
+  }
+
+  Future<void> _recordGalleryActivity({
+    required String venueId,
+    required String entityId,
+    required String entityName,
+    required String actorUid,
+    required String actionType,
+    required String description,
+  }) {
+    return _activityService.recordActivity(
+      VenueManagementActivity(
+        venueId: venueId,
+        sourceArea: VenueManagementActivitySourceAreas.gallery,
+        actionType: actionType,
+        entityType: VenueManagementActivityEntityTypes.media,
+        entityId: entityId,
+        entityName: entityName,
+        description: description,
+        actorUid: actorUid,
+      ),
+    );
+  }
+
+  Future<void> _recordProfileBrandingActivity({
+    required String venueId,
+    required String entityId,
+    required String entityName,
+    required String actorUid,
+    required String description,
+  }) {
+    return _activityService.recordActivity(
+      VenueManagementActivity(
+        venueId: venueId,
+        sourceArea: VenueManagementActivitySourceAreas.venueProfile,
+        actionType: VenueManagementActivityActionTypes.brandingChanged,
+        entityType: VenueManagementActivityEntityTypes.media,
+        entityId: entityId,
+        entityName: entityName,
+        description: description,
+        actorUid: actorUid,
+      ),
+    );
   }
 }
 

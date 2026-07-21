@@ -15,7 +15,10 @@ service cloud.firestore {
     }
 
     function roleLevel() {
-      return request.auth.token.roleLevel == null ? 0 : request.auth.token.roleLevel;
+      return ('roleLevel' in request.auth.token
+          && request.auth.token.roleLevel != null)
+        ? request.auth.token.roleLevel
+        : 0;
     }
 
     function hasStaffDocument(uid) {
@@ -63,7 +66,7 @@ service cloud.firestore {
 
     function isStaffPrincipal() {
       return signedIn() && (
-        request.auth.token.staff == true
+        ('staff' in request.auth.token && request.auth.token.staff == true)
         || staffRoleLevelFromDocument(request.auth.uid) >= 10
         || userRoleLevelFromDocument(request.auth.uid) >= 30
         || (
@@ -402,6 +405,80 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // workflow requests (VexWorkflow)
+    // -------------------------------------------------------------------------
+
+    function workflowVenueCanRead() {
+      return signedIn() &&
+        canManageVenue(resource.data.subjectVenueId);
+    }
+
+    function workflowVenueCanCreate() {
+      return signedIn() &&
+        request.resource.data.submittedByUid == request.auth.uid &&
+        request.resource.data.workflowType == 'trail.venue_participation' &&
+        request.resource.data.status == 'draft' &&
+        canManageVenue(request.resource.data.subjectVenueId) &&
+        request.resource.data.subjectRefs.trailId == request.resource.data.subjectTrailId &&
+        request.resource.data.subjectRefs.venueId == request.resource.data.subjectVenueId;
+    }
+
+    function workflowVenueCanUpdate() {
+      return signedIn() &&
+        resource.data.submittedByUid == request.auth.uid &&
+        request.resource.data.submittedByUid == resource.data.submittedByUid &&
+        request.resource.data.workflowType == resource.data.workflowType &&
+        request.resource.data.subjectTrailId == resource.data.subjectTrailId &&
+        request.resource.data.subjectVenueId == resource.data.subjectVenueId &&
+        request.resource.data.subjectRefs.trailId == resource.data.subjectTrailId &&
+        request.resource.data.subjectRefs.venueId == resource.data.subjectVenueId &&
+        canManageVenue(resource.data.subjectVenueId) &&
+        request.resource.data.status in ['draft', 'submitted', 'withdrawn'] &&
+        (
+          request.resource.data.status == resource.data.status ||
+          (
+            resource.data.status == 'draft' &&
+            request.resource.data.status == 'submitted'
+          ) ||
+          (
+            resource.data.status in ['submitted', 'under_review', 'information_requested'] &&
+            request.resource.data.status == 'withdrawn'
+          ) ||
+          (
+            resource.data.status == 'information_requested' &&
+            request.resource.data.status == 'submitted'
+          )
+        ) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status',
+          'payload',
+          'revision',
+          'updatedAt',
+          'submittedAt'
+        ]);
+    }
+
+    match /workflow_requests/{requestId} {
+      allow read: if isSupportOrAbove() || workflowVenueCanRead();
+      allow create: if workflowVenueCanCreate();
+      allow update: if isAdmin() || workflowVenueCanUpdate();
+      allow delete: if isFounder();
+
+      match /audit/{auditId} {
+        allow read: if isSupportOrAbove() || (
+          signedIn() &&
+          canManageVenue(get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.subjectVenueId)
+        );
+        allow create: if isAdmin() || (
+          signedIn() &&
+          get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.submittedByUid == request.auth.uid &&
+          canManageVenue(get(/databases/$(database)/documents/workflow_requests/$(requestId)).data.subjectVenueId)
+        );
+        allow update, delete: if false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
     // moderation / alerts
     // -------------------------------------------------------------------------
 
@@ -648,6 +725,63 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if signedIn();
       allow update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // venue management activity (append-only audit trail)
+    // -------------------------------------------------------------------------
+
+    function venueManagementActivityKeysValid() {
+      let keys = request.resource.data.keys();
+      return keys.hasAll([
+          'venueId', 'sourceArea', 'actionType', 'entityType', 'entityId',
+          'entityName', 'description', 'actorUid', 'metadata', 'version', 'occurredAt'
+        ])
+        && (
+          keys.hasOnly([
+            'venueId', 'sourceArea', 'actionType', 'entityType', 'entityId',
+            'entityName', 'description', 'actorUid', 'metadata', 'version', 'occurredAt'
+          ])
+          || keys.hasOnly([
+            'venueId', 'sourceArea', 'actionType', 'entityType', 'entityId',
+            'entityName', 'description', 'actorUid', 'actorDisplayName',
+            'metadata', 'version', 'occurredAt'
+          ])
+        );
+    }
+
+    function venueManagementActivityFieldsValid() {
+      let data = request.resource.data;
+      return data.venueId is string && data.venueId.size() > 0
+        && data.sourceArea is string && data.sourceArea.size() > 0
+        && data.actionType is string && data.actionType.size() > 0
+        && data.entityType is string && data.entityType.size() > 0
+        && data.entityId is string && data.entityId.size() > 0
+        && data.entityName is string && data.entityName.size() > 0
+        && data.description is string && data.description.size() > 0
+        && data.actorUid is string && data.actorUid.size() > 0
+        && data.metadata is map
+        && data.version is int && data.version == 1
+        && data.occurredAt == request.time
+        && (!data.keys().hasAny(['actorDisplayName']) || data.actorDisplayName is string);
+    }
+
+    function venueManagementActivityCreateValid() {
+      return venueManagementActivityKeysValid()
+        && venueManagementActivityFieldsValid();
+    }
+
+    match /venue_management_activity/{activityId} {
+      allow read: if isSupportOrAbove()
+        || (signedIn()
+          && resource.data.venueId is string
+          && canManageVenue(resource.data.venueId));
+      allow create: if signedIn()
+        && request.resource.data.venueId is string
+        && canManageVenue(request.resource.data.venueId)
+        && request.resource.data.actorUid == request.auth.uid
+        && venueManagementActivityCreateValid();
+      allow update, delete: if false;
     }
 
     match /financials/{docId} {

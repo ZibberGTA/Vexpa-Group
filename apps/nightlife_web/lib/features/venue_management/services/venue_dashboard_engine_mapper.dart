@@ -17,9 +17,12 @@ abstract final class VenueDashboardEngineMapper {
   ) {
     return switch (range) {
       VenueDashboardDateRange.today => AnalyticsDashboardDateRange.today,
-      VenueDashboardDateRange.last3Days => AnalyticsDashboardDateRange.last3Days,
-      VenueDashboardDateRange.last7Days => AnalyticsDashboardDateRange.last7Days,
-      VenueDashboardDateRange.lastMonth => AnalyticsDashboardDateRange.lastMonth,
+      VenueDashboardDateRange.last3Days =>
+        AnalyticsDashboardDateRange.last3Days,
+      VenueDashboardDateRange.last7Days =>
+        AnalyticsDashboardDateRange.last7Days,
+      VenueDashboardDateRange.lastMonth =>
+        AnalyticsDashboardDateRange.lastMonth,
       VenueDashboardDateRange.allTime => AnalyticsDashboardDateRange.allTime,
       VenueDashboardDateRange.custom => AnalyticsDashboardDateRange.custom,
     };

@@ -34,7 +34,8 @@
     ]
   },
   "firestore": {
-    "rules": "../nightlife_app/firestore.rules"
+    "rules": "../nightlife_app/firestore.rules",
+    "indexes": "../nightlife_app/firestore.indexes.json"
   },
   "storage": {
     "rules": "../nightlife_app/storage.rules"

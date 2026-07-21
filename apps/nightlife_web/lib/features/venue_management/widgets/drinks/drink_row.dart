@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/premium_effects.dart';
 import '../../../venue/data/models/drink_model.dart';
 import '../../../venue/data/venue_drinks_repository.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/bulk_drink_patch.dart';
 import '../../models/drink_categories.dart';
 import '../../models/featured_drinks_limit.dart';
@@ -55,12 +56,15 @@ class _DrinkRowState extends State<DrinkRow> {
     try {
       await widget.repository.patchDrink(
         drinkId: widget.drink.id,
+        venueId: widget.drink.venueId,
         venueName: widget.venueName,
         drinkName: widget.drink.name,
         category: widget.drink.category,
         patch: patch,
         updatedBy: userId,
       );
+      if (!context.mounted) return null;
+      await reloadVenueManagementPageActivity(context);
       return null;
     } catch (_) {
       return 'Could not save. Please try again.';

@@ -56,11 +56,18 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
   void initState() {
     super.initState();
     _cameraTarget = SearchVenueMapGeometry.initialCenterFor(widget.venues);
-    _loadMarkers();
+    if (!kIsWeb) {
+      _loadMarkers();
+    }
     if (kIsWeb) {
       GoogleMapsBootstrap.ensureReady().then((_) {
         if (!mounted) return;
-        setState(() => _mapsApiReady = true);
+        setState(() {
+          _mapsApiReady = true;
+          _loadError = null;
+          _loadErrorDetail = null;
+        });
+        _loadMarkers();
       }).catchError((_) {
         if (!mounted) return;
         setState(() {
@@ -110,6 +117,17 @@ class _SearchGoogleMapState extends State<SearchGoogleMap> {
         setState(() {
           _loadError = error;
           _loadErrorDetail = detail;
+        });
+        return;
+      }
+
+      if (error == null &&
+          _loadError != null &&
+          _mapsApiReady &&
+          _mapReady) {
+        setState(() {
+          _loadError = null;
+          _loadErrorDetail = null;
         });
         return;
       }

@@ -151,6 +151,7 @@ class _DrinkEditModalState extends State<DrinkEditModal> {
     try {
       await widget.repository.updateDrink(
         drinkId: widget.drink.id,
+        venueId: widget.drink.venueId,
         venueName: widget.venueName,
         name: _nameController.text,
         category: _selectedCategory!,
@@ -194,6 +195,8 @@ class _DrinkEditModalState extends State<DrinkEditModal> {
         drinkId: widget.drink.id,
         deletedBy: userId,
         deletedByEmail: _resolveUserEmail(),
+        venueId: widget.drink.venueId,
+        drinkName: widget.drink.name,
       );
 
       if (!mounted) return;

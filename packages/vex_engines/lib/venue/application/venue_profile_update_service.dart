@@ -104,6 +104,27 @@ final class VenueProfileUpdateService {
     });
   }
 
+  DataResult<VenueProfileUpdate> prepareContactDetailsUpdate({
+    required String venueId,
+    required String phone,
+    required String email,
+  }) {
+    return _withVenueId(venueId, () {
+      final trimmedEmail = email.trim();
+      final validationError = VenueProfileFieldCodec.validateEmail(trimmedEmail);
+      if (validationError != null) {
+        throw _ValidationException(validationError);
+      }
+
+      return VenueProfileUpdate(
+        fields: {
+          'phone': phone.trim(),
+          'email': trimmedEmail,
+        },
+      );
+    });
+  }
+
   DataResult<VenueProfileUpdate> prepareOpeningHoursUpdate({
     required String venueId,
     required Map<String, Map<String, dynamic>> openingHours,

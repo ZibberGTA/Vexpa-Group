@@ -26,6 +26,50 @@ void main() {
       );
     });
 
+    test('deal images use web cap instead of VexCore entitlement', () {
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'professional',
+          tab: MediaLibraryTab.dealImages,
+        ),
+        MediaSubscriptionLimits.dealImagesUploadLimit,
+      );
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'professional',
+          tab: MediaLibraryTab.dealImages,
+        ),
+        isNot(
+          engine.mediaUploadLimit(
+            planId: 'professional',
+            mediaLibraryKey: MediaLibraryLimitKey.dealImages,
+          ),
+        ),
+      );
+    });
+
+    test('event images use web cap instead of VexCore entitlement', () {
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'professional',
+          tab: MediaLibraryTab.eventImages,
+        ),
+        MediaSubscriptionLimits.eventImagesUploadLimit,
+      );
+      expect(
+        MediaSubscriptionLimits.limitFor(
+          planId: 'professional',
+          tab: MediaLibraryTab.eventImages,
+        ),
+        isNot(
+          engine.mediaUploadLimit(
+            planId: 'professional',
+            mediaLibraryKey: MediaLibraryLimitKey.eventImages,
+          ),
+        ),
+      );
+    });
+
     test('SubscriptionService.canUseGallery delegates to VexCore', () {
       expect(
         SubscriptionService.canUseGallery(

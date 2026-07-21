@@ -1,0 +1,35 @@
+/// VexTrail domain models and pure policies.
+library;
+
+export 'trail.dart';
+export 'trail_action.dart';
+export 'trail_activity_draft.dart';
+export 'trail_availability.dart';
+export 'trail_availability_policy.dart';
+export 'trail_check_in_policy.dart';
+export 'trail_completion_policy.dart';
+export 'trail_events.dart';
+export 'trail_generation_policy.dart';
+export 'trail_lifecycle_policy.dart';
+export 'trail_progress.dart';
+export 'trail_progress_state_policy.dart';
+export 'trail_publication_policy.dart';
+export 'trail_publication_readiness.dart';
+export 'trail_result.dart';
+export 'trail_status.dart';
+export 'trail_stop.dart';
+export 'trail_stop_order_policy.dart';
+export 'trail_stop_state.dart';
+export 'trail_transition_plan.dart';
+export 'trail_type.dart';
+export 'trail_visibility.dart';
+export 'trail_visibility_policy.dart';
+export 'participation/trail_participation_application.dart';
+export 'participation/trail_participation_approval_plan.dart';
+export 'participation/trail_participation_blocking_reason.dart';
+export 'participation/trail_participation_display_status.dart';
+export 'participation/trail_participation_duplicate_policy.dart';
+export 'participation/trail_participation_eligibility_policy.dart';
+export 'participation/trail_participation_events.dart';
+export 'participation/trail_participation_settings.dart';
+export 'participation/trail_participation_submission_payload.dart';

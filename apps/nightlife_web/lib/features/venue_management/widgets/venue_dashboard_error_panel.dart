@@ -12,53 +12,57 @@ class VenueDashboardErrorPanel extends StatelessWidget {
     super.key,
     required this.message,
     required this.onRetry,
+    this.embedded = false,
   });
 
   final String message;
   final VoidCallback onRetry;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
-    return PublicPageShell(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Padding(
+    final panel = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: EdgeInsets.all(embedded ? AppSpacing.lg : AppSpacing.xxl),
+          child: GlassContainer(
             padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: GlassContainer(
-              padding: const EdgeInsets.all(AppSpacing.xxl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dashboard unavailable',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dashboard unavailable',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14.5,
-                      height: 1.55,
-                    ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14.5,
+                    height: 1.55,
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  DrinkSpotButton(
-                    label: 'Retry',
-                    icon: Icons.refresh_rounded,
-                    onPressed: onRetry,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                DrinkSpotButton(
+                  label: 'Retry',
+                  icon: Icons.refresh_rounded,
+                  onPressed: onRetry,
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
+
+    if (embedded) return panel;
+
+    return PublicPageShell(child: panel);
   }
 }

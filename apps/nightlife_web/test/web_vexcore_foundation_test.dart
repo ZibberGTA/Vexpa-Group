@@ -9,6 +9,7 @@ void main() {
     WebVexCore.eventBusOverride = null;
     WebVexCore.storageOverride = null;
     WebVexCore.documentStorageOverride = null;
+    WebVexCore.venueManagementActivityServiceOverride = null;
   });
 
   test('WebVexCore exposes shared singleton platform services', () {

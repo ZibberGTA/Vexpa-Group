@@ -126,6 +126,15 @@ final class VenueProfileFieldCodec {
     return null;
   }
 
+  static String? validateEmail(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
   static String normaliseTimeInput(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return '';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,8 +9,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../venue/data/models/drink_model.dart';
 import '../../../venue/data/venue_drinks_repository.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/drink_categories.dart';
-import '../../models/venue_dashboard_activity.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_page_quick_action.dart';
 import '../../data/drink_spreadsheet_service.dart';
@@ -57,6 +58,7 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
   String _searchQuery = '';
   final Set<String> _selectedCategories = {};
   bool _exportingDrinks = false;
+  bool _pendingAddDrinkActionHandled = false;
   DrinkTableSort _sort = const DrinkTableSort();
 
   @override
@@ -98,9 +100,26 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
     );
     if (!mounted || !added) return;
 
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Drink added to your menu.')),
     );
+  }
+
+  void _maybeOpenPendingAddDrinkDialog(List<DrinkModel> drinks) {
+    if (_pendingAddDrinkActionHandled) return;
+
+    final pendingActionKey =
+        VenueDashboardController.maybeOf(context)?.takePendingTabActionKey?.call();
+    if (pendingActionKey != VenuePageActionKeys.addDrink) return;
+
+    _pendingAddDrinkActionHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_openAddDrinkDialog(drinks));
+    });
   }
 
   Future<void> _openEditDrinkDialog(
@@ -122,6 +141,8 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
         const SnackBar(content: Text('Drink deleted successfully.')),
       );
     }
+
+    await reloadVenueManagementPageActivity(context);
   }
 
   Future<void> _handleEditSelected(List<DrinkModel> allDrinks) async {
@@ -145,6 +166,9 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
       testUpdatedBy: widget.testCreatedBy,
     );
     if (!mounted || !applied) return;
+
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
 
     _clearSelection();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -181,7 +205,7 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
 
     try {
       await _repository.bulkDeleteDrinks(
-        drinkIds: selected.map((drink) => drink.id).toList(),
+        drinks: selected,
         deletedBy: userId,
       );
     } catch (_) {
@@ -288,25 +312,6 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
     }
   }
 
-  List<VenueDashboardActivity> _buildRecentActivity(List<DrinkModel> drinks) {
-    return WebExperienceContentSupport.summary
-        .recentDrinkActivity(
-          drinks: drinks,
-          name: (drink) => drink.name,
-          createdAt: (drink) => drink.createdAt,
-          updatedAt: (drink) => drink.updatedAt,
-          formatTimestamp: VenueDrinksRepository.relativeTimeLabel,
-        )
-        .map(
-          (activity) => VenueDashboardActivity(
-            title: activity.title,
-            timestampLabel: activity.timestampLabel,
-            icon: Icons.local_bar_outlined,
-          ),
-        )
-        .toList();
-  }
-
   void _clearCategoryFilters() {
     setState(_selectedCategories.clear);
   }
@@ -347,7 +352,7 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
     final venueId = controller?.contextData.venueId ?? '';
 
     return StreamBuilder<List<DrinkModel>>(
-      stream: _repository.watchDrinks(venueId),
+      stream: _repository.watchManagementDrinks(venueId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -358,6 +363,7 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
 
         final drinks = snapshot.data ?? const [];
         _pruneSelection(drinks);
+        _maybeOpenPendingAddDrinkDialog(drinks);
         final displayed = _displayDrinks(drinks);
 
         final drinkMetrics = WebExperienceContentSupport.summary.drinkMetrics(
@@ -371,7 +377,6 @@ class _VenueDrinksManagementPageState extends State<VenueDrinksManagementPage> {
           tab: VenueDashboardTab.drinks,
           onPrimaryAction: () => _openAddDrinkDialog(drinks),
           onQuickAction: (action) => _handleQuickAction(action, drinks),
-          activities: _buildRecentActivity(drinks),
           mainContent: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

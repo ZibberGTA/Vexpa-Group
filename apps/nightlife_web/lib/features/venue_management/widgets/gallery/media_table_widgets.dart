@@ -35,7 +35,7 @@ class MediaTableSort {
 abstract final class MediaTableSpec {
   static const checkboxColumnWidth = 32.0;
   static const thumbnailColumnWidth = 44.0;
-  static const coverColumnWidth = 56.0;
+  static const coverColumnWidth = 108.0;
   static const actionsColumnWidth = 72.0;
   static const nameFlex = 3;
   static const uploadedFlex = 2;
@@ -74,7 +74,7 @@ class MediaTableHeader extends StatelessWidget {
     required this.sort,
     required this.onSortColumn,
     this.showCoverColumn = true,
-    this.coverColumnLabel = 'Cover',
+    this.coverColumnLabel = 'Featured',
   });
 
   final MediaTableSort sort;
@@ -242,6 +242,8 @@ class MediaItemRow extends StatefulWidget {
     required this.isSelected,
     required this.onSelectionChanged,
     this.onAdjustPosition,
+    this.onSetFeatured,
+    this.isSettingFeatured = false,
     this.showCoverColumn = true,
     this.showCurrentColumn = false,
     this.showDivider = true,
@@ -251,6 +253,8 @@ class MediaItemRow extends StatefulWidget {
   final bool isSelected;
   final ValueChanged<bool> onSelectionChanged;
   final VoidCallback? onAdjustPosition;
+  final VoidCallback? onSetFeatured;
+  final bool isSettingFeatured;
   final bool showCoverColumn;
   final bool showCurrentColumn;
   final bool showDivider;
@@ -400,6 +404,8 @@ class _MediaItemRowState extends State<MediaItemRow> {
               ? AppColors.primaryPurple.withValues(
                   alpha: widget.isSelected ? 0.16 : 0.08,
                 )
+              : widget.item.isCover
+              ? AppColors.primaryPink.withValues(alpha: 0.08)
               : Colors.transparent,
           border: widget.showDivider
               ? Border(
@@ -408,7 +414,17 @@ class _MediaItemRowState extends State<MediaItemRow> {
                   ),
                 )
               : null,
-          boxShadow: _hovered ? PremiumEffects.hoverGlow(intensity: 0.2) : null,
+          boxShadow: widget.item.isCover
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryPink.withValues(alpha: 0.22),
+                    blurRadius: 12,
+                    spreadRadius: -2,
+                  ),
+                ]
+              : _hovered
+              ? PremiumEffects.hoverGlow(intensity: 0.2)
+              : null,
         ),
         child: _MediaTableRowShell(
           child: _MediaTableColumns(
@@ -446,11 +462,11 @@ class _MediaItemRowState extends State<MediaItemRow> {
                 fontSize: 12.5,
               ),
             ),
-            cover: widget.showCoverColumn && widget.item.isCover
-                ? Icon(
-                    Icons.star_rounded,
-                    size: 16,
-                    color: AppColors.primaryPink.withValues(alpha: 0.95),
+            cover: widget.showCoverColumn
+                ? _FeaturedColumnCell(
+                    item: widget.item,
+                    onSetFeatured: widget.onSetFeatured,
+                    isSettingFeatured: widget.isSettingFeatured,
                   )
                 : widget.showCurrentColumn && widget.item.isCurrent
                 ? Icon(
@@ -482,6 +498,73 @@ class _MediaItemRowState extends State<MediaItemRow> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FeaturedColumnCell extends StatelessWidget {
+  const _FeaturedColumnCell({
+    required this.item,
+    this.onSetFeatured,
+    this.isSettingFeatured = false,
+  });
+
+  final VenueMediaItem item;
+  final VoidCallback? onSetFeatured;
+  final bool isSettingFeatured;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.isCover) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.star_rounded,
+            size: 16,
+            color: AppColors.primaryPink.withValues(alpha: 0.95),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Featured',
+            style: TextStyle(
+              color: AppColors.primaryPink.withValues(alpha: 0.95),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (onSetFeatured == null || !item.canBeFeatured) {
+      return const SizedBox.shrink();
+    }
+
+    return TextButton(
+      onPressed: isSettingFeatured ? null : onSetFeatured,
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: isSettingFeatured
+          ? SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primaryPink.withValues(alpha: 0.9),
+              ),
+            )
+          : Text(
+              'Set as Featured',
+              style: TextStyle(
+                color: AppColors.textSecondary.withValues(alpha: 0.95),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
     );
   }
 }
@@ -764,7 +847,7 @@ class MediaSelectionActionBar extends StatelessWidget {
             TextButton.icon(
               onPressed: onSetCover,
               icon: const Icon(Icons.star_outline_rounded, size: 16),
-              label: const Text('Set Cover'),
+              label: const Text('Set as Featured'),
             ),
           if (onReplace != null)
             TextButton.icon(
@@ -786,4 +869,30 @@ class MediaSelectionActionBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Opens the existing tap-to-preview overlay for a gallery media item.
+void showVenueMediaItemPreviewOverlay(
+  BuildContext context,
+  VenueMediaItem item,
+) {
+  if (!item.hasLoadableUrl) return;
+
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (overlayContext) {
+      return _CenteredMediaPreviewOverlay(
+        url: item.previewUrl,
+        displayName: item.displayName,
+        tapMode: true,
+        onDismiss: () => entry.remove(),
+        onPreviewEnter: () {},
+        onPreviewExit: () => entry.remove(),
+      );
+    },
+  );
+  overlay.insert(entry);
 }

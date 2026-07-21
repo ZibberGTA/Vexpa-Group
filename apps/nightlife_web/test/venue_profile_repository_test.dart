@@ -7,6 +7,8 @@ import 'package:vex_engines/venue/application/venue_profile_update.dart';
 import 'package:vex_engines/venue/application/venue_profile_update_service.dart';
 import 'package:vex_engines/venue/data/venue_profile_write_repository.dart';
 
+import 'venue_management_activity_test_support.dart';
+
 final class MockVenueProfileWriteRepository
     implements VenueProfileWriteRepository {
   MockVenueProfileWriteRepository({this.result = const DataSuccess(null)});
@@ -46,6 +48,8 @@ VenueModelSnapshot _ownerContext({String venueId = 'venue-1'}) {
 }
 
 void main() {
+  registerDefaultVenueManagementActivityTestIsolation();
+
   group('VenueProfileRepository via Venue Engine', () {
     test('delegates name update to write repository once', () async {
       final writeRepository = MockVenueProfileWriteRepository();
@@ -81,6 +85,25 @@ void main() {
         throwsA(isA<VexException>()),
       );
       expect(writeRepository.callCount, 0);
+    });
+
+    test('delegates contact details update to write repository once', () async {
+      final writeRepository = MockVenueProfileWriteRepository();
+      final repository = VenueProfileRepository(
+        updateService: const VenueProfileUpdateService(),
+        writeRepository: writeRepository,
+      );
+
+      await repository.updateVenueContactDetails(
+        venueId: 'venue-1',
+        phone: '020 7946 0958',
+        email: 'hello@example.com',
+        context: _ownerContext(),
+      );
+
+      expect(writeRepository.callCount, 1);
+      expect(writeRepository.lastUpdate?.fields['phone'], '020 7946 0958');
+      expect(writeRepository.lastUpdate?.fields['email'], 'hello@example.com');
     });
 
     test('does not call write repository when permission is denied', () async {

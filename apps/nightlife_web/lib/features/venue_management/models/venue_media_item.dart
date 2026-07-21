@@ -67,6 +67,9 @@ class VenueMediaItem {
 
   bool get isCover => featured && mediaType == VenueMediaType.gallery;
 
+  bool get canBeFeatured =>
+      mediaType == VenueMediaType.gallery && isActive && hasLoadableUrl;
+
   bool get isActive => status == 'active' && visible;
 
   String get displayName {

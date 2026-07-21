@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'venue_dashboard_activity.dart';
 import 'venue_dashboard_tab.dart';
 import 'venue_page_quick_action.dart';
 
@@ -12,7 +11,6 @@ class VenuePageConfig {
     this.primaryActionLabel,
     this.primaryActionIcon,
     this.quickActions = const [],
-    this.recentActivity = const [],
   });
 
   final String title;
@@ -20,7 +18,6 @@ class VenuePageConfig {
   final String? primaryActionLabel;
   final IconData? primaryActionIcon;
   final List<VenuePageQuickAction> quickActions;
-  final List<VenueDashboardActivity> recentActivity;
 }
 
 extension VenuePageConfigX on VenueDashboardTab {
@@ -30,7 +27,6 @@ extension VenuePageConfigX on VenueDashboardTab {
         title: label,
         subtitle: '',
         quickActions: _dashboardQuickActions,
-        recentActivity: VenueDashboardActivity.mockRecent,
       ),
       VenueDashboardTab.map => VenuePageConfig(title: label, subtitle: ''),
       VenueDashboardTab.venueProfile => VenuePageConfig(
@@ -70,28 +66,6 @@ extension VenuePageConfigX on VenueDashboardTab {
           VenuePageQuickAction(
             label: 'Edit Tags',
             icon: Icons.label_outline_rounded,
-          ),
-        ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Logo updated',
-            timestampLabel: '1 hour ago',
-            icon: Icons.account_circle_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Banner changed',
-            timestampLabel: '3 hours ago',
-            icon: Icons.image_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Opening hours edited',
-            timestampLabel: 'Yesterday',
-            icon: Icons.schedule_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Contact details updated',
-            timestampLabel: '2 days ago',
-            icon: Icons.contact_mail_outlined,
           ),
         ],
       ),
@@ -191,23 +165,6 @@ extension VenuePageConfigX on VenueDashboardTab {
             actionKey: 'view_event_performance',
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Event created',
-            timestampLabel: '4 hours ago',
-            icon: Icons.event_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Event updated',
-            timestampLabel: 'Yesterday',
-            icon: Icons.edit_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Event published',
-            timestampLabel: '3 days ago',
-            icon: Icons.publish_outlined,
-          ),
-        ],
       ),
       VenueDashboardTab.gallery => VenuePageConfig(
         title: 'Gallery',
@@ -228,28 +185,12 @@ extension VenuePageConfigX on VenueDashboardTab {
             icon: Icons.delete_outline_rounded,
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Photos uploaded',
-            timestampLabel: '1 hour ago',
-            icon: Icons.photo_library_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Gallery reordered',
-            timestampLabel: 'Yesterday',
-            icon: Icons.reorder_rounded,
-          ),
-          VenueDashboardActivity(
-            title: 'Featured image changed',
-            timestampLabel: '2 days ago',
-            icon: Icons.star_outline_rounded,
-          ),
-        ],
       ),
       VenueDashboardTab.trails => VenuePageConfig(
         title: 'Trails',
-        subtitle: 'Manage your venue\'s participation in trails.',
-        primaryActionLabel: 'Learn About Trails',
+        subtitle:
+            'Join local trails, increase exposure and attract more customers.',
+        primaryActionLabel: 'Learn about Trails',
         primaryActionIcon: Icons.help_outline_rounded,
         quickActions: const [
           VenuePageQuickAction(
@@ -267,18 +208,6 @@ extension VenuePageConfigX on VenueDashboardTab {
           VenuePageQuickAction(
             label: 'Learn About Trails',
             icon: Icons.route_outlined,
-          ),
-        ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Joined trail',
-            timestampLabel: 'Yesterday',
-            icon: Icons.route_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Trail updated',
-            timestampLabel: '3 days ago',
-            icon: Icons.update_outlined,
           ),
         ],
       ),
@@ -302,18 +231,6 @@ extension VenuePageConfigX on VenueDashboardTab {
             icon: Icons.table_chart_outlined,
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Weekly report generated',
-            timestampLabel: 'Yesterday',
-            icon: Icons.insights_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Analytics exported',
-            timestampLabel: '4 days ago',
-            icon: Icons.download_outlined,
-          ),
-        ],
       ),
       VenueDashboardTab.reviews => VenuePageConfig(
         title: 'Reviews',
@@ -328,18 +245,6 @@ extension VenuePageConfigX on VenueDashboardTab {
           VenuePageQuickAction(
             label: 'Filter Reviews',
             icon: Icons.filter_list_outlined,
-          ),
-        ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Review received',
-            timestampLabel: '2 hours ago',
-            icon: Icons.rate_review_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Review responded',
-            timestampLabel: 'Yesterday',
-            icon: Icons.reply_outlined,
           ),
         ],
       ),
@@ -359,23 +264,6 @@ extension VenuePageConfigX on VenueDashboardTab {
           ),
           VenuePageQuickAction(
             label: 'Remove Staff',
-            icon: Icons.person_remove_outlined,
-          ),
-        ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Staff invited',
-            timestampLabel: '3 hours ago',
-            icon: Icons.mail_outline_rounded,
-          ),
-          VenueDashboardActivity(
-            title: 'Permission updated',
-            timestampLabel: 'Yesterday',
-            icon: Icons.admin_panel_settings_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Staff removed',
-            timestampLabel: '5 days ago',
             icon: Icons.person_remove_outlined,
           ),
         ],
@@ -399,18 +287,6 @@ extension VenuePageConfigX on VenueDashboardTab {
             icon: Icons.receipt_long_outlined,
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Subscription updated',
-            timestampLabel: '1 week ago',
-            icon: Icons.workspace_premium_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Invoice generated',
-            timestampLabel: '2 weeks ago',
-            icon: Icons.receipt_long_outlined,
-          ),
-        ],
       ),
       VenueDashboardTab.marketing => VenuePageConfig(
         title: 'Marketing',
@@ -428,23 +304,6 @@ extension VenuePageConfigX on VenueDashboardTab {
           ),
           VenuePageQuickAction(
             label: 'Download QR Code',
-            icon: Icons.qr_code_2_outlined,
-          ),
-        ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Campaign launched',
-            timestampLabel: 'Yesterday',
-            icon: Icons.campaign_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Notification sent',
-            timestampLabel: '3 days ago',
-            icon: Icons.notifications_active_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'QR downloaded',
-            timestampLabel: '1 week ago',
             icon: Icons.qr_code_2_outlined,
           ),
         ],
@@ -468,23 +327,6 @@ extension VenuePageConfigX on VenueDashboardTab {
             icon: Icons.history_rounded,
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Ticket created',
-            timestampLabel: 'Recently',
-            icon: Icons.confirmation_number_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Ticket updated',
-            timestampLabel: 'Recently',
-            icon: Icons.edit_outlined,
-          ),
-          VenueDashboardActivity(
-            title: 'Reply received',
-            timestampLabel: 'Recently',
-            icon: Icons.mark_email_read_outlined,
-          ),
-        ],
       ),
       VenueDashboardTab.settings => VenuePageConfig(
         title: 'Settings',
@@ -505,18 +347,6 @@ extension VenuePageConfigX on VenueDashboardTab {
             icon: Icons.download_outlined,
           ),
         ],
-        recentActivity: const [
-          VenueDashboardActivity(
-            title: 'Password changed',
-            timestampLabel: '2 weeks ago',
-            icon: Icons.lock_outline_rounded,
-          ),
-          VenueDashboardActivity(
-            title: 'Settings updated',
-            timestampLabel: '3 days ago',
-            icon: Icons.settings_outlined,
-          ),
-        ],
       ),
     };
   }
@@ -532,20 +362,24 @@ const _dashboardQuickActions = [
     label: 'Add New Drink',
     icon: Icons.add_circle_outline_rounded,
     targetTab: VenueDashboardTab.drinks,
+    actionKey: 'add_drink',
   ),
   VenuePageQuickAction(
     label: 'Create a Deal',
     icon: Icons.local_offer_outlined,
     targetTab: VenueDashboardTab.deals,
+    actionKey: 'create_deal',
   ),
   VenuePageQuickAction(
     label: 'Add Event',
     icon: Icons.event_available_outlined,
     targetTab: VenueDashboardTab.events,
+    actionKey: 'add_event',
   ),
   VenuePageQuickAction(
     label: 'Upload Photos',
     icon: Icons.cloud_upload_outlined,
     targetTab: VenueDashboardTab.gallery,
+    actionKey: 'media_upload',
   ),
 ];

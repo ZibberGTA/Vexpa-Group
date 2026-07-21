@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vexda Maps rendering diagnostic</title>
+  <script src="vexda_maps_state.js"></script>
+  <script src="vexda_maps_config.js"></script>
+  <script src="vexda_maps_config.local.js" onerror="void 0"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #111218;
+      color: #f5f5f7;
+      font: 13px/1.4 system-ui, sans-serif;
+    }
+    #controls {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(17, 18, 24, 0.92);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    button, select {
+      background: #242b3a;
+      color: inherit;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+    #report {
+      position: fixed;
+      right: 0;
+      top: 52px;
+      bottom: 0;
+      width: 420px;
+      overflow: auto;
+      z-index: 2;
+      background: rgba(17, 18, 24, 0.94);
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
+    #map-shell {
+      position: fixed;
+      inset: 52px 420px 0 0;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #111218;
+    }
+    #map-shell.fractional {
+      width: calc(100% - 420px - 0.5px);
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="analyze">Analyze rendering</button>
+    <button id="toggle-legacy-raster">Toggle legacy JSON raster</button>
+    <button id="toggle-fractional">Toggle fractional shell width</button>
+    <span id="status">Loading…</span>
+  </div>
+  <div id="map-shell">
+    <div id="map"></div>
+  </div>
+  <pre id="report">Waiting for map…</pre>
+
+  <script>
+    const LEGACY_RASTER_STYLE = [
+      { elementType: 'geometry', stylers: [{ color: '#111218' }] },
+      { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#F5F5F7' }] },
+      { elementType: 'labels.text.stroke', stylers: [{ color: '#111218' }] },
+      { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2A1841' }] },
+      { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#171A24' }] },
+      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#B8B8C8' }] },
+      { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#222A3A' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#07080D' }] },
+      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#111218' }] },
+    ];
+
+    let map;
+    let useLegacyRaster = false;
+    let fractionalShell = false;
+    let MapConstructor;
+    let configuredMapId = '';
+
+    function mapsConfig() {
+      return window.VEXDA_MAPS_CONFIG || { apiKey: '', mapId: '' };
+    }
+
+    function loadMaps() {
+      return new Promise((resolve, reject) => {
+        const config = mapsConfig();
+        if (!config.apiKey) {
+          reject(new Error('Missing VEXDA_MAPS_CONFIG.apiKey'));
+          return;
+        }
+        configuredMapId = (config.mapId || '').trim();
+
+        async function bootstrap() {
+          if (!window.google?.maps?.importLibrary) {
+            await new Promise((scriptResolve, scriptReject) => {
+              const script = document.createElement('script');
+              let src =
+                'https://maps.googleapis.com/maps/api/js?key=' +
+                encodeURIComponent(config.apiKey) +
+                '&loading=async&v=weekly';
+              if (configuredMapId && !useLegacyRaster) {
+                src += '&map_ids=' + encodeURIComponent(configuredMapId);
+              }
+              script.src = src;
+              script.onload = () => scriptResolve();
+              script.onerror = () => scriptReject(new Error('Maps script failed to load'));
+              document.head.appendChild(script);
+            });
+          }
+
+          for (let attempt = 0; attempt < 120; attempt += 1) {
+            if (window.google?.maps?.importLibrary) {
+              break;
+            }
+            if (typeof window.google?.maps?.Map === 'function') {
+              MapConstructor = window.google.maps.Map;
+              resolve();
+              return;
+            }
+            await new Promise((waitResolve) => setTimeout(waitResolve, 50));
+          }
+
+          if (!window.google?.maps?.importLibrary) {
+            throw new Error('google.maps.importLibrary never became available');
+          }
+
+          const mapsLib = await google.maps.importLibrary('maps');
+          MapConstructor = mapsLib.Map;
+          resolve();
+        }
+
+        bootstrap().catch(reject);
+      });
+    }
+
+    function buildMapOptions() {
+      const options = {
+        center: { lat: 51.5074, lng: -0.1278 },
+        zoom: 11,
+        disableDefaultUI: true,
+      };
+      if (useLegacyRaster || !configuredMapId) {
+        options.styles = LEGACY_RASTER_STYLE;
+      } else {
+        options.mapId = configuredMapId;
+      }
+      return options;
+    }
+
+    function recreateMap() {
+      const mapDiv = document.getElementById('map');
+      mapDiv.innerHTML = '';
+      map = new MapConstructor(mapDiv, buildMapOptions());
+      google.maps.event.addListenerOnce(map, 'tilesloaded', () => {
+        const renderingType =
+          typeof map.getRenderingType === 'function' ? map.getRenderingType() : 'unknown';
+        document.getElementById('status').textContent =
+          'Map ready (' + renderingType + ')';
+      });
+    }
+
+    function isFractional(n) {
+      return Math.abs(n - Math.round(n)) > 0.001;
+    }
+
+    function analyzeTiles() {
+      const shell = document.getElementById('map-shell');
+      const mapDiv = document.getElementById('map');
+      const shellRect = shell.getBoundingClientRect();
+      const mapRect = mapDiv.getBoundingClientRect();
+      const gmStyle = document.querySelector('.gm-style');
+      const imgs = gmStyle ? Array.from(gmStyle.querySelectorAll('img')) : [];
+      const canvases = gmStyle ? Array.from(gmStyle.querySelectorAll('canvas')) : [];
+      const tileImgs = imgs.filter((img) => {
+        const src = img.src || '';
+        return src.includes('google.com/vt') || src.includes('maps/vt') || src.includes('khms');
+      });
+      const sample = tileImgs.slice(0, 24).map((img) => {
+        const rect = img.getBoundingClientRect();
+        const style = getComputedStyle(img);
+        return {
+          srcHost: (() => {
+            try { return new URL(img.src).host; } catch (_) { return img.src.slice(0, 40); }
+          })(),
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          fractionalLeft: isFractional(rect.left),
+          fractionalTop: isFractional(rect.top),
+          fractionalWidth: isFractional(rect.width),
+          fractionalHeight: isFractional(rect.height),
+          transform: style.transform,
+          borderTopWidth: style.borderTopWidth,
+        };
+      });
+
+      const fractionalPositions = sample.filter(
+        (t) => t.fractionalLeft || t.fractionalTop || t.fractionalWidth || t.fractionalHeight,
+      );
+
+      const uniqueLefts = [...new Set(sample.map((t) => Math.round(t.left * 10) / 10))].sort((a, b) => a - b);
+      const uniqueTops = [...new Set(sample.map((t) => Math.round(t.top * 10) / 10))].sort((a, b) => a - b);
+
+      const renderingType =
+        map && typeof map.getRenderingType === 'function'
+          ? map.getRenderingType()
+          : null;
+
+      const report = {
+        timestamp: new Date().toISOString(),
+        environment: {
+          devicePixelRatio: window.devicePixelRatio,
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          visualViewportScale: window.visualViewport ? window.visualViewport.scale : null,
+          userAgent: navigator.userAgent,
+        },
+        configuration: {
+          renderer: 'google.maps.Map (Maps JavaScript API)',
+          getRenderingType: renderingType,
+          cloudMapId: useLegacyRaster ? null : configuredMapId || null,
+          styleMode: useLegacyRaster || !configuredMapId
+            ? 'legacy_json_raster'
+            : 'cloud_vector_map_id',
+          fractionalShell,
+          flutterHtmlElementView: false,
+        },
+        container: {
+          shellWidth: shellRect.width,
+          shellHeight: shellRect.height,
+          mapWidth: mapRect.width,
+          mapHeight: mapRect.height,
+          shellFractionalWidth: isFractional(shellRect.width),
+          shellFractionalHeight: isFractional(shellRect.height),
+          mapFractionalWidth: isFractional(mapRect.width),
+          mapFractionalHeight: isFractional(mapRect.height),
+        },
+        domSummary: {
+          hasGmStyle: !!gmStyle,
+          gmStyleChildTagCounts: gmStyle
+            ? Array.from(gmStyle.children).reduce((acc, el) => {
+                acc[el.tagName] = (acc[el.tagName] || 0) + 1;
+                return acc;
+              }, {})
+            : null,
+          gmStyleImgCount: imgs.length,
+          gmStyleCanvasCount: canvases.length,
+          rasterTileImgCount: tileImgs.length,
+          renderingModeInference:
+            tileImgs.length > 0
+              ? 'raster_image_tiles (<img src*="google.com/vt">)'
+              : canvases.length > 0
+                ? 'canvas_backed (WebGL vector compositor)'
+                : 'unknown',
+          vectorPipelineConfirmed:
+            renderingType === 'VECTOR' &&
+            tileImgs.length === 0 &&
+            canvases.length > 0,
+        },
+        tileSample: sample,
+        tileGridEvidence: {
+          distinctLeftPositions: uniqueLefts.length,
+          distinctTopPositions: uniqueTops.length,
+          leftPositionsSample: uniqueLefts.slice(0, 8),
+          topPositionsSample: uniqueTops.slice(0, 8),
+          tilesWithFractionalGeometry: fractionalPositions.length,
+        },
+      };
+
+      document.getElementById('report').textContent = JSON.stringify(report, null, 2);
+      return report;
+    }
+
+    document.getElementById('analyze').addEventListener('click', analyzeTiles);
+    document.getElementById('toggle-legacy-raster').addEventListener('click', () => {
+      useLegacyRaster = !useLegacyRaster;
+      loadMaps().then(() => {
+        recreateMap();
+        document.getElementById('status').textContent = useLegacyRaster
+          ? 'Legacy JSON raster mode'
+          : 'Cloud vector mapId mode';
+      });
+    });
+    document.getElementById('toggle-fractional').addEventListener('click', () => {
+      fractionalShell = !fractionalShell;
+      document.getElementById('map-shell').classList.toggle('fractional', fractionalShell);
+      google.maps.event.trigger(map, 'resize');
+      document.getElementById('status').textContent = fractionalShell
+        ? 'Fractional shell enabled'
+        : 'Integer shell';
+    });
+
+    loadMaps()
+      .then(() => {
+        recreateMap();
+        setTimeout(analyzeTiles, 2500);
+      })
+      .catch((error) => {
+        document.getElementById('status').textContent = error.message;
+        document.getElementById('report').textContent = String(error);
+      });
+  </script>
+</body>
+</html>

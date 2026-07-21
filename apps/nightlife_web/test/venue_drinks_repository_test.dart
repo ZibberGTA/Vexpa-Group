@@ -185,5 +185,22 @@ void main() {
         throwsA(isA<VexException>()),
       );
     });
+
+    test('watchDrinks excludes unavailable drinks through public pipeline', () async {
+      final repository = VenueDrinksRepository(
+        venueDrinkDataService: VenueDrinkDataService(
+          repository: MockVenueDrinkRepository(
+            publicDrinks: [
+              mockVenueDrink(id: '1', name: 'Visible'),
+              mockVenueDrink(id: '2', name: 'Hidden', available: false),
+            ],
+          ),
+        ),
+      );
+
+      final drinks = await repository.watchDrinks('venue-1').first;
+
+      expect(drinks.map((drink) => drink.name), ['Visible']);
+    });
   });
 }

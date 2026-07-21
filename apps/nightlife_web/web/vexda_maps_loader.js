@@ -19,11 +19,34 @@
   });
 
   function settleReady() {
+    loadState.error = null;
+    loadState.errorCode = null;
+    loadState.errorDetail = null;
     if (readySettled) {
       return;
     }
     readySettled = true;
     readyResolve();
+  }
+
+  function resolveApiKey(config) {
+    var apiKey = ((config && config.apiKey) || '').trim();
+    if (apiKey && apiKey.indexOf('REPLACE') === -1) {
+      return apiKey;
+    }
+
+    var scripts = document.querySelectorAll(
+      'script[src*="maps.googleapis.com/maps/api/js"]',
+    );
+    for (var i = 0; i < scripts.length; i++) {
+      var src = scripts[i].getAttribute('src') || '';
+      var match = src.match(/[?&]key=([^&]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+
+    return '';
   }
 
   function setLoadError(code, summary, detail) {
@@ -45,46 +68,7 @@
     );
   }
 
-  function ensureMapsLibraryReady() {
-    if (mapConstructorReady()) {
-      settleReady();
-      return;
-    }
-
-    if (
-      window.google &&
-      window.google.maps &&
-      typeof window.google.maps.importLibrary === 'function'
-    ) {
-      window.google.maps
-        .importLibrary('maps')
-        .then(function () {
-          if (mapConstructorReady()) {
-            settleReady();
-            return;
-          }
-          setLoadError(
-            'maps_api_incomplete',
-            'Google Maps library loaded without Map constructor',
-            'google.maps.Map is still unavailable after importLibrary("maps").',
-          );
-        })
-        .catch(function (error) {
-          setLoadError(
-            'import_library_failed',
-            'Failed to load Google Maps libraries',
-            String(error && error.message ? error.message : error),
-          );
-        });
-      return;
-    }
-
-    setLoadError(
-      'maps_api_incomplete',
-      'Google Maps API script loaded but google.maps is unavailable',
-      'The Maps JavaScript API did not expose google.maps before Flutter initialised map widgets.',
-    );
-  }
+  var importLibraryStarted = false;
 
   function waitForMapsApi(attempt) {
     if (typeof attempt !== 'number') {
@@ -96,16 +80,25 @@
       return;
     }
 
-    if (loadState.errorCode) {
-      return;
-    }
-
     if (
+      !importLibraryStarted &&
       window.google &&
       window.google.maps &&
       typeof window.google.maps.importLibrary === 'function'
     ) {
-      ensureMapsLibraryReady();
+      importLibraryStarted = true;
+      window.google.maps
+        .importLibrary('maps')
+        .then(function () {
+          waitForMapsApi(attempt);
+        })
+        .catch(function (error) {
+          setLoadError(
+            'import_library_failed',
+            'Failed to load Google Maps libraries',
+            String(error && error.message ? error.message : error),
+          );
+        });
       return;
     }
 
@@ -129,14 +122,14 @@
   }
 
   var config = window.VEXDA_MAPS_CONFIG || { apiKey: '', mapId: '' };
-  var apiKey = (config.apiKey || '').trim();
+  var apiKey = resolveApiKey(config);
   var mapId = (config.mapId || '').trim();
 
-  if (!apiKey || apiKey.indexOf('REPLACE') !== -1) {
+  if (!apiKey) {
     setLoadError(
       'missing_api_key',
       'Maps browser API key is not configured',
-      'Set VEXDA_WEB_MAPS_API_KEY and run dart run tool/ensure_local_platform_config.dart from the repository root, then restart the web app.',
+      'Run dart run tool/ensure_local_platform_config.dart from the repository root to restore web/vexda_maps_config.js, then restart the web app.',
     );
     return;
   }
@@ -171,7 +164,7 @@
   }
   script.src = apiUrl;
   script.onload = function () {
-    ensureMapsLibraryReady();
+    waitForMapsApi(0);
   };
   script.onerror = function () {
     setLoadError(

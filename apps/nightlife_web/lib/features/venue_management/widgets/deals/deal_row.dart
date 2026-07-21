@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/premium_effects.dart';
 import '../../../venue/data/models/deal_model.dart';
 import '../../../venue/data/venue_deals_repository.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/bulk_deal_patch.dart';
 import '../../models/deal_status.dart';
 import '../../models/deal_types.dart';
@@ -57,6 +58,7 @@ class _DealRowState extends State<DealRow> {
     try {
       await widget.repository.patchDeal(
         dealId: widget.deal.id,
+        venueId: widget.deal.venueId,
         venueName: widget.venueName,
         title: widget.deal.title,
         description: widget.deal.description,
@@ -65,6 +67,8 @@ class _DealRowState extends State<DealRow> {
         patch: patch,
         updatedBy: userId,
       );
+      if (!context.mounted) return null;
+      await reloadVenueManagementPageActivity(context);
       return null;
     } catch (_) {
       return 'Could not save. Please try again.';

@@ -12,8 +12,12 @@ import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue/data/models/deal_model.dart';
 import '../../venue/data/public_venue_content_filters.dart';
 import '../../venue_management/data/deal_write_payload.dart';
+import '../../venue_management/data/venue_management_activity_action_inference.dart';
+import '../../venue_management/data/venue_management_activity_recording.dart';
+import '../../venue_management/data/venue_management_activity_service.dart';
 import '../../venue_management/models/bulk_deal_patch.dart';
 import '../../venue_management/models/deal_types.dart';
+import '../../venue_management/models/venue_management_activity_types.dart';
 
 /// Loads and writes deals for a venue.
 class VenueDealsRepository {
@@ -21,10 +25,13 @@ class VenueDealsRepository {
     FirebaseFirestore? firestore,
     VenueDealDataService? venueDealDataService,
     ExperienceContentOrchestrator? contentOrchestrator,
+    VenueManagementActivityService? activityService,
   }) : _firestoreOverride = firestore,
        _venueDealDataService =
            venueDealDataService ?? WebVexCore.venueDealDataService,
-       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
+       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator,
+       _activityService =
+           activityService ?? WebVexCore.venueManagementActivityService;
 
   static const _defaultOrchestrator = ExperienceContentOrchestrator();
   static const _ordering = VenueContentOrderingService();
@@ -33,6 +40,7 @@ class VenueDealsRepository {
   final FirebaseFirestore? _firestoreOverride;
   final VenueDealDataService _venueDealDataService;
   final ExperienceContentOrchestrator _contentOrchestrator;
+  final VenueManagementActivityService _activityService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -100,6 +108,36 @@ class VenueDealsRepository {
         });
   }
 
+  /// One-time fetch of non-deleted deals for dashboard schedule composition.
+  Future<List<DealModel>> fetchScheduleDeals({
+    required String venueId,
+  }) async {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) return const [];
+
+    final firestore = _resolveFirestore();
+    if (firestore == null) return const [];
+
+    try {
+      final snapshot = await firestore
+          .collection('deals')
+          .where('venueId', isEqualTo: trimmedId)
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => DealModel.fromMap(doc.id, doc.data()))
+          .toList();
+    } on FirebaseException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[VenueDealsRepository] schedule deals (${error.code})',
+        );
+      }
+      return const [];
+    }
+  }
+
   Future<String> addDeal({
     required String venueId,
     required String venueName,
@@ -145,6 +183,14 @@ class VenueDealsRepository {
 
     try {
       await docRef.set(payload);
+      await _recordDealActivity(
+        venueId: venueId,
+        dealId: docRef.id,
+        dealTitle: title,
+        actorUid: createdBy,
+        actionType: VenueManagementActivityActionTypes.created,
+        description: 'Deal created',
+      );
       return docRef.id;
     } on FirebaseException catch (error) {
       if (kDebugMode) {
@@ -186,6 +232,7 @@ class VenueDealsRepository {
 
   Future<void> updateDeal({
     required String dealId,
+    required String venueId,
     required String venueName,
     required String title,
     required String description,
@@ -227,6 +274,14 @@ class VenueDealsRepository {
 
     try {
       await firestore.collection('deals').doc(dealId).update(payload);
+      await _recordDealActivity(
+        venueId: venueId,
+        dealId: dealId,
+        dealTitle: title,
+        actorUid: updatedBy,
+        actionType: VenueManagementActivityActionTypes.updated,
+        description: 'Deal updated',
+      );
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint('[VenueDealsRepository] update deal failed (${error.code})');
@@ -239,6 +294,8 @@ class VenueDealsRepository {
     required String dealId,
     required String deletedBy,
     String? deletedByEmail,
+    String? venueId,
+    String? dealTitle,
   }) async {
     final firestore = _resolveFirestore();
     if (firestore == null) {
@@ -254,6 +311,19 @@ class VenueDealsRepository {
 
     try {
       await firestore.collection('deals').doc(dealId).update(payload);
+      if (venueId != null &&
+          venueId.trim().isNotEmpty &&
+          dealTitle != null &&
+          dealTitle.trim().isNotEmpty) {
+        await _recordDealActivity(
+          venueId: venueId,
+          dealId: dealId,
+          dealTitle: dealTitle,
+          actorUid: deletedBy,
+          actionType: VenueManagementActivityActionTypes.archived,
+          description: 'Deal archived',
+        );
+      }
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint('[VenueDealsRepository] delete deal failed (${error.code})');
@@ -263,21 +333,24 @@ class VenueDealsRepository {
   }
 
   Future<void> bulkDeleteDeals({
-    required List<String> dealIds,
+    required List<DealModel> deals,
     required String deletedBy,
     String? deletedByEmail,
   }) async {
-    for (final dealId in dealIds) {
+    for (final deal in deals) {
       await deleteDeal(
-        dealId: dealId,
+        dealId: deal.id,
         deletedBy: deletedBy,
         deletedByEmail: deletedByEmail,
+        venueId: deal.venueId,
+        dealTitle: deal.title,
       );
     }
   }
 
   Future<void> patchDeal({
     required String dealId,
+    required String venueId,
     required String venueName,
     required String title,
     required String description,
@@ -315,6 +388,19 @@ class VenueDealsRepository {
 
     try {
       await firestore.collection('deals').doc(dealId).update(payload);
+      final resolvedTitle = patch.title ?? title;
+      await _recordDealActivity(
+        venueId: venueId,
+        dealId: dealId,
+        dealTitle: resolvedTitle,
+        actorUid: updatedBy,
+        actionType: VenueManagementActivityActionInference.dealPatchActionType(
+          patch,
+        ),
+        description: patch.isActive != null
+            ? (patch.isActive! ? 'Deal activated' : 'Deal deactivated')
+            : 'Deal updated',
+      );
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint('[VenueDealsRepository] patch deal failed (${error.code})');
@@ -327,4 +413,23 @@ class VenueDealsRepository {
 
   static String relativeTimeLabel(DateTime date) =>
       _presentation.managementRelativeTimeLabel(date);
+
+  Future<void> _recordDealActivity({
+    required String venueId,
+    required String dealId,
+    required String dealTitle,
+    required String actorUid,
+    required String actionType,
+    required String description,
+  }) {
+    return VenueManagementActivityRecording.recordDeal(
+      service: _activityService,
+      venueId: venueId,
+      dealId: dealId,
+      dealTitle: dealTitle,
+      actorUid: actorUid,
+      actionType: actionType,
+      description: description,
+    );
+  }
 }

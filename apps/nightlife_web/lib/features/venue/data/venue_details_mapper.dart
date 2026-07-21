@@ -1,4 +1,4 @@
-import 'package:vex_engines/experience/application/venue_public_presentation_service.dart';
+import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../search/data/search_venue_open_status.dart';
 import '../../venues/models/venue_model.dart';
@@ -9,9 +9,6 @@ import 'venue_opening_hours_formatter.dart';
 /// Maps Firestore venue documents to venue details UI models.
 class VenueDetailsMapper {
   VenueDetailsMapper._();
-
-  static const _publicPresentation = VenuePublicPresentationService();
-  static const _defaultRating = 4.5;
 
   static VenueDetailsView fromVenueModel(VenueModel venue) {
     final openStatus = SearchVenueOpenStatus.fromOpeningHours(
@@ -27,10 +24,9 @@ class VenueDetailsMapper {
     final phone = venue.phone.trim();
     final website = venue.website.trim();
     final description = venue.description.trim();
-    final tags = _publicPresentation.resolvePublicTags(
+    final tags = VenueProfileFieldCodec.displayFeatureTags(
       featureTags: venue.featureTags,
-      venueType: venue.venueType,
-      category: venue.category,
+      features: venue.features,
     );
 
     return VenueDetailsView(
@@ -42,7 +38,7 @@ class VenueDetailsMapper {
       postcode: venue.postcode,
       category: venue.category,
       venueType: venue.venueType,
-      rating: venue.averageRating > 0 ? venue.averageRating : _defaultRating,
+      rating: venue.averageRating,
       isOpen: openStatus.isOpen,
       tags: tags,
       highlights: VenueHighlightsMapper.fromVenueModel(venue),

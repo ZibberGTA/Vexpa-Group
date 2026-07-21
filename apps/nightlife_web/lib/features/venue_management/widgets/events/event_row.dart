@@ -6,6 +6,7 @@ import '../../../../shared/widgets/premium_effects.dart';
 import '../../../venue/data/models/event_model.dart';
 import '../../../venue/data/venue_events_repository.dart';
 import '../../data/event_write_payload.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/bulk_event_patch.dart';
 import '../../models/event_status.dart';
 import '../../models/featured_events_limit.dart';
@@ -51,9 +52,13 @@ class _EventRowState extends State<EventRow> {
     try {
       await widget.repository.patchEvent(
         eventId: widget.event.id,
+        venueId: widget.event.venueId,
+        eventTitle: widget.event.title,
         patch: patch,
         updatedBy: userId,
       );
+      if (!context.mounted) return null;
+      await reloadVenueManagementPageActivity(context);
       return null;
     } catch (_) {
       return 'Could not save. Please try again.';

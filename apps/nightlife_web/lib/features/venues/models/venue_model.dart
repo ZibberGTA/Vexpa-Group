@@ -26,6 +26,7 @@ class VenueModel {
     this.logoImagePosition,
     this.galleryImagePositions = const {},
     this.phone = '',
+    this.email = '',
     this.website = '',
     this.description = '',
     this.galleryImageUrls = const [],
@@ -61,6 +62,7 @@ class VenueModel {
   final ImagePositionMetadata? logoImagePosition;
   final Map<String, ImagePositionMetadata> galleryImagePositions;
   final String phone;
+  final String email;
   final String website;
   final String description;
   final List<String> galleryImageUrls;
@@ -105,6 +107,7 @@ class VenueModel {
         map,
       ),
       phone: (map['phone'] ?? '').toString(),
+      email: (map['email'] ?? '').toString(),
       website: (map['website'] ?? map['websiteUrl'] ?? '').toString(),
       description: (map['description'] ?? map['Description'] ?? '').toString(),
       galleryImageUrls: _parseStringList(
@@ -386,7 +389,7 @@ class VenueGalleryImageData {
       thumbnailUrl: (map['thumbnailUrl'] ?? '').toString().trim(),
       category: _normalizeCategory(map['category']?.toString()),
       caption: (map['caption'] ?? '').toString().trim(),
-      isCover: map['isCover'] == true,
+      isCover: map['isCover'] == true || map['featured'] == true,
       sortOrder: map['sortOrder'] is num
           ? (map['sortOrder'] as num).toInt()
           : int.tryParse(map['sortOrder']?.toString() ?? '') ?? 0,

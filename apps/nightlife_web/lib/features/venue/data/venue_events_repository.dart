@@ -10,7 +10,11 @@ import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_event_mapper.dart';
 import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue_management/data/event_write_payload.dart';
+import '../../venue_management/data/venue_management_activity_action_inference.dart';
+import '../../venue_management/data/venue_management_activity_recording.dart';
+import '../../venue_management/data/venue_management_activity_service.dart';
 import '../../venue_management/models/bulk_event_patch.dart';
+import '../../venue_management/models/venue_management_activity_types.dart';
 import 'models/event_model.dart';
 
 /// Loads and writes events for a venue from Firestore.
@@ -19,10 +23,13 @@ class VenueEventsRepository {
     FirebaseFirestore? firestore,
     VenueEventDataService? venueEventDataService,
     ExperienceContentOrchestrator? contentOrchestrator,
+    VenueManagementActivityService? activityService,
   }) : _firestoreOverride = firestore,
        _venueEventDataService =
            venueEventDataService ?? WebVexCore.venueEventDataService,
-       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator;
+       _contentOrchestrator = contentOrchestrator ?? _defaultOrchestrator,
+       _activityService =
+           activityService ?? WebVexCore.venueManagementActivityService;
 
   static const _defaultOrchestrator = ExperienceContentOrchestrator();
   static const _ordering = VenueContentOrderingService();
@@ -31,6 +38,7 @@ class VenueEventsRepository {
   final FirebaseFirestore? _firestoreOverride;
   final VenueEventDataService _venueEventDataService;
   final ExperienceContentOrchestrator _contentOrchestrator;
+  final VenueManagementActivityService _activityService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -80,16 +88,63 @@ class VenueEventsRepository {
         .where('isDeleted', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
-      final events = _ordering.sortEventsByStart(
-        events: snapshot.docs.map(EventModel.fromDoc).toList(),
+          final events = _ordering.sortEventsByStart(
+            events: snapshot.docs.map(EventModel.fromDoc).toList(),
+            startDateTime: (event) => event.startDateTime,
+          );
+          return events;
+        });
+  }
+
+  /// One-time fetch of published events overlapping a dashboard schedule window.
+  Future<List<EventModel>> fetchScheduleEvents({
+    required String venueId,
+    required DateTime windowStart,
+    required DateTime windowEndExclusive,
+  }) async {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) return const [];
+
+    final firestore = _resolveFirestore();
+    if (firestore == null) return const [];
+
+    try {
+      final snapshot = await firestore
+          .collection('events')
+          .where('venueId', isEqualTo: trimmedId)
+          .where('isDeleted', isEqualTo: false)
+          .where('endDateTime', isGreaterThan: Timestamp.fromDate(windowStart))
+          .get();
+
+      final events = snapshot.docs
+          .map(EventModel.fromDoc)
+          .where(
+            (event) =>
+                event.isActive &&
+                event.startDateTime.isBefore(windowEndExclusive),
+          )
+          .toList();
+
+      return _ordering.sortEventsByStart(
+        events: events,
         startDateTime: (event) => event.startDateTime,
       );
-      return events;
-    });
+    } on FirebaseException catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint(
+          '[VenueEventsRepository] schedule events failed '
+          '(${error.code}): ${error.message}',
+        );
+        debugPrint('[VenueEventsRepository] stackTrace:\n$stackTrace');
+      }
+      return const [];
+    }
   }
 
   Future<void> patchEvent({
     required String eventId,
+    required String venueId,
+    required String eventTitle,
     required BulkEventPatch patch,
     required String updatedBy,
   }) async {
@@ -111,9 +166,24 @@ class VenueEventsRepository {
 
     try {
       await firestore.collection('events').doc(eventId).update(payload);
+      final resolvedTitle = patch.title ?? eventTitle;
+      await _recordEventActivity(
+        venueId: venueId,
+        eventId: eventId,
+        eventTitle: resolvedTitle,
+        actorUid: updatedBy,
+        actionType: VenueManagementActivityActionInference.eventPatchActionType(
+          patch,
+        ),
+        description: patch.isActive != null
+            ? (patch.isActive! ? 'Event published' : 'Event unpublished')
+            : 'Event updated',
+      );
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueEventsRepository] patch event failed (${error.code})');
+        debugPrint(
+          '[VenueEventsRepository] patch event failed (${error.code})',
+        );
       }
       rethrow;
     }
@@ -154,6 +224,14 @@ class VenueEventsRepository {
 
     try {
       await docRef.set(payload);
+      await _recordEventActivity(
+        venueId: venueId,
+        eventId: docRef.id,
+        eventTitle: title,
+        actorUid: createdBy,
+        actionType: VenueManagementActivityActionTypes.created,
+        description: 'Event created',
+      );
       return docRef.id;
     } on FirebaseException catch (error) {
       if (kDebugMode) {
@@ -189,6 +267,8 @@ class VenueEventsRepository {
   Future<void> deleteEvent({
     required String eventId,
     required String deletedBy,
+    String? venueId,
+    String? eventTitle,
   }) async {
     final firestore = _resolveFirestore();
     if (firestore == null) {
@@ -203,20 +283,40 @@ class VenueEventsRepository {
 
     try {
       await firestore.collection('events').doc(eventId).update(payload);
+      if (venueId != null &&
+          venueId.trim().isNotEmpty &&
+          eventTitle != null &&
+          eventTitle.trim().isNotEmpty) {
+        await _recordEventActivity(
+          venueId: venueId,
+          eventId: eventId,
+          eventTitle: eventTitle,
+          actorUid: deletedBy,
+          actionType: VenueManagementActivityActionTypes.archived,
+          description: 'Event archived',
+        );
+      }
     } on FirebaseException catch (error) {
       if (kDebugMode) {
-        debugPrint('[VenueEventsRepository] delete event failed (${error.code})');
+        debugPrint(
+          '[VenueEventsRepository] delete event failed (${error.code})',
+        );
       }
       rethrow;
     }
   }
 
   Future<void> bulkDeleteEvents({
-    required List<String> eventIds,
+    required List<EventModel> events,
     required String deletedBy,
   }) async {
-    for (final eventId in eventIds) {
-      await deleteEvent(eventId: eventId, deletedBy: deletedBy);
+    for (final event in events) {
+      await deleteEvent(
+        eventId: event.id,
+        deletedBy: deletedBy,
+        venueId: event.venueId,
+        eventTitle: event.title,
+      );
     }
   }
 
@@ -224,4 +324,23 @@ class VenueEventsRepository {
 
   static String relativeTimeLabel(DateTime date) =>
       _presentation.managementRelativeTimeLabel(date);
+
+  Future<void> _recordEventActivity({
+    required String venueId,
+    required String eventId,
+    required String eventTitle,
+    required String actorUid,
+    required String actionType,
+    required String description,
+  }) {
+    return VenueManagementActivityRecording.recordEvent(
+      service: _activityService,
+      venueId: venueId,
+      eventId: eventId,
+      eventTitle: eventTitle,
+      actorUid: actorUid,
+      actionType: actionType,
+      description: description,
+    );
+  }
 }

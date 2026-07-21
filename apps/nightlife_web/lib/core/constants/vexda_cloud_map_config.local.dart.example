@@ -1,0 +1,9 @@
+/// Local Cloud Vector Map ID for Vexda web maps.
+///
+/// Copy to [vexda_cloud_map_config.local.dart] (gitignored) or generate via:
+///   export VEXDA_WEB_MAPS_MAP_ID=your_cloud_vector_map_id
+///   dart run tool/ensure_local_platform_config.dart
+///
+/// Create the map ID in GCP (JavaScript · Vector) and link the
+/// `vexda_web_dark` cloud style. See docs/maps_configuration.md.
+const String kVexdaWebCloudMapId = '';

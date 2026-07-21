@@ -76,11 +76,6 @@ class VenueOverviewSection extends StatelessWidget {
               final isWide = constraints.maxWidth >= 720;
               final cards = [
                 _FactCard(
-                  icon: Icons.star_rounded,
-                  label: 'Rating',
-                  value: venue.rating.toStringAsFixed(1),
-                ),
-                _FactCard(
                   icon: Icons.local_bar_rounded,
                   label: 'Type',
                   value: venue.displayCategory,

@@ -121,6 +121,7 @@ class _BulkEditDealsDialogState extends State<BulkEditDealsDialog> {
       for (final row in _rows) {
         await widget.repository.updateDeal(
           dealId: row.dealId,
+          venueId: widget.deals.first.venueId,
           venueName: widget.venueName,
           title: row.titleController.text,
           description: row.description,

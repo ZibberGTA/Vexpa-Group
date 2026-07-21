@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vex_core/vex_core.dart';
+import 'package:vex_engines/experience/application/venue_public_presentation_service.dart';
 import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 import 'package:vex_engines/venue/shared/venue_image_field_parser.dart';
 
@@ -9,6 +10,8 @@ import '../../features/venues/models/venue_details_model.dart';
 /// Maps Firestore venue documents into VexCore and mobile view models.
 final class MobileVenueDocumentMapper {
   MobileVenueDocumentMapper._();
+
+  static const _publicPresentation = VenuePublicPresentationService();
 
   static bool isCatalogVisible(Map<String, dynamic>? data) {
     if (data == null) return false;
@@ -109,6 +112,10 @@ final class MobileVenueDocumentMapper {
         coverImageUrl: VenueImageFieldParser.resolveVenueBannerUrl(data),
         galleryImageUrls: List<String>.from(data['galleryImageUrls'] ?? []),
         features: List<String>.from(data['features'] ?? []),
+        featureTags: _publicPresentation.parseFeatureTags(
+          featureTags: data['featureTags'],
+          venueFeatures: data['venueFeatures'],
+        ),
         priceRange: data['priceRange'] ?? '',
         averageRating: (data['averageRating'] ?? 0).toDouble(),
         reviewCount: data['reviewCount'] ?? 0,

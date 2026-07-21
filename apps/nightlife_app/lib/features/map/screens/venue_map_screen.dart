@@ -762,49 +762,6 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
                                       ),
                               ),
                             ),
-                            Positioned(
-                              right: -7,
-                              bottom: -7,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xB3111218),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.12),
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x99000000),
-                                      blurRadius: 12,
-                                      offset: Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '4.8',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    SizedBox(width: 3),
-                                    Icon(
-                                      Icons.star_rounded,
-                                      color: Color(0xFFFFC542),
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(width: 16),

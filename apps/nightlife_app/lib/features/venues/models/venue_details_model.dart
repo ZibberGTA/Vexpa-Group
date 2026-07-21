@@ -23,6 +23,7 @@ class VenueDetailsModel {
   final String coverImageUrl;
   final List<String> galleryImageUrls;
   final List<String> features;
+  final List<String> featureTags;
   final String priceRange;
   final double averageRating;
   final int reviewCount;
@@ -60,6 +61,7 @@ class VenueDetailsModel {
     required this.coverImageUrl,
     required this.galleryImageUrls,
     required this.features,
+    this.featureTags = const [],
     required this.priceRange,
     required this.averageRating,
     required this.reviewCount,

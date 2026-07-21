@@ -150,6 +150,7 @@ class _EditDealDialogState extends State<EditDealDialog> {
     try {
       await widget.repository.updateDeal(
         dealId: widget.deal.id,
+        venueId: widget.deal.venueId,
         venueName: widget.venueName,
         title: _titleController.text,
         description: _descriptionController.text,
@@ -198,6 +199,8 @@ class _EditDealDialogState extends State<EditDealDialog> {
         dealId: widget.deal.id,
         deletedBy: userId,
         deletedByEmail: _resolveUserEmail(),
+        venueId: widget.deal.venueId,
+        dealTitle: widget.deal.title,
       );
 
       if (!mounted) return;

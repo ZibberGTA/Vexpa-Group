@@ -8,6 +8,12 @@ class MediaSubscriptionLimits {
 
   static const _entitlements = EntitlementService();
 
+  /// Web gallery cap for deal images (independent of VexCore plan entitlements).
+  static const dealImagesUploadLimit = 5;
+
+  /// Web gallery cap for event images (independent of VexCore plan entitlements).
+  static const eventImagesUploadLimit = 5;
+
   static const starterPlanId = 'starter';
 
   static bool hasMediaCentreAccess(String planId) {
@@ -19,6 +25,12 @@ class MediaSubscriptionLimits {
     required MediaLibraryTab tab,
     Map<String, int> customLimits = const {},
   }) {
+    if (tab == MediaLibraryTab.dealImages) {
+      return dealImagesUploadLimit;
+    }
+    if (tab == MediaLibraryTab.eventImages) {
+      return eventImagesUploadLimit;
+    }
     return _entitlements.mediaUploadLimit(
       planId: planId,
       mediaLibraryKey: tab.customLimitKey,

@@ -2,10 +2,8 @@
 final class DiscoverySearchResultRules {
   DiscoverySearchResultRules._();
 
-  static const double defaultRating = 4.5;
-
   static double resolveRating(double averageRating) {
-    return averageRating > 0 ? averageRating : defaultRating;
+    return averageRating > 0 ? averageRating : 0;
   }
 
   static List<String> tagsFromCategory(String category) {

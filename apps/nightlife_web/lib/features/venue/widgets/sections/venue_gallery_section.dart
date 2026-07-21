@@ -405,20 +405,27 @@ class _GalleryLightboxState extends State<_GalleryLightbox> {
 }
 
 List<VenueGalleryImageData> _galleryImagesForVenue(VenueDetailsView venue) {
-  if (venue.galleryImages.isNotEmpty) return venue.galleryImages;
-  return _presentation
-      .legacyGalleryFromUrls(venue.galleryImageUrls)
-      .map(
-        (image) => VenueGalleryImageData(
-          imageId: image.id,
-          imageUrl: image.imageUrl,
-          thumbnailUrl: image.thumbnailUrl,
-          category: image.category,
-          isCover: image.isCover,
-          sortOrder: image.sortOrder,
-        ),
-      )
-      .toList();
+  final images = venue.galleryImages.isNotEmpty
+      ? [...venue.galleryImages]
+      : _presentation
+            .legacyGalleryFromUrls(venue.galleryImageUrls)
+            .map(
+              (image) => VenueGalleryImageData(
+                imageId: image.id,
+                imageUrl: image.imageUrl,
+                thumbnailUrl: image.thumbnailUrl,
+                category: image.category,
+                isCover: image.isCover,
+                sortOrder: image.sortOrder,
+              ),
+            )
+            .toList();
+
+  images.sort((a, b) {
+    if (a.isCover != b.isCover) return a.isCover ? -1 : 1;
+    return a.sortOrder.compareTo(b.sortOrder);
+  });
+  return images;
 }
 
 String _categoryLabel(String category) =>

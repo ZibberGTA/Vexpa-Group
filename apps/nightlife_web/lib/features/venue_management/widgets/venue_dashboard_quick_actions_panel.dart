@@ -58,7 +58,10 @@ class VenueDashboardQuickActionsPanel extends StatelessWidget {
                 }
                 final targetTab = action.targetTab;
                 if (targetTab != null && selectTab != null) {
-                  selectTab(targetTab);
+                  selectTab(
+                    targetTab,
+                    pendingActionKey: action.actionKey,
+                  );
                   return;
                 }
                 if (onQuickAction != null) {

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -15,6 +17,7 @@ import '../../../venues/models/venue_model.dart';
 import '../../data/venue_image_picker.dart';
 import '../../data/venue_images_repository.dart';
 import '../../data/venue_media_repository.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../data/venue_media_upload_errors.dart';
 import '../../data/venue_media_upload_logger.dart';
 import '../../data/venue_media_upload_service.dart';
@@ -23,7 +26,6 @@ import '../../services/subscription_service.dart';
 import '../../models/media_library_page_config.dart';
 import '../../models/media_library_tab.dart';
 import '../../models/media_subscription_limits.dart';
-import '../../models/venue_dashboard_activity.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_media_item.dart';
 import '../../models/venue_page_quick_action.dart';
@@ -38,6 +40,7 @@ import 'media_table_widgets.dart';
 import 'media_upgrade_card.dart';
 import 'media_upload_dialog.dart';
 import 'media_usage_card.dart';
+import 'venue_gallery_preview_carousel.dart';
 
 /// Gallery / Media Centre with separate venue, deal and event libraries.
 class VenueGalleryManagementPage extends StatefulWidget {
@@ -48,6 +51,7 @@ class VenueGalleryManagementPage extends StatefulWidget {
     this.uploadService,
     this.testUploadedByUid,
     this.testUserProfile,
+    this.testPickFiles,
   });
 
   final VenueMediaRepository? mediaRepository;
@@ -55,6 +59,8 @@ class VenueGalleryManagementPage extends StatefulWidget {
   final VenueMediaUploadService? uploadService;
   final String? testUploadedByUid;
   final UserRoleProfile? testUserProfile;
+  final Future<List<({Uint8List bytes, String fileName})>> Function()?
+  testPickFiles;
 
   @override
   State<VenueGalleryManagementPage> createState() =>
@@ -78,6 +84,8 @@ class _VenueGalleryManagementPageState
   MediaTableSort _sort = const MediaTableSort();
   bool _exporting = false;
   String? _uploadProgressLabel;
+  bool _pendingMediaUploadActionHandled = false;
+  String? _settingFeaturedItemId;
 
   @override
   void dispose() {
@@ -105,7 +113,7 @@ class _VenueGalleryManagementPageState
   }
 
   void _clearSelection() {
-    if (_selectedIds.isEmpty) return;
+    if (!mounted || _selectedIds.isEmpty) return;
     setState(_selectedIds.clear);
   }
 
@@ -119,6 +127,24 @@ class _VenueGalleryManagementPageState
       final hadStale = _selectedIds.any((id) => !ids.contains(id));
       if (!hadStale) return;
       setState(() => _selectedIds.removeWhere((id) => !ids.contains(id)));
+    });
+  }
+
+  void _maybeOpenPendingMediaUploadWorkflow({
+    required VenueModel venue,
+    required List<VenueMediaItem> currentItems,
+  }) {
+    if (_pendingMediaUploadActionHandled) return;
+
+    final pendingActionKey = VenueDashboardController.maybeOf(
+      context,
+    )?.takePendingTabActionKey?.call();
+    if (pendingActionKey != VenuePageActionKeys.mediaUpload) return;
+
+    _pendingMediaUploadActionHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_handleUpload(venue: venue, currentItems: currentItems));
     });
   }
 
@@ -197,7 +223,9 @@ class _VenueGalleryManagementPageState
       return;
     }
 
-    final bytesList = await pickVenueImageFiles(limit: remaining);
+    final bytesList = widget.testPickFiles != null
+        ? await widget.testPickFiles!()
+        : await pickVenueImageFiles(limit: remaining);
     if (!mounted || bytesList.isEmpty) return;
 
     final draft = await showMediaUploadDialog(
@@ -250,6 +278,8 @@ class _VenueGalleryManagementPageState
         caption: draft.caption,
       );
 
+      if (!mounted) return;
+      await reloadVenueManagementPageActivity(context);
       if (!mounted) return;
       _showMessage('Uploaded ${uploaded.length} ${_activeTab.emptyUnit}.');
     } on VenueMediaAccessDeniedException catch (error) {
@@ -329,6 +359,8 @@ class _VenueGalleryManagementPageState
         caption: draft.caption,
       );
       if (!mounted) return;
+      await reloadVenueManagementPageActivity(context);
+      if (!mounted) return;
       _clearSelection();
       _showMessage('Image replaced.');
     } on VenueMediaAccessDeniedException catch (error) {
@@ -374,11 +406,15 @@ class _VenueGalleryManagementPageState
     if (!mounted || ordered == null) return;
 
     try {
+      final actorUid = await _resolveUserId();
       await _mediaRepository.updateSortOrder(
         venueId: venue.id,
         tab: _activeTab,
         orderedItems: ordered,
+        actorUid: actorUid,
       );
+      if (!mounted) return;
+      await reloadVenueManagementPageActivity(context);
       if (!mounted) return;
       _clearSelection();
       _showMessage('Gallery order updated.');
@@ -405,10 +441,12 @@ class _VenueGalleryManagementPageState
     if (selected.isEmpty) return;
 
     try {
+      final actorUid = await _resolveUserId();
       await _mediaRepository.deleteMediaItems(
         venueId: venue.id,
         itemIds: selected.map((item) => item.id),
         itemsForStorage: selected,
+        actorUid: actorUid,
       );
     } catch (_) {
       if (!mounted) return;
@@ -417,9 +455,59 @@ class _VenueGalleryManagementPageState
     }
 
     if (!mounted) return;
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
     final count = selected.length;
     _clearSelection();
     _showMessage(count == 1 ? 'Image deleted.' : '$count images deleted.');
+  }
+
+  Future<void> _handleSetFeaturedForItem({
+    required VenueModel venue,
+    required VenueMediaItem item,
+  }) async {
+    if (_activeTab != MediaLibraryTab.venueGallery) return;
+    if (_settingFeaturedItemId != null) return;
+    if (item.isCover) return;
+
+    if (!item.canBeFeatured) {
+      _showMessage(
+        'Only active venue gallery photos with a saved URL can be featured.',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _settingFeaturedItemId = item.id);
+
+    var succeeded = false;
+    try {
+      final actorUid = await _resolveUserId();
+      await _mediaRepository.setCoverPhoto(
+        venueId: venue.id,
+        itemId: item.id,
+        actorUid: actorUid,
+      );
+      succeeded = true;
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[VenueGallery] set featured failed: $error');
+        debugPrint('[VenueGallery] stackTrace:\n$stackTrace');
+      }
+    } finally {
+      _settingFeaturedItemId = null;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+
+    if (!mounted) return;
+    if (succeeded) {
+      _clearSelection();
+      _showMessage('Featured image updated.');
+      return;
+    }
+    _showMessage('Could not set featured image.');
   }
 
   Future<void> _handleSetCover({
@@ -427,42 +515,15 @@ class _VenueGalleryManagementPageState
     required List<VenueMediaItem> items,
   }) async {
     if (_activeTab != MediaLibraryTab.venueGallery) return;
+    if (_settingFeaturedItemId != null) return;
 
     final selected = _selectedItems(items);
     if (selected.length != 1) {
-      _showMessage('Select one photo to set as cover.');
+      _showMessage('Select one photo to set as featured.');
       return;
     }
 
-    final item = selected.first;
-    if (!item.hasLoadableUrl) {
-      _showMessage('Cover photo must have a saved image URL.');
-      return;
-    }
-
-    try {
-      if (item.id.startsWith('legacy-')) {
-        await _imagesRepository.saveImagePosition(
-          venueId: venue.id,
-          frameKind: ImageFrameKind.galleryCover,
-          metadata: item.position ?? ImagePositionMetadata.defaults,
-          galleryIndexKey: '0',
-        );
-      } else {
-        await _mediaRepository.setCoverPhoto(
-          venueId: venue.id,
-          itemId: item.id,
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-      _showMessage('Could not set cover photo.');
-      return;
-    }
-
-    if (!mounted) return;
-    _clearSelection();
-    _showMessage('Cover photo updated.');
+    await _handleSetFeaturedForItem(venue: venue, item: selected.first);
   }
 
   Future<void> _handleAdjustPosition({
@@ -562,29 +623,11 @@ class _VenueGalleryManagementPageState
     showVenuePagePlaceholderAction(context, action.label);
   }
 
-  List<VenueDashboardActivity> _buildRecentActivity(
-    List<VenueMediaItem> items,
-  ) {
-    final sorted = [...items]
-      ..sort((a, b) {
-        final aTime = a.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.uploadedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
-
-    return sorted.take(5).map((item) {
-      return VenueDashboardActivity(
-        title: '${_activeTab.label}: ${item.displayName}',
-        timestampLabel: item.uploadedAt == null
-            ? 'Recently'
-            : VenueMediaRepository.relativeTimeLabel(item.uploadedAt!),
-        icon: Icons.photo_library_outlined,
-      );
-    }).toList();
-  }
-
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
@@ -660,13 +703,17 @@ class _VenueGalleryManagementPageState
                 !mediaSnapshot.hasData;
 
             _scheduleSelectionPrune(currentItems);
+            _maybeOpenPendingMediaUploadWorkflow(
+              venue: venue,
+              currentItems: currentItems,
+            );
 
             return VenueDashboardPageScaffold(
               tab: VenueDashboardTab.gallery,
+              activityLimit: 5,
               quickActionsOverride: pageConfig.quickActions,
               primaryActionLabelOverride: pageConfig.primaryActionLabel,
               primaryActionIconOverride: pageConfig.primaryActionIcon,
-              activities: _buildRecentActivity(currentItems),
               onPrimaryAction: () {
                 if (!_activeTab.supportsDirectUpload) {
                   _showMessage(
@@ -711,6 +758,9 @@ class _VenueGalleryManagementPageState
                     ),
                     onSetCover: () =>
                         _handleSetCover(venue: venue, items: currentItems),
+                    onSetFeaturedForItem: (item) =>
+                        _handleSetFeaturedForItem(venue: venue, item: item),
+                    settingFeaturedItemId: _settingFeaturedItemId,
                     uploadProgressLabel: _uploadProgressLabel,
                     displayItems: _displayItems,
                     selectedIds: _selectedIds,
@@ -745,6 +795,8 @@ class _ActiveLibraryContent extends StatelessWidget {
     required this.onAdjustPosition,
     required this.onDeleteSelected,
     required this.onSetCover,
+    required this.onSetFeaturedForItem,
+    required this.settingFeaturedItemId,
     required this.uploadProgressLabel,
     required this.displayItems,
   });
@@ -766,6 +818,8 @@ class _ActiveLibraryContent extends StatelessWidget {
   final Future<void> Function(VenueMediaItem item) onAdjustPosition;
   final VoidCallback onDeleteSelected;
   final VoidCallback onSetCover;
+  final Future<void> Function(VenueMediaItem item) onSetFeaturedForItem;
+  final String? settingFeaturedItemId;
   final String? uploadProgressLabel;
   final List<VenueMediaItem> Function(List<VenueMediaItem> items) displayItems;
 
@@ -784,9 +838,6 @@ class _ActiveLibraryContent extends StatelessWidget {
     final isBrandAssets = activeTab == MediaLibraryTab.brandAssets;
     final showCoverColumn = activeTab == MediaLibraryTab.venueGallery;
     final showCurrentColumn = isBrandAssets;
-    final coverItem = activeTab == MediaLibraryTab.venueGallery
-        ? items.where((item) => item.isCover).firstOrNull
-        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -796,10 +847,7 @@ class _ActiveLibraryContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
         ],
         if (activeTab == MediaLibraryTab.venueGallery) ...[
-          _GalleryCoverSummaryCard(
-            coverItem: coverItem,
-            totalCount: items.length,
-          ),
+          VenueGalleryPreviewCarousel(items: items),
           const SizedBox(height: AppSpacing.lg),
         ],
         MediaUsageCard(
@@ -894,7 +942,7 @@ class _ActiveLibraryContent extends StatelessWidget {
                   sort: sort,
                   onSortColumn: onToggleSort,
                   showCoverColumn: showCoverColumn || showCurrentColumn,
-                  coverColumnLabel: showCurrentColumn ? 'Current' : 'Cover',
+                  coverColumnLabel: showCurrentColumn ? 'Current' : 'Featured',
                 ),
                 for (var i = 0; i < displayed.length; i++)
                   MediaItemRow(
@@ -907,6 +955,13 @@ class _ActiveLibraryContent extends StatelessWidget {
                             activeTab == MediaLibraryTab.venueGallery
                         ? () => onAdjustPosition(displayed[i])
                         : null,
+                    onSetFeatured:
+                        activeTab == MediaLibraryTab.venueGallery &&
+                            displayed[i].canBeFeatured &&
+                            !displayed[i].isCover
+                        ? () => onSetFeaturedForItem(displayed[i])
+                        : null,
+                    isSettingFeatured: settingFeaturedItemId == displayed[i].id,
                     showCoverColumn: showCoverColumn,
                     showCurrentColumn: showCurrentColumn,
                     showDivider: i < displayed.length - 1,
@@ -958,167 +1013,6 @@ class _MediaUploadProgressBanner extends StatelessWidget {
             minHeight: 4,
             color: AppColors.primaryPink,
             backgroundColor: AppColors.surfaceElevated.withValues(alpha: 0.8),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GalleryCoverSummaryCard extends StatelessWidget {
-  const _GalleryCoverSummaryCard({
-    required this.coverItem,
-    required this.totalCount,
-  });
-
-  final VenueMediaItem? coverItem;
-  final int totalCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final item = coverItem;
-
-    return VenuePageSection(
-      title: 'Cover / Hero Image',
-      child: GlassContainer(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        borderRadius: AppSpacing.radiusLg,
-        elevation: GlassElevation.soft,
-        innerHighlight: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 680;
-            final preview = ClipRRect(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              child: SizedBox(
-                height: compact ? 180 : 220,
-                child: item == null || !item.hasLoadableUrl
-                    ? DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: AppColors.brandGradient,
-                          color: AppColors.surfaceElevated,
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.add_photo_alternate_outlined,
-                            color: AppColors.white,
-                            size: 44,
-                          ),
-                        ),
-                      )
-                    : Image.network(
-                        item.previewUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, error, stackTrace) => const Center(
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-              ),
-            );
-            final copy = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item == null ? 'No cover selected yet' : item.displayName,
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  item == null
-                      ? 'Upload photos and set one as the cover to make your public venue profile feel alive.'
-                      : '${venueGalleryCategoryLabel(item.category)} · ${item.caption.trim().isEmpty ? 'No caption' : item.caption.trim()}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    _GalleryMetricChip(
-                      icon: Icons.photo_library_outlined,
-                      label: '$totalCount active photos',
-                    ),
-                    const _GalleryMetricChip(
-                      icon: Icons.view_in_ar_outlined,
-                      label: '360° ready',
-                    ),
-                    const _GalleryMetricChip(
-                      icon: Icons.videocam_outlined,
-                      label: 'Video ready',
-                    ),
-                  ],
-                ),
-              ],
-            );
-
-            if (compact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  preview,
-                  const SizedBox(height: AppSpacing.md),
-                  copy,
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(flex: 7, child: preview),
-                const SizedBox(width: AppSpacing.lg),
-                Expanded(flex: 5, child: copy),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _GalleryMetricChip extends StatelessWidget {
-  const _GalleryMetricChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.primaryPurple.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        border: Border.all(
-          color: AppColors.primaryPurple.withValues(alpha: 0.24),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.primaryPink),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
           ),
         ],
       ),
@@ -1255,13 +1149,5 @@ class _GalleryReorderDialogState extends State<_GalleryReorderDialog> {
         ),
       ),
     );
-  }
-}
-
-extension _FirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull {
-    final iterator = this.iterator;
-    if (!iterator.moveNext()) return null;
-    return iterator.current;
   }
 }

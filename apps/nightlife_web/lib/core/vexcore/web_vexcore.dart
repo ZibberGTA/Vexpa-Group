@@ -13,7 +13,12 @@ import 'firebase_venue_deal_repository.dart';
 import 'firebase_venue_drink_repository.dart';
 import 'firebase_venue_event_repository.dart';
 import 'firebase_venue_profile_write_repository.dart';
+import 'firebase_trail_repository.dart';
+import 'firebase_workflow_audit_repository.dart';
+import 'firebase_workflow_command_gateway.dart';
+import 'firebase_workflow_request_repository.dart';
 import 'firebase_venue_repository.dart';
+import '../../features/venue_management/data/venue_management_activity_service.dart';
 
 /// Composition root for the web app's VexCore adapters.
 abstract final class WebVexCore {
@@ -95,6 +100,45 @@ abstract final class WebVexCore {
   static VenueProfileWriteRepository get venueProfileWriteRepository =>
       venueProfileWriteRepositoryOverride ??
       _defaultVenueProfileWriteRepository;
+
+  static final _defaultVenueManagementActivityService =
+      DefaultVenueManagementActivityService();
+
+  /// Test override for venue management activity service. Reset to null after each test.
+  @visibleForTesting
+  static VenueManagementActivityService? venueManagementActivityServiceOverride;
+
+  static VenueManagementActivityService get venueManagementActivityService =>
+      venueManagementActivityServiceOverride ??
+      _defaultVenueManagementActivityService;
+
+  static final _defaultTrailRepository = FirebaseTrailRepository();
+
+  @visibleForTesting
+  static TrailRepository? trailRepositoryOverride;
+
+  static TrailRepository get trailRepository =>
+      trailRepositoryOverride ?? _defaultTrailRepository;
+
+  static final _defaultWorkflowRequestRepository =
+      FirebaseWorkflowRequestRepository();
+
+  @visibleForTesting
+  static WorkflowRequestRepository? workflowRequestRepositoryOverride;
+
+  static WorkflowRequestRepository get workflowRequestRepository =>
+      workflowRequestRepositoryOverride ?? _defaultWorkflowRequestRepository;
+
+  static final _defaultWorkflowAuditRepository =
+      FirebaseWorkflowAuditRepository();
+
+  @visibleForTesting
+  static WorkflowAuditRepository? workflowAuditRepositoryOverride;
+
+  static WorkflowAuditRepository get workflowAuditRepository =>
+      workflowAuditRepositoryOverride ?? _defaultWorkflowAuditRepository;
+
+  static const workflowCommandGateway = FirebaseWorkflowCommandGateway();
 
   static const discoveryVenueSearchService = DiscoveryVenueSearchService();
 

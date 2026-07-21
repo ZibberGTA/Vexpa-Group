@@ -16,6 +16,7 @@ import 'package:nightlife_web/features/venue_management/widgets/venue_dashboard_
 import 'package:nightlife_web/features/venue_management/widgets/venue_dashboard_shell.dart';
 
 import 'venue_dashboard_test_data.dart';
+import 'venue_management_activity_test_support.dart';
 
 class FakeVenueDealsRepository extends VenueDealsRepository {
   FakeVenueDealsRepository({List<DealModel>? initial})
@@ -155,6 +156,7 @@ class FakeVenueDealsRepository extends VenueDealsRepository {
   @override
   Future<void> updateDeal({
     required String dealId,
+    required String venueId,
     required String venueName,
     required String title,
     required String description,
@@ -202,6 +204,8 @@ class FakeVenueDealsRepository extends VenueDealsRepository {
     required String dealId,
     required String deletedBy,
     String? deletedByEmail,
+    String? venueId,
+    String? dealTitle,
   }) async {
     final index = _deals.indexWhere((deal) => deal.id == dealId);
     if (index == -1) throw StateError('Deal not found.');
@@ -231,16 +235,18 @@ class FakeVenueDealsRepository extends VenueDealsRepository {
 
   @override
   Future<void> bulkDeleteDeals({
-    required List<String> dealIds,
+    required List<DealModel> deals,
     required String deletedBy,
     String? deletedByEmail,
   }) async {
-    lastBulkDeletedIds = List.of(dealIds);
-    for (final dealId in dealIds) {
+    lastBulkDeletedIds = deals.map((deal) => deal.id).toList();
+    for (final deal in deals) {
       await deleteDeal(
-        dealId: dealId,
+        dealId: deal.id,
         deletedBy: deletedBy,
         deletedByEmail: deletedByEmail,
+        venueId: deal.venueId,
+        dealTitle: deal.title,
       );
     }
   }
@@ -248,6 +254,7 @@ class FakeVenueDealsRepository extends VenueDealsRepository {
   @override
   Future<void> patchDeal({
     required String dealId,
+    required String venueId,
     required String venueName,
     required String title,
     required String description,
@@ -301,6 +308,8 @@ Future<void> doubleTapText(WidgetTester tester, String text) async {
 }
 
 void main() {
+  registerDefaultVenueManagementActivityTestIsolation();
+
   group('VenueDealsManagementPage', () {
     late FakeVenueDealsRepository repository;
 
@@ -326,7 +335,7 @@ void main() {
           theme: ThemeData.dark(),
           home: Scaffold(
             body: VenueDashboardController(
-              selectTab: (_) {},
+              selectTab: (_, {pendingActionKey}) {},
               contextData: const VenueDashboardContext(
                 ownerName: 'Alex Morgan',
                 ownerFirstName: 'Alex',

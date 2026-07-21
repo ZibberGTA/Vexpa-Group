@@ -9,6 +9,8 @@ import '../models/venue_dashboard_context.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_dashboard_home_data.dart';
 import '../models/venue_dashboard_tab.dart';
+import '../models/venue_profile_views_chart_data.dart';
+import '../presentation/venue_management_activity_presentation.dart';
 import 'venue_dashboard_controller.dart';
 import 'venue_dashboard_layout.dart';
 import 'venue_dashboard_page_transition.dart';
@@ -27,6 +29,12 @@ class VenueDashboardShell extends StatefulWidget {
     this.isLoadingHomeData = false,
     this.onRefreshHomeData,
     this.onDateRangeChanged,
+    this.onChartDateRangeChanged,
+    this.recentManagementActivity,
+    this.isLoadingRecentActivity = false,
+    this.recentActivityError,
+    this.onRetryRecentActivity,
+    this.trailsTabOverride,
   });
 
   const VenueDashboardShell.loading({super.key})
@@ -36,7 +44,13 @@ class VenueDashboardShell extends StatefulWidget {
       homeData = null,
       isLoadingHomeData = true,
       onRefreshHomeData = null,
-      onDateRangeChanged = null;
+      onDateRangeChanged = null,
+      onChartDateRangeChanged = null,
+      recentManagementActivity = null,
+      isLoadingRecentActivity = false,
+      recentActivityError = null,
+      onRetryRecentActivity = null,
+      trailsTabOverride = null;
 
   final VenueDashboardContext? contextData;
   final VenueDashboardTab initialTab;
@@ -46,6 +60,15 @@ class VenueDashboardShell extends StatefulWidget {
   final Future<void> Function()? onRefreshHomeData;
   final Future<void> Function(VenueDashboardDateRange range)?
   onDateRangeChanged;
+  final Future<List<VenueProfileViewsDataPoint>> Function(
+    VenueDashboardDateRange range,
+  )?
+  onChartDateRangeChanged;
+  final List<VenueManagementActivityPresentation>? recentManagementActivity;
+  final bool isLoadingRecentActivity;
+  final Object? recentActivityError;
+  final Future<void> Function()? onRetryRecentActivity;
+  final Widget? trailsTabOverride;
 
   @override
   State<VenueDashboardShell> createState() => VenueDashboardShellState();
@@ -58,6 +81,7 @@ class VenueDashboardShellState extends State<VenueDashboardShell> {
       : widget.initialTab;
   late bool _sidebarExpanded;
   bool _compactLayoutResolved = false;
+  String? _pendingTabActionKey;
   final _venueImagesRepository = VenueImagesRepository();
 
   @override
@@ -79,14 +103,21 @@ class VenueDashboardShellState extends State<VenueDashboardShell> {
     setState(() => _sidebarExpanded = !_sidebarExpanded);
   }
 
-  void _selectTab(VenueDashboardTab tab) {
+  void _selectTab(VenueDashboardTab tab, {String? pendingActionKey}) {
     if (tab.opensPublicMap) {
       Navigator.pushNamed(context, AppRouter.map);
       return;
     }
 
+    _pendingTabActionKey = pendingActionKey;
     setState(() => _selectedTab = tab);
     widget.onTabSelected?.call(tab);
+  }
+
+  String? _takePendingTabActionKey() {
+    final key = _pendingTabActionKey;
+    _pendingTabActionKey = null;
+    return key;
   }
 
   bool _isCompact(BuildContext context) {
@@ -157,11 +188,21 @@ class VenueDashboardShellState extends State<VenueDashboardShell> {
                             ),
                             child: VenueDashboardController(
                               selectTab: _selectTab,
+                              takePendingTabActionKey: _takePendingTabActionKey,
                               contextData: liveContext,
                               homeData: widget.homeData,
                               isLoadingHomeData: widget.isLoadingHomeData,
                               onRefreshHomeData: widget.onRefreshHomeData,
                               onDateRangeChanged: widget.onDateRangeChanged,
+                              onChartDateRangeChanged:
+                                  widget.onChartDateRangeChanged,
+                              recentManagementActivity:
+                                  widget.recentManagementActivity,
+                              isLoadingRecentActivity:
+                                  widget.isLoadingRecentActivity,
+                              recentActivityError: widget.recentActivityError,
+                              onRetryRecentActivity:
+                                  widget.onRetryRecentActivity,
                               child: AnimatedSwitcher(
                                 duration: VenueDashboardPageTransition.duration,
                                 switchInCurve: Curves.easeOutCubic,
@@ -181,6 +222,7 @@ class VenueDashboardShellState extends State<VenueDashboardShell> {
                                 child: VenueDashboardTabContentView(
                                   key: ValueKey(_selectedTab),
                                   tab: _selectedTab,
+                                  trailsTabOverride: widget.trailsTabOverride,
                                 ),
                               ),
                             ),

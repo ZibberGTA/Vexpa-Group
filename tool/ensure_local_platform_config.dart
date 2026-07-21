@@ -17,13 +17,7 @@ void main() {
     envKey: 'VEXDA_ROUTES_API_KEY',
     templateReplacer: _replaceRoutesKeyInDart,
   );
-  _ensureFile(
-    repoRoot: repoRoot,
-    targetRelative: 'apps/nightlife_web/web/vexda_maps_config.js',
-    exampleRelative: 'apps/nightlife_web/web/vexda_maps_config.example.js',
-    envKey: 'VEXDA_WEB_MAPS_API_KEY',
-    templateReplacer: _replaceWebMapsKeyInJs,
-  );
+  _ensureWebMapsConfig(repoRoot);
   _ensureAndroidLocalProperties(repoRoot);
   _ensureFile(
     repoRoot: repoRoot,
@@ -83,6 +77,140 @@ void _ensureFile({
   target.parent.createSync(recursive: true);
   target.writeAsStringSync(example.readAsStringSync());
   stdout.writeln('Created $targetRelative from template.');
+}
+
+void _ensureWebMapsConfig(Directory repoRoot) {
+  const targetRelative = 'apps/nightlife_web/web/vexda_maps_config.js';
+  const exampleRelative = 'apps/nightlife_web/web/vexda_maps_config.example.js';
+  const envKey = 'VEXDA_WEB_MAPS_API_KEY';
+
+  final target = File('${repoRoot.path}${Platform.pathSeparator}$targetRelative');
+  final example = File('${repoRoot.path}${Platform.pathSeparator}$exampleRelative');
+  if (!example.existsSync()) {
+    throw StateError('Missing template: $exampleRelative');
+  }
+
+  final envValue = Platform.environment[envKey]?.trim() ?? '';
+  if (envValue.isNotEmpty) {
+    final content = _replaceWebMapsKeyInJs(example.readAsStringSync(), envValue);
+    target.parent.createSync(recursive: true);
+    target.writeAsStringSync(content);
+    stdout.writeln('Wrote $targetRelative from $envKey.');
+    return;
+  }
+
+  final canonicalKey = _canonicalWebMapsApiKey(repoRoot);
+
+  if (target.existsSync()) {
+    final existingKey = _readJsConfigApiKey(target.readAsStringSync());
+    if (_isUsableMapsKey(existingKey) &&
+        _isSameMapsKey(existingKey, canonicalKey)) {
+      stdout.writeln('Kept existing $targetRelative');
+      return;
+    }
+
+    if (_isUsableMapsKey(canonicalKey)) {
+      final content =
+          _replaceWebMapsKeyInJs(example.readAsStringSync(), canonicalKey!);
+      target.writeAsStringSync(content);
+      stdout.writeln(
+        'Restored $targetRelative to the last working web Maps browser key.',
+      );
+      return;
+    }
+
+    if (_isUsableMapsKey(existingKey)) {
+      stdout.writeln('Kept existing $targetRelative');
+      return;
+    }
+
+    stdout.writeln('Kept existing $targetRelative');
+    return;
+  }
+
+  target.parent.createSync(recursive: true);
+  if (_isUsableMapsKey(canonicalKey)) {
+    final content =
+        _replaceWebMapsKeyInJs(example.readAsStringSync(), canonicalKey!);
+    target.writeAsStringSync(content);
+    stdout.writeln(
+      'Created $targetRelative from the last working web Maps browser key.',
+    );
+    return;
+  }
+
+  target.writeAsStringSync(example.readAsStringSync());
+  stdout.writeln('Created $targetRelative from template.');
+}
+
+String? _readJsConfigApiKey(String jsContent) {
+  final match = RegExp(r"apiKey:\s*'((?:\\'|[^'])*)'").firstMatch(jsContent);
+  if (match == null) {
+    return null;
+  }
+  return match.group(1)?.replaceAll(r"\'", "'");
+}
+
+bool _isUsableMapsKey(String? key) {
+  if (key == null) {
+    return false;
+  }
+  final trimmed = key.trim();
+  return trimmed.isNotEmpty && !trimmed.contains('REPLACE');
+}
+
+bool _isSameMapsKey(String? a, String? b) {
+  if (a == null || b == null) {
+    return false;
+  }
+  return a.trim() == b.trim();
+}
+
+String? _canonicalWebMapsApiKey(Directory repoRoot) {
+  return _webMapsApiKeyFromGitIndexHtml(repoRoot);
+}
+
+String? _recoverWebMapsApiKey(Directory repoRoot) {
+  return _canonicalWebMapsApiKey(repoRoot);
+}
+
+String? _webMapsApiKeyFromGitIndexHtml(Directory repoRoot) {
+  final result = Process.runSync(
+    'git',
+    ['show', 'b394ec1^:apps/nightlife_web/web/index.html'],
+    workingDirectory: repoRoot.path,
+  );
+  if (result.exitCode != 0) {
+    return null;
+  }
+  final html = _processStdout(result.stdout);
+  if (html.isEmpty) {
+    return null;
+  }
+  return _parseMapsApiKeyFromHtml(html);
+}
+
+String _processStdout(Object? stdout) {
+  if (stdout == null) {
+    return '';
+  }
+  if (stdout is String) {
+    return stdout;
+  }
+  if (stdout is List<int>) {
+    return systemEncoding.decode(stdout);
+  }
+  return stdout.toString();
+}
+
+String? _parseMapsApiKeyFromHtml(String html) {
+  final match = RegExp(
+    r'maps\.googleapis\.com/maps/api/js\?key=([^&"]+)',
+  ).firstMatch(html);
+  if (match == null) {
+    return null;
+  }
+  return Uri.decodeComponent(match.group(1)!);
 }
 
 void _ensureAndroidLocalProperties(Directory repoRoot) {

@@ -1,13 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/vexcore/web_vexcore.dart';
 import '../../auth/services/auth_service.dart';
 import '../../auth/services/user_role_service.dart';
 import '../../venues/models/venue_model.dart';
+import '../data/venue_analytics_service.dart';
 import '../data/venue_dashboard_repository.dart';
 import '../models/venue_dashboard_context.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_dashboard_home_data.dart';
 import '../models/venue_dashboard_tab.dart';
+import '../models/venue_profile_views_chart_data.dart';
+import '../presentation/venue_management_activity_presentation.dart';
+import '../presentation/venue_management_activity_presentation_mapper.dart';
 import '../widgets/venue_dashboard_error_panel.dart';
 import '../widgets/venue_dashboard_shell.dart';
 
@@ -26,11 +33,20 @@ class VenueDashboardScreen extends StatefulWidget {
 
 class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
   final _repository = VenueDashboardRepository();
+  final _analyticsService = VenueAnalyticsService();
+  final _activityService = WebVexCore.venueManagementActivityService;
+  final _activityPresentationMapper =
+      const VenueManagementActivityPresentationMapper();
 
   VenueDashboardContext? _contextData;
   VenueModel? _activeVenue;
   VenueDashboardHomeData? _homeData;
-  VenueDashboardDateRange _selectedRange = VenueDashboardDateRange.defaultRange;
+  VenueDashboardDateRange _summaryRange = VenueDashboardDateRange.defaultRange;
+
+  List<VenueManagementActivityPresentation>? _recentManagementActivity;
+  String? _loadedActivityVenueId;
+  bool _loadingRecentActivity = false;
+  Object? _recentActivityError;
 
   bool _loadingContext = true;
   bool _loadingHomeData = false;
@@ -81,7 +97,8 @@ class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
         _loadingContext = false;
       });
 
-      await _loadHomeData(_selectedRange);
+      await _loadHomeData(_summaryRange);
+      await _loadRecentActivity();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -97,7 +114,7 @@ class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
 
     setState(() {
       _loadingHomeData = true;
-      _selectedRange = range;
+      _summaryRange = range;
     });
 
     try {
@@ -123,6 +140,67 @@ class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
     }
   }
 
+  void _handleTabSelected(VenueDashboardTab tab) {
+    if (tab == VenueDashboardTab.dashboard) {
+      unawaited(_loadRecentActivity());
+    }
+  }
+
+  Future<void> _refreshHomeAndActivity() async {
+    await _loadHomeData(_summaryRange);
+    await _loadRecentActivity();
+  }
+
+  Future<void> _loadRecentActivity() async {
+    final venue = _activeVenue;
+    if (venue == null) return;
+
+    final venueId = venue.id;
+    setState(() {
+      _loadingRecentActivity = true;
+      _recentActivityError = null;
+      if (_loadedActivityVenueId != venueId) {
+        _recentManagementActivity = null;
+      }
+    });
+
+    try {
+      final records = await _activityService.loadRecentActivity(
+        venueId: venueId,
+        limit: 10,
+      );
+
+      if (!mounted || _activeVenue?.id != venueId) return;
+
+      setState(() {
+        _recentManagementActivity = records
+            .map(_activityPresentationMapper.map)
+            .toList(growable: false);
+        _loadedActivityVenueId = venueId;
+        _loadingRecentActivity = false;
+      });
+    } catch (error) {
+      if (!mounted || _activeVenue?.id != venueId) return;
+
+      setState(() {
+        _recentActivityError = error;
+        _loadingRecentActivity = false;
+      });
+    }
+  }
+
+  Future<List<VenueProfileViewsDataPoint>> _loadChartData(
+    VenueDashboardDateRange range,
+  ) async {
+    final venue = _activeVenue;
+    if (venue == null) return const [];
+
+    return _analyticsService.loadProfileViewsOverTime(
+      venueId: venue.id,
+      range: range,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingContext) {
@@ -141,10 +219,16 @@ class _VenueDashboardScreenState extends State<VenueDashboardScreen> {
     return VenueDashboardShell(
       contextData: _contextData!,
       initialTab: widget.initialTab ?? VenueDashboardTab.dashboard,
+      onTabSelected: _handleTabSelected,
       homeData: _homeData,
       isLoadingHomeData: _loadingHomeData,
-      onRefreshHomeData: () => _loadHomeData(_selectedRange),
+      onRefreshHomeData: _refreshHomeAndActivity,
       onDateRangeChanged: _loadHomeData,
+      onChartDateRangeChanged: _loadChartData,
+      recentManagementActivity: _recentManagementActivity,
+      isLoadingRecentActivity: _loadingRecentActivity,
+      recentActivityError: _recentActivityError,
+      onRetryRecentActivity: _loadRecentActivity,
     );
   }
 }

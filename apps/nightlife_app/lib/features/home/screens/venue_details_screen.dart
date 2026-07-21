@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vex_engines/experience/application/experience_drink_grouper.dart';
+import 'package:vex_engines/venue/domain/venue_profile_field_codec.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/premium_scaffold.dart';
@@ -147,6 +148,11 @@ class _VenueHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heroTags = VenueProfileFieldCodec.displayFeatureTags(
+      featureTags: venue.featureTags,
+      features: const [],
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: _PremiumListCard(
@@ -208,12 +214,8 @@ class _VenueHeroCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _Pill(
-                  icon: Icons.local_bar,
-                  label: venue.category.trim().isNotEmpty
-                      ? venue.category.trim()
-                      : 'Venue',
-                ),
+                for (final tag in heroTags)
+                  _Pill(icon: Icons.label_outline_rounded, label: tag),
                 _CrowdPill(level: venue.crowdLevel),
                 if (venue.hasDeals)
                   const _Pill(icon: Icons.local_offer, label: 'Deals'),

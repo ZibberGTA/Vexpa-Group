@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'package:vex_engines/venue/domain/venue_opening_hours_entry.dart';
+
 import '../../../../core/constants/breakpoints.dart';
-import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/components/drinkspot_button.dart';
 import '../../../../shared/components/pill_tag.dart';
 import '../../../../shared/widgets/premium_effects.dart';
 import '../../../../shared/widgets/positioned_venue_image.dart';
-import '../../../search/data/search_venue_mapper.dart';
-import '../../../search/widgets/venue_result_card.dart';
 import '../../../venue/data/venue_opening_hours_formatter.dart';
 import '../../../venue/models/venue_details_view.dart';
+import '../../../venue/services/venue_crowd_status_service.dart';
+import '../../../venue/widgets/venue_crowd_status_badge.dart';
+import '../../../venue/widgets/venue_opening_status_line.dart';
+import '../../../venue/widgets/venue_hero_action_button_row.dart';
+import '../../../venue/widgets/venue_hero_action_specs.dart';
 import '../../../venues/models/image_position_metadata.dart';
 import '../../../venues/models/venue_model.dart';
 import '../../data/venue_profile_field_codec.dart';
@@ -24,15 +28,15 @@ class VenueProfileDashboardLayout extends StatelessWidget {
   const VenueProfileDashboardLayout({
     super.key,
     required this.publicPreview,
-    required this.searchPreview,
     required this.profileDetails,
+    required this.openingTimes,
     required this.branding,
     required this.visibilityChecklist,
   });
 
   final Widget publicPreview;
-  final Widget searchPreview;
   final Widget profileDetails;
+  final Widget openingTimes;
   final Widget branding;
   final Widget visibilityChecklist;
 
@@ -53,7 +57,7 @@ class VenueProfileDashboardLayout extends StatelessWidget {
               const SizedBox(height: gap),
               branding,
               const SizedBox(height: gap),
-              searchPreview,
+              openingTimes,
               const SizedBox(height: gap),
               profileDetails,
               const SizedBox(height: gap),
@@ -78,7 +82,7 @@ class VenueProfileDashboardLayout extends StatelessWidget {
               rightFlex: 30,
               gap: gap,
               left: profileDetails,
-              right: searchPreview,
+              right: openingTimes,
             ),
             const SizedBox(height: gap),
             visibilityChecklist,
@@ -176,57 +180,62 @@ class VenueProfilePublicPreviewCard extends StatelessWidget {
     required this.details,
     required this.usableBannerUrl,
     required this.usableLogoUrl,
-    required this.onEditProfileDetails,
+    this.rawVenueDocument,
   });
 
   final VenueModel venue;
   final VenueDetailsView details;
   final String? usableBannerUrl;
   final String? usableLogoUrl;
-  final VoidCallback onEditProfileDetails;
+  final Map<String, dynamic>? rawVenueDocument;
 
   @override
   Widget build(BuildContext context) {
     return VenuePageSection(
-      title: 'Public Profile Preview',
+      title: 'Public Hero Card',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                FramedVenueImage(
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                child: FramedVenueImage(
                   imageUrl: usableBannerUrl,
                   metadata: venue.bannerImagePosition,
                   height: Breakpoints.isMobile(context) ? 160 : 200,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   fallback: const _PreviewBannerFallback(height: 200),
                 ),
-                Positioned(
-                  left: AppSpacing.lg,
-                  bottom: -36,
-                  child: _ProfilePreviewLogoFrame(
-                    child: FramedVenueImage(
-                      imageUrl: usableLogoUrl,
-                      metadata: venue.logoImagePosition,
-                      width: 72,
-                      height: 72,
-                      circular: true,
-                      fallback: _LogoInitialFallback(name: venue.name),
-                    ),
+              ),
+              Positioned(
+                left: AppSpacing.lg,
+                bottom: -36,
+                child: _ProfilePreviewLogoFrame(
+                  child: FramedVenueImage(
+                    imageUrl: usableLogoUrl,
+                    metadata: venue.logoImagePosition,
+                    width: 72,
+                    height: 72,
+                    circular: true,
+                    fallback: _LogoInitialFallback(name: venue.name),
                   ),
                 ),
-                Positioned(
-                  top: AppSpacing.md,
-                  right: AppSpacing.md,
-                  child: _PreviewEditChip(
-                    onTap: onEditProfileDetails,
+              ),
+              Positioned(
+                top: AppSpacing.md,
+                right: AppSpacing.md,
+                child: VenueCrowdStatusBadge(
+                  venueId: venue.id,
+                  crowdLevel: venue.crowdLevel,
+                  crowdUpdatedAt: VenueCrowdStatusService.crowdUpdatedAtFromDocument(
+                    rawVenueDocument,
                   ),
+                  previewOnly: true,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 48),
           Text(
@@ -248,52 +257,8 @@ class VenueProfilePublicPreviewCard extends StatelessWidget {
               letterSpacing: 0.4,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(
-                Icons.location_on_outlined,
-                size: 15,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  details.locationLabel,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              _StatusChip(
-                icon: details.isOpen ? Icons.circle : Icons.circle_outlined,
-                label: details.isOpen ? 'Open now' : 'Closed',
-                accent: details.isOpen
-                    ? AppColors.primaryPink
-                    : AppColors.textSecondary,
-              ),
-              _StatusChip(
-                icon: Icons.star_rounded,
-                label: details.rating.toStringAsFixed(1),
-                accent: AppColors.trailGold,
-              ),
-              if (details.hasOpeningHours)
-                _StatusChip(
-                  icon: Icons.schedule_outlined,
-                  label: details.todayHoursLabel,
-                  accent: AppColors.primaryPurple,
-                ),
-            ],
-          ),
+          VenueOpeningStatusLine(openingHours: venue.openingHours),
           if (details.tags.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Wrap(
@@ -308,101 +273,10 @@ class VenueProfilePublicPreviewCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            details.overviewDescription,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13.5,
-              height: 1.55,
-            ),
-          ),
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              DrinkSpotButton(
-                label: 'View Live Public Profile',
-                icon: Icons.open_in_new_rounded,
-                compact: true,
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRouter.venueDetails(venue.id),
-                  );
-                },
-              ),
-              DrinkSpotButton(
-                label: 'Edit Profile Details',
-                icon: Icons.edit_outlined,
-                compact: true,
-                variant: DrinkSpotButtonVariant.secondary,
-                onPressed: onEditProfileDetails,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class VenueProfileSearchPreviewCard extends StatelessWidget {
-  const VenueProfileSearchPreviewCard({
-    super.key,
-    required this.venue,
-  });
-
-  final VenueModel venue;
-
-  @override
-  Widget build(BuildContext context) {
-    final searchResult = SearchVenueMapper.previewFromVenueModel(venue);
-
-    return VenuePageSection(
-      title: 'Search & Map Card Preview',
-      padding: const EdgeInsets.all(AppSpacing.md + 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            child: Align(
-              alignment: Alignment.topCenter,
-              heightFactor: 1,
-              child: Transform.scale(
-                scale: 0.92,
-                alignment: Alignment.topCenter,
-                child: IgnorePointer(
-                  child: VenueResultCard(
-                    venue: searchResult,
-                    selected: false,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'This is how customers discover your venue in search and on the map.',
-            style: TextStyle(
-              color: AppColors.textSecondary.withValues(alpha: 0.95),
-              fontSize: 12,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          DrinkSpotButton(
-            label: 'View on Map',
-            icon: Icons.map_outlined,
-            compact: true,
-            variant: DrinkSpotButtonVariant.ghost,
-            onPressed: () {
-              Navigator.pushNamed(context, AppRouter.search);
-            },
+          VenueHeroActionButtonRow(
+            actions: VenueHeroActionConfigs.customerHeroActions,
+            previewOnly: true,
           ),
         ],
       ),
@@ -426,14 +300,6 @@ class VenueProfileDetailsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final openingHours = VenueOpeningHoursFormatter.fromMap(venue.openingHours);
-    final openingSummary = openingHours.isEmpty
-        ? 'Not set'
-        : openingHours
-              .where((entry) => !entry.isClosed)
-              .take(3)
-              .map((entry) => '${entry.dayLabel}: ${entry.hoursLabel}')
-              .join('\n');
     final tags = VenueProfileFieldCodec.displayFeatureTags(venue);
     final ageLabel = _ageRestrictionLabel(
       venue,
@@ -469,9 +335,9 @@ class VenueProfileDetailsGrid extends StatelessWidget {
         icon: Icons.language_outlined,
       ),
       _DetailSpec(
-        label: 'Opening Hours',
-        value: openingSummary,
-        icon: Icons.schedule_outlined,
+        label: 'Contact Details',
+        value: _contactDetailsSummary(venue),
+        icon: Icons.contact_phone_outlined,
       ),
       _DetailSpec(
         label: 'Feature Tags',
@@ -529,6 +395,18 @@ class VenueProfileDetailsGrid extends StatelessWidget {
     );
   }
 
+  static String _contactDetailsSummary(VenueModel venue) {
+    final phone = venue.phone.trim();
+    final email = venue.email.trim();
+    final phoneLine = phone.isEmpty
+        ? 'Phone Number: Not set'
+        : 'Phone Number: $phone';
+    final emailLine = email.isEmpty
+        ? 'Email Address: Not set'
+        : 'Email Address: $email';
+    return '$phoneLine\n$emailLine';
+  }
+
   static String _formatCrowdLevel(String raw) {
     final cleaned = raw.trim();
     if (cleaned.isEmpty) return 'Not set';
@@ -546,6 +424,110 @@ class VenueProfileDetailsGrid extends StatelessWidget {
       return '18+';
     }
     return 'Not set';
+  }
+}
+
+class VenueProfileOpeningTimesCard extends StatelessWidget {
+  const VenueProfileOpeningTimesCard({
+    super.key,
+    required this.venue,
+    required this.onEdit,
+  });
+
+  final VenueModel venue;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = _openingTimesEntries(venue);
+
+    return VenuePageSection(
+      title: 'Opening Times',
+      trailing: TextButton(
+        onPressed: onEdit,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primaryPink,
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text(
+          'Edit',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < entries.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.sm),
+            _OpeningTimesRow(entry: entries[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static List<VenueOpeningHoursEntry> _openingTimesEntries(VenueModel venue) {
+    if (venue.openingHours.isEmpty) {
+      return VenueProfileConstants.openingDayKeys
+          .map(
+            (key) => VenueOpeningHoursEntry(
+              dayLabel: VenueProfileConstants.openingDayLabels[key] ?? key,
+              hoursLabel: 'Not set',
+            ),
+          )
+          .toList();
+    }
+
+    return VenueOpeningHoursFormatter.fromMap(venue.openingHours);
+  }
+}
+
+class _OpeningTimesRow extends StatelessWidget {
+  const _OpeningTimesRow({required this.entry});
+
+  final VenueOpeningHoursEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final hoursColor = entry.isClosed
+        ? AppColors.textSecondary
+        : entry.hoursLabel == 'Not set'
+        ? AppColors.textSecondary
+        : AppColors.white;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 108,
+          child: Text(
+            entry.dayLabel,
+            style: TextStyle(
+              color: entry.isToday ? AppColors.primaryPink : AppColors.white,
+              fontWeight: entry.isToday ? FontWeight.w700 : FontWeight.w600,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            entry.hoursLabel,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: hoursColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -751,7 +733,7 @@ class VenueProfileVisibilityChecklist extends StatelessWidget {
       _ChecklistItem('Events created', counts.eventCount > 0),
       _ChecklistItem(
         'Contact information complete',
-        venue.phone.trim().isNotEmpty,
+        venue.phone.trim().isNotEmpty || venue.email.trim().isNotEmpty,
       ),
     ];
   }
@@ -786,45 +768,6 @@ class _ProfilePreviewLogoFrame extends StatelessWidget {
         ],
       ),
       child: ClipOval(child: child),
-    );
-  }
-}
-
-class _PreviewEditChip extends StatelessWidget {
-  const _PreviewEditChip({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            border: Border.all(color: AppColors.glassBorder),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.edit_outlined, size: 14, color: AppColors.white),
-              SizedBox(width: 4),
-              Text(
-                'Edit',
-                style: TextStyle(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -870,45 +813,6 @@ class _LogoInitialFallback extends StatelessWidget {
             fontSize: 24,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.icon,
-    required this.label,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.background.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accent.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: accent),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -962,50 +866,60 @@ class _ProfileDetailTileState extends State<_ProfileDetailTile> {
           ),
           boxShadow: _hovered ? PremiumEffects.hoverGlow(intensity: 0.25) : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                PremiumIconBadge(icon: widget.spec.icon, highlighted: _hovered),
-                const Spacer(),
-                TextButton(
-                  onPressed: widget.onEdit,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryPink,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            PremiumIconBadge(icon: widget.spec.icon, highlighted: _hovered),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.spec.label,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: widget.onEdit,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryPink,
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Edit',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    widget.spec.value,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      height: 1.4,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              widget.spec.label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              widget.spec.value,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 13.5,
-                height: 1.4,
+                ],
               ),
             ),
           ],

@@ -15,9 +15,10 @@ import '../../venues/models/venue_model.dart';
 import '../models/venue_dashboard_context.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_dashboard_home_data.dart';
+import '../models/venue_dashboard_schedule.dart';
 import '../services/venue_dashboard_engine_mapper.dart';
 import '../services/venue_profile_completion_calculator.dart';
-import 'venue_activity_service.dart';
+import '../services/venue_dashboard_schedule_service.dart';
 import 'venue_analytics_service.dart';
 
 /// Resolves active venue context and dashboard home data from Firestore.
@@ -25,30 +26,35 @@ class VenueDashboardRepository {
   VenueDashboardRepository({
     FirebaseFirestore? firestore,
     VenueAnalyticsService? analyticsService,
-    VenueActivitySource? activityService,
     VenueActiveVenueSelector? activeVenueSelector,
     AnalyticsDashboardStatsComposer? statsComposer,
     AnalyticsDashboardHighlightComposer? highlightComposer,
     VenueDashboardHighlightComposer? dashboardHighlightComposer,
     VenueWhatsNextComposer? whatsNextComposer,
-  })  : _firestoreOverride = firestore,
-        _analyticsService = analyticsService ?? VenueAnalyticsService(firestore: firestore),
-        _activityService = activityService ?? VenueActivityService(firestore: firestore),
-        _activeVenueSelector = activeVenueSelector ?? const VenueActiveVenueSelector(),
-        _statsComposer = statsComposer ?? const AnalyticsDashboardStatsComposer(),
-        _highlightComposer = highlightComposer ?? const AnalyticsDashboardHighlightComposer(),
-        _dashboardHighlightComposer =
-            dashboardHighlightComposer ?? const VenueDashboardHighlightComposer(),
-        _whatsNextComposer = whatsNextComposer ?? const VenueWhatsNextComposer();
+    VenueDashboardScheduleService? scheduleService,
+  }) : _firestoreOverride = firestore,
+       _analyticsService =
+           analyticsService ?? VenueAnalyticsService(firestore: firestore),
+       _activeVenueSelector =
+           activeVenueSelector ?? const VenueActiveVenueSelector(),
+       _statsComposer =
+           statsComposer ?? const AnalyticsDashboardStatsComposer(),
+       _highlightComposer =
+           highlightComposer ?? const AnalyticsDashboardHighlightComposer(),
+       _dashboardHighlightComposer =
+           dashboardHighlightComposer ??
+           const VenueDashboardHighlightComposer(),
+       _whatsNextComposer = whatsNextComposer ?? const VenueWhatsNextComposer(),
+       _scheduleService = scheduleService ?? VenueDashboardScheduleService();
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueAnalyticsService _analyticsService;
-  final VenueActivitySource _activityService;
   final VenueActiveVenueSelector _activeVenueSelector;
   final AnalyticsDashboardStatsComposer _statsComposer;
   final AnalyticsDashboardHighlightComposer _highlightComposer;
   final VenueDashboardHighlightComposer _dashboardHighlightComposer;
   final VenueWhatsNextComposer _whatsNextComposer;
+  final VenueDashboardScheduleService _scheduleService;
 
   FirebaseFirestore? get _db {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -61,7 +67,10 @@ class VenueDashboardRepository {
     required UserRoleProfile roleProfile,
     String? preferredVenueId,
   }) async {
-    final venues = await _loadAccessibleVenues(user: user, roleProfile: roleProfile);
+    final venues = await _loadAccessibleVenues(
+      user: user,
+      roleProfile: roleProfile,
+    );
     if (venues.isEmpty) {
       throw VenueDashboardLoadException(
         'No venue found for your account. Please contact support.',
@@ -81,7 +90,9 @@ class VenueDashboardRepository {
     return VenueDashboardContext(
       ownerName: ownerName,
       ownerFirstName: ownerFirstName,
-      venueName: activeVenue.name.trim().isEmpty ? 'Your Venue' : activeVenue.name,
+      venueName: activeVenue.name.trim().isEmpty
+          ? 'Your Venue'
+          : activeVenue.name,
       venueId: activeVenue.id,
       logoUrl: activeVenue.logoUrl.trim().isEmpty ? null : activeVenue.logoUrl,
       bannerImageUrl: activeVenue.bannerImageUrl.trim().isEmpty
@@ -115,11 +126,12 @@ class VenueDashboardRepository {
     final drinkCount = await _countDrinks(venue.id);
     final dealCount = await _countDeals(venue.id);
     final eventCount = await _countEvents(venue.id);
-    final hasUpcomingEvent = await _hasUpcomingEvent(venue.id);
-
-    final recentActivity = await _activityService.loadRecentActivity(
-      venueId: venue.id,
-    );
+    final upcomingResults = await Future.wait([
+      _hasUpcomingEvent(venue.id),
+      _scheduleService.loadUpcomingSchedule(venueId: venue.id),
+    ]);
+    final hasUpcomingEvent = upcomingResults[0] as bool;
+    final nextSevenDaysSchedule = upcomingResults[1] as VenueDashboardSchedule;
 
     final analyticsHighlights = analytics.hasData
         ? VenueDashboardEngineMapper.analyticsHighlightsFromEngine(
@@ -158,7 +170,7 @@ class VenueDashboardRepository {
           ),
         ),
       ),
-      recentActivity: recentActivity,
+      nextSevenDaysSchedule: nextSevenDaysSchedule,
       analyticsAvailable: analytics.hasData,
     );
   }
@@ -363,7 +375,14 @@ class VenueDashboardRepository {
           .limit(1)
           .get();
       return snapshot.docs.isNotEmpty;
-    } on FirebaseException {
+    } on FirebaseException catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint(
+          '[VenueDashboardRepository] upcoming event check failed '
+          '(${error.code}): ${error.message}',
+        );
+        debugPrint('[VenueDashboardRepository] stackTrace:\n$stackTrace');
+      }
       return false;
     }
   }

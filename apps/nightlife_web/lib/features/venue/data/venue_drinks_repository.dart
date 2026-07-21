@@ -7,9 +7,13 @@ import '../../../core/firebase/vexda_firebase.dart';
 import '../../../core/vexcore/vex_venue_drink_mapper.dart';
 import '../../../core/vexcore/web_vexcore.dart';
 import '../../venue_management/data/drink_write_payload.dart';
+import '../../venue_management/data/venue_management_activity_action_inference.dart';
+import '../../venue_management/data/venue_management_activity_service.dart';
 import '../../venue_management/models/bulk_drink_patch.dart';
 import '../../venue_management/models/drink_categories.dart';
 import '../../venue_management/models/drink_import_row.dart';
+import '../../venue_management/models/venue_management_activity.dart';
+import '../../venue_management/models/venue_management_activity_types.dart';
 import 'models/drink_model.dart';
 
 /// Loads and writes drinks for a venue.
@@ -17,12 +21,16 @@ class VenueDrinksRepository {
   VenueDrinksRepository({
     FirebaseFirestore? firestore,
     VenueDrinkDataService? venueDrinkDataService,
+    VenueManagementActivityService? activityService,
   }) : _firestoreOverride = firestore,
        _venueDrinkDataService =
-           venueDrinkDataService ?? WebVexCore.venueDrinkDataService;
+           venueDrinkDataService ?? WebVexCore.venueDrinkDataService,
+       _activityService =
+           activityService ?? WebVexCore.venueManagementActivityService;
 
   final FirebaseFirestore? _firestoreOverride;
   final VenueDrinkDataService _venueDrinkDataService;
+  final VenueManagementActivityService _activityService;
 
   FirebaseFirestore? _resolveFirestore() {
     if (_firestoreOverride != null) return _firestoreOverride;
@@ -43,6 +51,37 @@ class VenueDrinksRepository {
         DataFailure(:final error) => throw error,
       };
     });
+  }
+
+  /// All non-deleted drinks for venue management (includes unavailable).
+  Stream<List<DrinkModel>> watchManagementDrinks(String venueId) async* {
+    final trimmedId = venueId.trim();
+    if (trimmedId.isEmpty) {
+      yield const [];
+      return;
+    }
+
+    final firestore = _resolveFirestore();
+    if (firestore == null) {
+      yield const [];
+      return;
+    }
+
+    yield* firestore
+        .collection('drinks')
+        .where('venueId', isEqualTo: trimmedId)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) {
+          final drinks =
+              snapshot.docs
+                  .map((doc) => DrinkModel.fromMap(doc.id, doc.data()))
+                  .toList()
+                ..sort(
+                  (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                );
+          return drinks;
+        });
   }
 
   Future<String> addDrink({
@@ -80,6 +119,14 @@ class VenueDrinksRepository {
 
     try {
       await docRef.set(payload);
+      await _recordDrinkActivity(
+        venueId: venueId,
+        drinkId: docRef.id,
+        drinkName: name,
+        actorUid: createdBy,
+        actionType: VenueManagementActivityActionTypes.created,
+        description: 'Drink created',
+      );
       return docRef.id;
     } on FirebaseException catch (error) {
       if (kDebugMode) {
@@ -91,6 +138,7 @@ class VenueDrinksRepository {
 
   Future<void> updateDrink({
     required String drinkId,
+    required String venueId,
     required String venueName,
     required String name,
     required String category,
@@ -122,6 +170,14 @@ class VenueDrinksRepository {
 
     try {
       await firestore.collection('drinks').doc(drinkId).update(payload);
+      await _recordDrinkActivity(
+        venueId: venueId,
+        drinkId: drinkId,
+        drinkName: name,
+        actorUid: updatedBy,
+        actionType: VenueManagementActivityActionTypes.updated,
+        description: 'Drink updated',
+      );
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint(
@@ -136,6 +192,8 @@ class VenueDrinksRepository {
     required String drinkId,
     required String deletedBy,
     String? deletedByEmail,
+    String? venueId,
+    String? drinkName,
   }) async {
     final firestore = _resolveFirestore();
     if (firestore == null) {
@@ -151,6 +209,19 @@ class VenueDrinksRepository {
 
     try {
       await firestore.collection('drinks').doc(drinkId).update(payload);
+      if (venueId != null &&
+          venueId.trim().isNotEmpty &&
+          drinkName != null &&
+          drinkName.trim().isNotEmpty) {
+        await _recordDrinkActivity(
+          venueId: venueId,
+          drinkId: drinkId,
+          drinkName: drinkName,
+          actorUid: deletedBy,
+          actionType: VenueManagementActivityActionTypes.archived,
+          description: 'Drink archived',
+        );
+      }
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint(
@@ -163,6 +234,7 @@ class VenueDrinksRepository {
 
   Future<void> patchDrink({
     required String drinkId,
+    required String venueId,
     required String venueName,
     required String drinkName,
     required String category,
@@ -194,6 +266,19 @@ class VenueDrinksRepository {
 
     try {
       await firestore.collection('drinks').doc(drinkId).update(payload);
+      final resolvedName = patch.name ?? drinkName;
+      await _recordDrinkActivity(
+        venueId: venueId,
+        drinkId: drinkId,
+        drinkName: resolvedName,
+        actorUid: updatedBy,
+        actionType: VenueManagementActivityActionInference.drinkPatchActionType(
+          patch,
+        ),
+        description: patch.available != null
+            ? 'Drink availability changed'
+            : 'Drink updated',
+      );
     } on FirebaseException catch (error) {
       if (kDebugMode) {
         debugPrint(
@@ -213,6 +298,7 @@ class VenueDrinksRepository {
     for (final drink in drinks) {
       await patchDrink(
         drinkId: drink.id,
+        venueId: drink.venueId,
         venueName: venueName,
         drinkName: drink.name,
         category: drink.category,
@@ -223,15 +309,17 @@ class VenueDrinksRepository {
   }
 
   Future<void> bulkDeleteDrinks({
-    required List<String> drinkIds,
+    required List<DrinkModel> drinks,
     required String deletedBy,
     String? deletedByEmail,
   }) async {
-    for (final drinkId in drinkIds) {
+    for (final drink in drinks) {
       await deleteDrink(
-        drinkId: drinkId,
+        drinkId: drink.id,
         deletedBy: deletedBy,
         deletedByEmail: deletedByEmail,
+        venueId: drink.venueId,
+        drinkName: drink.name,
       );
     }
   }
@@ -259,6 +347,7 @@ class VenueDrinksRepository {
       var batch = firestore.batch();
       var writesInBatch = 0;
       var importedCount = 0;
+      final importedDrinks = <({String id, String name})>[];
 
       for (final drink in drinks) {
         final docRef = firestore.collection('drinks').doc();
@@ -276,6 +365,7 @@ class VenueDrinksRepository {
             price: drink.price,
           ),
         );
+        importedDrinks.add((id: docRef.id, name: drink.name));
         writesInBatch++;
         importedCount++;
 
@@ -288,6 +378,17 @@ class VenueDrinksRepository {
 
       if (writesInBatch > 0) {
         await batch.commit();
+      }
+
+      for (final drink in importedDrinks) {
+        await _recordDrinkActivity(
+          venueId: venueId,
+          drinkId: drink.id,
+          drinkName: drink.name,
+          actorUid: createdBy,
+          actionType: VenueManagementActivityActionTypes.created,
+          description: 'Drink created',
+        );
       }
 
       return importedCount;
@@ -305,4 +406,26 @@ class VenueDrinksRepository {
 
   static String relativeTimeLabel(DateTime date) =>
       _presentation.managementRelativeTimeLabel(date);
+
+  Future<void> _recordDrinkActivity({
+    required String venueId,
+    required String drinkId,
+    required String drinkName,
+    required String actorUid,
+    required String actionType,
+    required String description,
+  }) {
+    return _activityService.recordActivity(
+      VenueManagementActivity(
+        venueId: venueId,
+        sourceArea: VenueManagementActivitySourceAreas.drinks,
+        actionType: actionType,
+        entityType: VenueManagementActivityEntityTypes.drink,
+        entityId: drinkId,
+        entityName: drinkName,
+        description: description,
+        actorUid: actorUid,
+      ),
+    );
+  }
 }

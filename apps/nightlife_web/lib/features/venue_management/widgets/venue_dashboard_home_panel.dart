@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../models/venue_dashboard_home_data.dart';
 import 'venue_dashboard_controller.dart';
 import 'venue_dashboard_main_content.dart';
+import 'venue_dashboard_next_seven_days_section.dart';
 import 'venue_dashboard_performance_highlights_section.dart';
 import 'venue_dashboard_right_column.dart';
 import 'venue_dashboard_whats_next_section.dart';
@@ -15,8 +16,15 @@ class VenueDashboardHomePanel extends StatelessWidget {
 
   static List<Widget> _lowerSections(VenueDashboardController? controller) {
     final homeData = controller?.homeData;
+    final loading = controller?.isLoadingHomeData ?? false;
 
     return [
+      const SizedBox(height: AppSpacing.xl),
+      VenueDashboardNextSevenDaysSection(
+        schedule: homeData?.nextSevenDaysSchedule ??
+            VenueDashboardHomeData.empty().nextSevenDaysSchedule,
+        loading: loading,
+      ),
       const SizedBox(height: AppSpacing.xl),
       VenueDashboardPerformanceHighlightsSection(
         highlights: homeData?.highlights ??
@@ -32,7 +40,6 @@ class VenueDashboardHomePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = VenueDashboardController.maybeOf(context);
-    final homeData = controller?.homeData;
     final sideBySide = Breakpoints.isDesktop(context);
     final lowerSections = _lowerSections(controller);
 
@@ -50,9 +57,7 @@ class VenueDashboardHomePanel extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xl),
-          VenueDashboardRightColumn(
-            activities: homeData?.recentActivity,
-          ),
+          const VenueDashboardRightColumn(useControllerFeed: true),
         ],
       );
     }
@@ -63,9 +68,9 @@ class VenueDashboardHomePanel extends StatelessWidget {
         const VenueDashboardMainContent(),
         ...lowerSections,
         const SizedBox(height: AppSpacing.xl),
-        VenueDashboardRightColumn(
+        const VenueDashboardRightColumn(
           expanded: true,
-          activities: homeData?.recentActivity,
+          useControllerFeed: true,
         ),
       ],
     );

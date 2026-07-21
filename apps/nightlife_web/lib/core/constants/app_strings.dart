@@ -72,9 +72,12 @@ class AppStrings {
   static const String venueDashboardActionAddEvent = 'Add Event';
   static const String venueDashboardActionUploadPhotos = 'Upload Photos';
   static const String venueDashboardRecentActivityTitle = 'Recent Activity';
-  static const String venueDashboardViewAll = 'View All';
-  static const String venueDashboardRecentActivityPlaceholder =
-      'Full activity history is coming soon. You\'ll be able to review every update across your venue profile, drinks, deals, events and gallery.';
+  static const String venueDashboardRecentActivityEmptyTitle =
+      'No recent activity';
+  static const String venueDashboardRecentActivityEmptyBody =
+      'Changes made to your venue will appear here.';
+  static const String venueDashboardRecentActivityError =
+      'Recent activity could not be loaded right now.';
   static const String venueDashboardGoPremiumTitle = 'Go Premium';
   static const String venueDashboardGoPremiumBody =
       'Unlock smarter insights, stronger promotion tools and more ways to grow your venue.';
@@ -90,6 +93,10 @@ class AppStrings {
   static const String venueDashboardImproveProfile = 'Improve Profile';
   static const String venueDashboardPerformanceHighlightsTitle =
       'Performance Highlights';
+  static const String venueDashboardNextSevenDaysTitle = 'Next 7 Days';
+  static const String venueDashboardNextSevenDaysSubtitle =
+      'Everything happening at your venue this week';
+  static const String venueDashboardViewFullCalendar = 'View Full Calendar';
   static const String venueDashboardWhatsNextTitle = 'What\'s Next?';
   static const String venueDashboardWhatsNextSubtitle =
       'Keep your profile fresh and engaging.';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -5,9 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../venue/data/models/event_model.dart';
 import '../../../venue/data/venue_events_repository.dart';
-import '../../data/experience_content_support.dart';
-import '../../models/event_status.dart';
-import '../../models/venue_dashboard_activity.dart';
+import '../../data/venue_management_page_activity_support.dart';
 import '../../models/venue_dashboard_tab.dart';
 import '../../models/venue_page_quick_action.dart';
 import '../drinks/drinks_search_field.dart';
@@ -53,6 +53,7 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
   final _searchController = TextEditingController();
   final Set<String> _selectedEventIds = {};
   String _searchQuery = '';
+  bool _pendingAddEventActionHandled = false;
 
   @override
   void dispose() {
@@ -102,9 +103,26 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
     );
     if (!mounted || !added) return;
 
+    await reloadVenueManagementPageActivity(context);
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Event created successfully.')),
     );
+  }
+
+  void _maybeOpenPendingAddEventDialog(List<EventModel> events) {
+    if (_pendingAddEventActionHandled) return;
+
+    final pendingActionKey =
+        VenueDashboardController.maybeOf(context)?.takePendingTabActionKey?.call();
+    if (pendingActionKey != VenuePageActionKeys.addEvent) return;
+
+    _pendingAddEventActionHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_openAddEventDialog(events));
+    });
   }
 
   void _handleEditSelected() {
@@ -138,7 +156,7 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
 
     try {
       await _repository.bulkDeleteEvents(
-        eventIds: selected.map((event) => event.id).toList(),
+        events: selected,
         deletedBy: userId,
       );
     } catch (_) {
@@ -149,6 +167,9 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
       return;
     }
 
+    if (!mounted) return;
+
+    await reloadVenueManagementPageActivity(context);
     if (!mounted) return;
 
     final count = selected.length;
@@ -293,25 +314,6 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
     );
   }
 
-  List<VenueDashboardActivity> _buildRecentActivity(List<EventModel> events) {
-    return WebExperienceContentSupport.summary
-        .recentEventActivity(
-          events: events,
-          title: (event) => event.title,
-          createdAt: (event) => event.createdAt,
-          updatedAt: (event) => event.updatedAt,
-          formatTimestamp: VenueEventsRepository.relativeTimeLabel,
-        )
-        .map(
-          (activity) => VenueDashboardActivity(
-            title: activity.title,
-            timestampLabel: activity.timestampLabel,
-            icon: Icons.event_outlined,
-          ),
-        )
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = VenueDashboardController.maybeOf(context);
@@ -329,13 +331,13 @@ class _VenueEventsManagementPageState extends State<VenueEventsManagementPage> {
 
         final events = snapshot.data ?? const [];
         _pruneSelection(events);
+        _maybeOpenPendingAddEventDialog(events);
         final displayed = _displayEvents(events);
 
         return VenueDashboardPageScaffold(
           tab: VenueDashboardTab.events,
           onPrimaryAction: () => _openAddEventDialog(events),
           onQuickAction: (action) => _handleQuickAction(action, events),
-          activities: _buildRecentActivity(events),
           mainContent: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

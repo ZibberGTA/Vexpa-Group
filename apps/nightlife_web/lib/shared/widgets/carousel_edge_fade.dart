@@ -13,12 +13,24 @@ class CarouselEdgeFade extends StatelessWidget {
     super.key,
     required this.child,
     this.edgeWidth,
+    this.showLeftEdge = true,
+    this.showRightEdge = true,
+    this.surfaceTintColor,
   });
 
   final Widget child;
 
   /// Optional override for fade zone width in logical pixels.
   final double? edgeWidth;
+
+  /// When false, the left edge stays fully visible (carousel at start).
+  final bool showLeftEdge;
+
+  /// When false, the right edge stays fully visible (carousel at end).
+  final bool showRightEdge;
+
+  /// Optional ambient tint blended into edge fades (defaults to purple/pink).
+  final Color? surfaceTintColor;
 
   static double edgeFadeWidth(BuildContext context) {
     return switch (Breakpoints.of(context)) {
@@ -31,6 +43,9 @@ class CarouselEdgeFade extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fadeWidth = edgeWidth ?? edgeFadeWidth(context);
+    const opaque = Color(0xFFFFFFFF);
+    const softOpaque = Color(0xFFFFFFFF);
+    const softFade = Color(0x40FFFFFF);
 
     return Stack(
       fit: StackFit.passthrough,
@@ -52,13 +67,13 @@ class CarouselEdgeFade extends StatelessWidget {
                 1.0 - softStop,
                 1.0,
               ],
-              colors: const [
-                Colors.transparent,
-                Color(0x40FFFFFF),
-                Color(0xFFFFFFFF),
-                Color(0xFFFFFFFF),
-                Color(0x40FFFFFF),
-                Colors.transparent,
+              colors: [
+                showLeftEdge ? Colors.transparent : opaque,
+                showLeftEdge ? softFade : softOpaque,
+                opaque,
+                opaque,
+                showRightEdge ? softFade : softOpaque,
+                showRightEdge ? Colors.transparent : opaque,
               ],
             ).createShader(bounds);
           },
@@ -69,13 +84,25 @@ class CarouselEdgeFade extends StatelessWidget {
           left: 0,
           top: 0,
           bottom: 0,
-          child: _AmbientEdgeTint(width: fadeWidth, isLeft: true),
+          child: _AmbientEdgeTint(
+            key: const Key('carousel-edge-fade-left'),
+            width: fadeWidth,
+            isLeft: true,
+            visible: showLeftEdge,
+            surfaceTintColor: surfaceTintColor,
+          ),
         ),
         Positioned(
           right: 0,
           top: 0,
           bottom: 0,
-          child: _AmbientEdgeTint(width: fadeWidth, isLeft: false),
+          child: _AmbientEdgeTint(
+            key: const Key('carousel-edge-fade-right'),
+            width: fadeWidth,
+            isLeft: false,
+            visible: showRightEdge,
+            surfaceTintColor: surfaceTintColor,
+          ),
         ),
       ],
     );
@@ -84,29 +111,44 @@ class CarouselEdgeFade extends StatelessWidget {
 
 class _AmbientEdgeTint extends StatelessWidget {
   const _AmbientEdgeTint({
+    super.key,
     required this.width,
     required this.isLeft,
+    required this.visible,
+    this.surfaceTintColor,
   });
 
   final double width;
   final bool isLeft;
+  final bool visible;
+  final Color? surfaceTintColor;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: SizedBox(
-        width: width * 0.7,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
-              end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
-              stops: const [0.0, 0.45, 1.0],
-              colors: [
-                AppColors.primaryPurple.withValues(alpha: 0.11),
-                AppColors.primaryPink.withValues(alpha: 0.04),
-                Colors.transparent,
-              ],
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 180),
+        child: SizedBox(
+          width: width * 0.7,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
+                end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
+                stops: const [0.0, 0.45, 1.0],
+                colors: surfaceTintColor == null
+                    ? [
+                        AppColors.primaryPurple.withValues(alpha: 0.11),
+                        AppColors.primaryPink.withValues(alpha: 0.04),
+                        Colors.transparent,
+                      ]
+                    : [
+                        surfaceTintColor!.withValues(alpha: 0.92),
+                        surfaceTintColor!.withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ],
+              ),
             ),
           ),
         ),

@@ -70,6 +70,10 @@ class VenueProfileFieldCodec {
     return engine.VenueProfileFieldCodec.validateWebsite(value);
   }
 
+  static String? validateEmail(String value) {
+    return engine.VenueProfileFieldCodec.validateEmail(value);
+  }
+
   static String normaliseTimeInput(String value) {
     return engine.VenueProfileFieldCodec.normaliseTimeInput(value);
   }

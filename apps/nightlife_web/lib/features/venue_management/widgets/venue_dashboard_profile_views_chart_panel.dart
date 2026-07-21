@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_strings.dart';
@@ -9,6 +7,7 @@ import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/widgets/premium_effects.dart';
 import '../models/venue_dashboard_date_range.dart';
 import '../models/venue_profile_views_chart_data.dart';
+import '../utils/venue_profile_views_chart_presentation.dart';
 import 'venue_dashboard_date_range_dropdown.dart';
 
 /// Profile views line chart panel with an independent timeframe filter.
@@ -73,7 +72,10 @@ class _VenueDashboardProfileViewsChartPanelState
                       strokeWidth: 2,
                     ),
                   )
-                : _ProfileViewsLineChart(points: points),
+                : _ProfileViewsLineChart(
+                    points: points,
+                    selectedRange: widget.selectedRange,
+                  ),
           ),
         ],
       ),
@@ -82,9 +84,13 @@ class _VenueDashboardProfileViewsChartPanelState
 }
 
 class _ProfileViewsLineChart extends StatefulWidget {
-  const _ProfileViewsLineChart({required this.points});
+  const _ProfileViewsLineChart({
+    required this.points,
+    required this.selectedRange,
+  });
 
   final List<VenueProfileViewsDataPoint> points;
+  final VenueDashboardDateRange selectedRange;
 
   @override
   State<_ProfileViewsLineChart> createState() => _ProfileViewsLineChartState();
@@ -137,88 +143,141 @@ class _ProfileViewsLineChartState extends State<_ProfileViewsLineChart>
       );
     }
 
+    final displayPoints = VenueProfileViewsChartPresentation.normalizeForDisplay(
+      points: widget.points,
+      range: widget.selectedRange,
+    );
+
     return Column(
       children: [
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final geometry = _ProfileViewsChartGeometry.compute(
-                points: widget.points,
-                size: Size(constraints.maxWidth, constraints.maxHeight),
+              final plotWidth = VenueProfileViewsChartPresentation.plotAreaWidth(
+                totalWidth: constraints.maxWidth,
+              );
+              final plotHeight = constraints.maxHeight - AppSpacing.sm - 16;
+              final layout = ProfileViewsChartPlotLayout.compute(
+                points: displayPoints,
+                plotWidth: plotWidth,
+                plotHeight: plotHeight,
+              );
+              final visibleLabelIndices =
+                  VenueProfileViewsChartPresentation.visibleLabelIndices(
+                pointCount: displayPoints.length,
+                plotWidth: plotWidth,
               );
 
-              return Row(
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _YAxisLabels(ticks: geometry.yTicks),
-                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Stack(
-                      clipBehavior: Clip.none,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        AnimatedBuilder(
-                          animation: _drawAnimation,
-                          builder: (context, _) {
-                            return CustomPaint(
-                              painter: _ProfileViewsChartPainter(
-                                geometry: geometry,
-                                drawProgress: _drawAnimation.value,
-                                highlightIndex: widget.points.length - 1,
+                        _YAxisLabels(ticks: layout.yTicks),
+                        const SizedBox(width: VenueProfileViewsChartPresentation.yAxisGap),
+                        Expanded(
+                          child: Stack(
+                            clipBehavior: Clip.hardEdge,
+                            children: [
+                              AnimatedBuilder(
+                                animation: _drawAnimation,
+                                builder: (context, _) {
+                                  return CustomPaint(
+                                    painter: _ProfileViewsChartPainter(
+                                      layout: layout,
+                                      drawProgress: _drawAnimation.value,
+                                      highlightIndex: displayPoints.length - 1,
+                                    ),
+                                    size: Size(plotWidth, plotHeight),
+                                  );
+                                },
                               ),
-                              size: Size(geometry.plotSize.width, constraints.maxHeight),
-                            );
-                          },
+                              for (var i = 0; i < layout.coords.length; i++)
+                                _ChartPointHitTarget(
+                                  center: layout.coords[i],
+                                  active: _hoveredIndex == i,
+                                  onEnter: () => setState(() => _hoveredIndex = i),
+                                  onExit: () => setState(() {
+                                    if (_hoveredIndex == i) _hoveredIndex = null;
+                                  }),
+                                ),
+                              if (_hoveredIndex != null)
+                                _ChartPointTooltip(
+                                  point: displayPoints[_hoveredIndex!],
+                                  anchor: layout.coords[_hoveredIndex!],
+                                  plotWidth: plotWidth,
+                                ),
+                            ],
+                          ),
                         ),
-                        for (var i = 0; i < geometry.coords.length; i++)
-                          _ChartPointHitTarget(
-                            center: geometry.coords[i],
-                            active: _hoveredIndex == i,
-                            onEnter: () => setState(() => _hoveredIndex = i),
-                            onExit: () => setState(() {
-                              if (_hoveredIndex == i) _hoveredIndex = null;
-                            }),
-                          ),
-                        if (_hoveredIndex != null)
-                          _ChartPointTooltip(
-                            point: widget.points[_hoveredIndex!],
-                            anchor: geometry.coords[_hoveredIndex!],
-                            plotWidth: geometry.plotSize.width,
-                          ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: VenueProfileViewsChartPresentation.yAxisWidth +
+                            VenueProfileViewsChartPresentation.yAxisGap,
+                      ),
+                      Expanded(
+                        child: SizedBox(
+                          height: 16,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              for (final index in visibleLabelIndices)
+                                _ChartXAxisLabel(
+                                  label: displayPoints[index].label,
+                                  centerX: layout.labelCenterX(index),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               );
             },
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
-          children: [
-            SizedBox(width: _ProfileViewsChartGeometry.yAxisWidth + AppSpacing.sm),
-            Expanded(
-              child: Row(
-                children: [
-                  for (var i = 0; i < widget.points.length; i++)
-                    Expanded(
-                      child: Text(
-                        widget.points[i].label,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.textSecondary.withValues(alpha: 0.9),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ],
+    );
+  }
+}
+
+class _ChartXAxisLabel extends StatelessWidget {
+  const _ChartXAxisLabel({
+    required this.label,
+    required this.centerX,
+  });
+
+  final String label;
+  final double centerX;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: centerX,
+      top: 0,
+      child: FractionalTranslation(
+        translation: const Offset(-0.5, 0),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            color: AppColors.textSecondary.withValues(alpha: 0.9),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -231,14 +290,14 @@ class _YAxisLabels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _ProfileViewsChartGeometry.yAxisWidth,
+      width: VenueProfileViewsChartPresentation.yAxisWidth,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: ticks
             .map(
               (value) => Text(
-                _ProfileViewsChartGeometry.formatAxisValue(value),
+                ProfileViewsChartPlotLayout.formatAxisValue(value),
                 style: TextStyle(
                   color: AppColors.textSecondary.withValues(alpha: 0.75),
                   fontSize: 10.5,
@@ -382,103 +441,21 @@ class _ChartPointTooltip extends StatelessWidget {
   }
 }
 
-class _ProfileViewsChartGeometry {
-  _ProfileViewsChartGeometry({
-    required this.plotSize,
-    required this.chartRect,
-    required this.coords,
-    required this.yTicks,
-    required this.maxValue,
-  });
-
-  static const yAxisWidth = 36.0;
-
-  final Size plotSize;
-  final Rect chartRect;
-  final List<Offset> coords;
-  final List<double> yTicks;
-  final double maxValue;
-
-  static _ProfileViewsChartGeometry compute({
-    required List<VenueProfileViewsDataPoint> points,
-    required Size size,
-  }) {
-    const horizontalPad = 4.0;
-    const verticalPad = 6.0;
-
-    final chartRect = Rect.fromLTWH(
-      horizontalPad,
-      verticalPad,
-      size.width - (horizontalPad * 2),
-      size.height - (verticalPad * 2),
-    );
-
-    final maxValue = _niceMaxValue(points.map((p) => p.value).reduce(math.max));
-    final yTicks = <double>[
-      maxValue,
-      maxValue * 2 / 3,
-      maxValue / 3,
-      0,
-    ];
-
-    final coords = <Offset>[];
-    for (var i = 0; i < points.length; i++) {
-      final x = chartRect.left +
-          (chartRect.width * i / math.max(points.length - 1, 1));
-      final normalized = maxValue == 0 ? 0.0 : points[i].value / maxValue;
-      final y = chartRect.bottom - (chartRect.height * normalized);
-      coords.add(Offset(x, y));
-    }
-
-    return _ProfileViewsChartGeometry(
-      plotSize: size,
-      chartRect: chartRect,
-      coords: coords,
-      yTicks: yTicks,
-      maxValue: maxValue,
-    );
-  }
-
-  static double _niceMaxValue(double rawMax) {
-    if (rawMax <= 0) return 1;
-    if (rawMax <= 10) return 10;
-    if (rawMax <= 50) return 50;
-    if (rawMax <= 100) return 100;
-    if (rawMax <= 250) return 250;
-    if (rawMax <= 500) return 500;
-    if (rawMax <= 1000) return 1000;
-    if (rawMax <= 2500) return 2500;
-    if (rawMax <= 5000) return 5000;
-    return (rawMax / 1000).ceil() * 1000;
-  }
-
-  static String formatAxisValue(double value) {
-    if (value >= 1000) {
-      final thousands = value / 1000;
-      if (value % 1000 == 0) {
-        return '${thousands.toStringAsFixed(0)}k';
-      }
-      return '${thousands.toStringAsFixed(1)}k';
-    }
-    return value.round().toString();
-  }
-}
-
 class _ProfileViewsChartPainter extends CustomPainter {
   _ProfileViewsChartPainter({
-    required this.geometry,
+    required this.layout,
     required this.drawProgress,
     this.highlightIndex,
   });
 
-  final _ProfileViewsChartGeometry geometry;
+  final ProfileViewsChartPlotLayout layout;
   final double drawProgress;
   final int? highlightIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final chartRect = geometry.chartRect;
-    final coords = geometry.coords;
+    final chartRect = layout.chartRect;
+    final coords = layout.coords;
 
     final gridPaint = Paint()
       ..color = AppColors.primaryPurple.withValues(alpha: 0.08)
@@ -591,7 +568,7 @@ class _ProfileViewsChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProfileViewsChartPainter oldDelegate) {
-    return oldDelegate.geometry != geometry ||
+    return oldDelegate.layout != layout ||
         oldDelegate.drawProgress != drawProgress ||
         oldDelegate.highlightIndex != highlightIndex;
   }

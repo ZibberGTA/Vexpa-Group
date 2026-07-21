@@ -48,11 +48,17 @@ class _AdminClaimVenueMapState extends State<AdminClaimVenueMap> {
       target: _initialCenter(widget.venues),
       zoom: 5.4,
     );
-    unawaited(_rebuildMarkers());
+    if (!kIsWeb) {
+      unawaited(_rebuildMarkers());
+    }
     if (kIsWeb) {
       GoogleMapsBootstrap.ensureReady().then((_) {
         if (!mounted) return;
-        setState(() => _mapsApiReady = true);
+        setState(() {
+          _mapsApiReady = true;
+          _loadError = null;
+        });
+        unawaited(_rebuildMarkers());
       }).catchError((_) {
         if (!mounted) return;
         setState(() {
